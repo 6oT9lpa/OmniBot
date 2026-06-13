@@ -1,8 +1,6 @@
 import asyncio
 import signal
 import sys
-import disnake
-from disnake.ext import commands
 
 from di import Container
 from presentation import DiscordBot
@@ -72,7 +70,7 @@ class Bootstrap:
         logger.info("Registering commands...")
         
         self.bot.add_cog(RolesCog(self.bot, self._role_service))
-        logger.info("  ✅ RolesCog registered")
+        logger.info("RolesCog registered")
 
         logger.info("All cogs registered successfully")
         

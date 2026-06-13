@@ -7,6 +7,7 @@ from infrastructure.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 class DatabaseManager:
     def __init__(self, database_url: str):
         if database_url.startswith("sqlite:///"):
@@ -30,6 +31,9 @@ class DatabaseManager:
         if not self._connection:
             self._connection = await aiosqlite.connect(self.db_path)
             self._connection.row_factory = aiosqlite.Row
+
+            await self._connection.execute("SELECT datetime('now', 'localtime')")
+
             logger.info("Database connection established")
 
         return self._connection
@@ -56,6 +60,8 @@ class DatabaseManager:
         await self._create_roles_table()
         await self._create_channel_config_table()
         await self._create_user_stats_table()
+        await self._create_role_panel_messages_table()
+        await self._create_role_panel_buttons_table()
 
         logger.info("All tables created successfully")
     
@@ -73,7 +79,7 @@ class DatabaseManager:
                 edited_content TEXT,
                 ai_flagged BOOLEAN DEFAULT 0,
                 ai_reason TEXT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                timestamp TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )
         """)
         await self._connection.execute("""
@@ -93,19 +99,21 @@ class DatabaseManager:
             ON messages(deleted)
         """)
 
+        logger.info("Created messages table")
+
     async def _create_punishments_table(self) -> None:
         """Таблица наказаний"""
         await self._connection.execute("""
             CREATE TABLE IF NOT EXISTS punishments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                mod_id INTEGER,  -- ← изменено: может быть NULL для авто-наказаний
+                mod_id INTEGER,
                 type TEXT NOT NULL,
                 reason TEXT,
-                duration TEXT,  -- ← добавлено: '10m', '1h', '1d'
+                duration TEXT,
                 expires_at TIMESTAMP,
                 active BOOLEAN DEFAULT 1,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                timestamp TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )
         """)
         await self._connection.execute("""
@@ -119,7 +127,9 @@ class DatabaseManager:
         await self._connection.execute("""
             CREATE INDEX IF NOT EXISTS idx_punishments_expires 
             ON punishments(expires_at)
-        """) 
+        """)
+
+        logger.info("Created punishments table")
 
     async def _create_streamers_table(self) -> None:
         """Таблица стримеров"""
@@ -130,12 +140,12 @@ class DatabaseManager:
                 platform TEXT NOT NULL CHECK(platform IN ('twitch', 'youtube', 'kick')),
                 channel_url TEXT NOT NULL,
                 channel_name TEXT,
-                template TEXT,  -- JSON с настройками embed
-                ping_role_id INTEGER,  -- ← добавлено: роль для пинга
+                template TEXT,
+                ping_role_id INTEGER,
                 active BOOLEAN DEFAULT 1,
-                last_stream_id TEXT,  -- ← добавлено: для антидубля
-                last_check TIMESTAMP,  -- ← добавлено: когда проверяли
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_stream_id TEXT,
+                last_check TIMESTAMP,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                 UNIQUE(user_id, platform)
             )
         """)
@@ -152,27 +162,31 @@ class DatabaseManager:
             ON streamers(active)
         """)
 
+        logger.info("Created streamers table")
+
     async def _create_server_stats_table(self) -> None:
         """Таблица статистики сервера"""
         await self._connection.execute("""
             CREATE TABLE IF NOT EXISTS server_stats (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date TEXT UNIQUE,  -- ← изменено: TEXT для ISO даты
+                date TEXT UNIQUE,
                 members_total INTEGER DEFAULT 0,
                 members_online INTEGER DEFAULT 0,
-                members_voice INTEGER DEFAULT 0,  -- ← добавлено
+                members_voice INTEGER DEFAULT 0,
                 messages_count INTEGER DEFAULT 0,
                 voice_hours REAL DEFAULT 0,
                 new_members INTEGER DEFAULT 0,
                 left_members INTEGER DEFAULT 0,
-                top_channel_id INTEGER,  -- ← добавлено: самый активный канал
-                top_channel_count INTEGER  -- ← добавлено: количество сообщений
+                top_channel_id INTEGER,
+                top_channel_count INTEGER
             )
         """)
         await self._connection.execute("""
             CREATE INDEX IF NOT EXISTS idx_stats_date 
             ON server_stats(date)
         """)
+
+        logger.info("Created server_stats table")
 
     async def _create_roles_table(self) -> None:
         """Таблица ролей"""
@@ -186,8 +200,8 @@ class DatabaseManager:
                 is_auto_assign BOOLEAN DEFAULT 0,
                 is_public BOOLEAN DEFAULT 1,
                 display_emoji TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )
         """)
         await self._connection.execute("""
@@ -199,6 +213,8 @@ class DatabaseManager:
             ON roles(is_auto_assign)
         """)
 
+        logger.info("Created roles table")
+
     async def _create_channel_config_table(self) -> None:
         """Таблица конфигурации каналов"""
         await self._connection.execute("""
@@ -208,9 +224,9 @@ class DatabaseManager:
                 is_ai_whitelisted BOOLEAN DEFAULT 0,
                 welcome_enabled BOOLEAN DEFAULT 1,
                 slowmode_override INTEGER DEFAULT NULL,
-                auto_delete_after INTEGER,  -- ← добавлено: авто-удаление через N секунд
+                auto_delete_after INTEGER,
                 custom_name TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )
         """)
         await self._connection.execute("""
@@ -222,8 +238,10 @@ class DatabaseManager:
             ON channel_config(is_ai_whitelisted)
         """)
 
+        logger.info("Created channel_config table")
+
     async def _create_user_stats_table(self) -> None:
-        """Таблица статистики пользователей (добавил новую)"""
+        """Таблица статистики пользователей"""
         await self._connection.execute("""
             CREATE TABLE IF NOT EXISTS user_stats (
                 user_id INTEGER NOT NULL,
@@ -232,7 +250,7 @@ class DatabaseManager:
                 voice_minutes INTEGER DEFAULT 0,
                 warnings_count INTEGER DEFAULT 0,
                 last_message TIMESTAMP,
-                joined_at TIMESTAMP,
+                joined_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                 PRIMARY KEY (user_id, guild_id)
             )
         """)
@@ -240,6 +258,56 @@ class DatabaseManager:
             CREATE INDEX IF NOT EXISTS idx_user_stats_messages 
             ON user_stats(messages_count DESC)
         """)
+        logger.info("Created user_stats table")
+
+    async def _create_role_panel_messages_table(self) -> None:
+        """Таблица панелей ролей"""
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS role_panel_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                channel_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                embed_title TEXT DEFAULT 'Выберите свою роль',
+                embed_description TEXT DEFAULT 'Нажмите на кнопку, чтобы получить или снять роль',
+                embed_color INTEGER DEFAULT 65280,
+                created_by INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                is_active BOOLEAN DEFAULT 1,
+                UNIQUE(guild_id, channel_id, message_id)
+            )
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_role_panel_messages_guild 
+            ON role_panel_messages(guild_id)
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_role_panel_messages_active 
+            ON role_panel_messages(is_active)
+        """)
+        logger.info("Created role_panel_messages table")
+
+    async def _create_role_panel_buttons_table(self) -> None:
+        """Таблица кнопок панелей ролей"""
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS role_panel_buttons (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                panel_message_id INTEGER NOT NULL,
+                role_id INTEGER NOT NULL,
+                role_name TEXT NOT NULL,
+                emoji TEXT,
+                position INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (panel_message_id) REFERENCES role_panel_messages(id) ON DELETE CASCADE,
+                UNIQUE(panel_message_id, role_id)
+            )
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_role_panel_buttons_panel 
+            ON role_panel_buttons(panel_message_id)
+        """)
+        logger.info("Created role_panel_buttons table")
     
     async def execute(self, query: str, params: tuple = ()) -> aiosqlite.Cursor:
         """Выполнение запроса"""

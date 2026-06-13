@@ -4,8 +4,6 @@ from pydantic_settings import BaseSettings
 
 
 class BotConfig(BaseSettings):
-    """Configuration for the bot"""
-
     # Discord
     discord_token: SecretStr = Field(..., env="DISCORD_TOKEN")
     discord_guild_id: int = Field(..., env="DISCORD_GUILD_ID")

@@ -1,4 +1,5 @@
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 
 from infrastructure.database.connection import DatabaseManager
 from infrastructure.database.repositories.base import BaseRepository
@@ -9,6 +10,11 @@ logger = get_logger(__name__)
 
 class RoleRepository(BaseRepository):
     _TABLE_NAME = "roles"
+    _ALLOWED_COLUMNS = {
+        "role_id", "guild_id", "name", "color", "position",
+        "is_auto_assign", "is_public", "display_emoji",
+        "created_at", "updated_at"
+    }
 
     def __init__(self, db_manager: DatabaseManager, guild_id: int):
         super().__init__(db_manager)
@@ -24,21 +30,53 @@ class RoleRepository(BaseRepository):
         is_public: bool = True,
         display_emoji: Optional[str] = None,
     ) -> bool:
-        """Добавить роль"""
-        data = {
-            "role_id": role_id,
-            "guild_id": self._guild_id,
-            "name": name,
-            "color": color,
-            "position": position,
-            "is_auto_assign": 1 if is_auto_assign else 0,
-            "is_public": 1 if is_public else 0,
-            "display_emoji": display_emoji,
-            "updated_at": "CURRENT_TIMESTAMP"
-        }
+        """Добавление или обновление ролей"""
+        existing = await self.get_role(role_id)
         
-        logger.info(f"Role added/updated: {name} ({role_id})")
-        return await self.upsert(data, conflict_column="role_id")
+        if existing:
+            needs_update = False
+            update_data = {}
+            
+            if existing["name"] != name:
+                update_data["name"] = name
+                needs_update = True
+            if existing["color"] != color:
+                update_data["color"] = color
+                needs_update = True
+            if existing["position"] != position:
+                update_data["position"] = position
+                needs_update = True
+            if existing["display_emoji"] != display_emoji:
+                update_data["display_emoji"] = display_emoji
+                needs_update = True
+            
+            if needs_update:
+                update_data["updated_at"] = "CURRENT_TIMESTAMP"
+                for key, value in update_data.items():
+                    await self.update(
+                        data={key: value},
+                        where_column="role_id",
+                        where_value=role_id
+                    )
+                logger.debug(f"Updated role {name} ({role_id})")
+            else:
+                logger.debug(f"Role {name} ({role_id}) unchanged, skipping update")
+
+        else:
+            data = {
+                "role_id": role_id,
+                "guild_id": self._guild_id,
+                "name": name,
+                "color": color,
+                "position": position,
+                "is_auto_assign": 1 if is_auto_assign else 0,
+                "is_public": 1 if is_public else 0,
+                "display_emoji": display_emoji,
+            }
+            await self.insert(data)
+            logger.info(f"Added new role: {name} ({role_id})")
+        
+        return True
         
     async def get_auto_assign_roles(self) -> List[int]:
         """Получить ID ролей для автовыдачи"""
@@ -98,7 +136,7 @@ class RoleRepository(BaseRepository):
     
     async def sync_from_discord(self, discord_roles: List[Dict[str, Any]]) -> int:
         """Синхронизировать роли из Discord (для админки)"""
-        data = []
+        synced_count = 0
         for role in discord_roles:
             await self.add_role(
                 role_id=role["id"],
@@ -106,11 +144,13 @@ class RoleRepository(BaseRepository):
                 color=role.get("color"),
                 position=role.get("position"),
                 is_auto_assign=False,
-                is_public=True
+                is_public=True,
+                display_emoji=None
             )
+            synced_count += 1
         
         logger.info(f"Synced {len(discord_roles)} roles from Discord")
-        return len(discord_roles)
+        return synced_count
     
     async def remove_role(self, role_id: int) -> bool:
         """Удалить роль из БД"""

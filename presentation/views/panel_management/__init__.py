@@ -1,6 +1,3 @@
-from presentation.views.base import BaseView
-from presentation.views.role_button import RoleButton
-from presentation.views.role_panel_view import RolePanelView
 from presentation.views.panel_management.create_panel_role_select_view import CreatePanelRoleSelectView
 from presentation.views.panel_management.emoji_input_view import EmojiInputView
 from presentation.views.panel_management.panel_select_view import PanelSelectView
@@ -19,9 +16,6 @@ from presentation.views.panel_management.helpers import (
 )
 
 __all__ = [
-    'BaseView',
-    'RoleButton',
-    'RolePanelView',
     'CreatePanelRoleSelectView',
     'EmojiInputView',
     'PanelSelectView',
