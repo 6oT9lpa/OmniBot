@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from di import Bootstrap
 from infrastructure.logging import get_logger
 
@@ -13,8 +14,14 @@ async def main():
 
 if __name__ == "__main__":
     try:
+        # На Windows используем ProactorEventLoop для лучшей обработки сигналов
+        if sys.platform == 'win32':
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+        logger.info("Bot stopped by user (Ctrl+C)")
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Error: {e}", exc_info=True)
+    finally:
+        logger.info("Bye!")
