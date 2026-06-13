@@ -49,6 +49,9 @@ class Bootstrap:
         except KeyboardInterrupt:
             logger.info("KeyboardInterrupt received. Shutting down...")
             await self._shutdown()
+        except asyncio.CancelledError:
+            logger.info("Task cancelled. Shutting down...")
+            await self._shutdown()
         except Exception as e:
             logger.error(f"Unexpected error: {e}", exc_info=True)
             await self._shutdown()
