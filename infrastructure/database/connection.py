@@ -62,6 +62,8 @@ class DatabaseManager:
         await self._create_user_stats_table()
         await self._create_role_panel_messages_table()
         await self._create_role_panel_buttons_table()
+        await self._create_server_channel_purposes_table()
+        await self._create_welcome_config_table()
 
         logger.info("All tables created successfully")
     
@@ -309,6 +311,46 @@ class DatabaseManager:
         """)
         logger.info("Created role_panel_buttons table")
     
+    async def _create_server_channel_purposes_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS server_channel_purposes (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id    INTEGER NOT NULL,
+                purpose     TEXT    NOT NULL,
+                channel_id  INTEGER NOT NULL,
+                created_at  TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                updated_at  TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                UNIQUE(guild_id, purpose)
+            )
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_scp_guild
+            ON server_channel_purposes(guild_id)
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_scp_purpose
+            ON server_channel_purposes(guild_id, purpose)
+        """)
+
+    async def _create_welcome_config_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS welcome_config (
+                guild_id INTEGER PRIMARY KEY,
+                title TEXT DEFAULT 'Добро пожаловать!',
+                description TEXT,
+                thumbnail_url TEXT,
+                footer_text TEXT,
+                footer_icon_url TEXT,
+                color INTEGER DEFAULT 5763719,
+                is_enabled INTEGER DEFAULT 1,
+                rules_channel_id INTEGER,
+                roles_channel_id INTEGER,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+        logger.info("Created welcome_config table")
+
     async def execute(self, query: str, params: tuple = ()) -> aiosqlite.Cursor:
         """Выполнение запроса"""
         conn = await self.connect()
