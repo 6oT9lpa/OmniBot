@@ -1,24 +1,24 @@
 import disnake
 from disnake.ext import commands, tasks
 from datetime import datetime
+from typing import Dict
 
 from application.services.role_service import RoleService
 from infrastructure.logging import get_logger
-from presentation.views.role_panel_view import RolePanelView
 from presentation.views import (
     CreatePanelRoleSelectView,
     PanelSelectView,
-    PanelAddRoleView,
-    PanelRemoveRoleView,
-    DeletePanelConfirmView,
+    RolePanelReactionView
 )
 
 logger = get_logger(__name__)
+
 
 class RolesCog(commands.Cog):
     def __init__(self, bot: commands.Bot, role_service: RoleService):
         self._bot = bot
         self._role_service = role_service
+        self._reaction_panels: Dict[int, RolePanelReactionView] = {}
         logger.info("RolesCog initialized")
 
     def cog_load(self):
@@ -60,6 +60,19 @@ class RolesCog(commands.Cog):
             role_names = ", ".join([r.name for r in assigned])
             logger.info(f"Assigned roles {role_names} to {member}")
 
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload: disnake.RawReactionActionEvent):
+        if payload.user_id == self._bot.user.id:
+            return
+
+        if payload.message_id in self._reaction_panels:
+            await self._reaction_panels[payload.message_id].handle_reaction(payload)
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_remove(self, payload: disnake.RawReactionActionEvent):
+        if payload.message_id in self._reaction_panels:
+            await self._reaction_panels[payload.message_id].handle_reaction(payload)
+
     @commands.slash_command(name="sync_roles", description="Синхронизировать роли с Discord")
     async def sync_roles(self, ctx: disnake.ApplicationCommandInteraction):
         if not ctx.author.guild_permissions.administrator:
@@ -71,7 +84,7 @@ class RolesCog(commands.Cog):
             count = await self.role_service.sync_roles(ctx.guild)
             logger.info(f"Synced {count} roles for guild {ctx.guild.name}")
             embed = disnake.Embed(
-                title="✅ Синхронизация завершена",
+                title="Синхронизация завершена",
                 description=f"Синхронизировано **{count}** ролей с базой данных",
                 color=disnake.Color.green(),
             )
@@ -98,7 +111,7 @@ class RolesCog(commands.Cog):
             return
 
         await self.role_service.set_auto_assign(role.id, auto_assign)
-        status = "включена" if auto_assign else "выключена ❌"
+        status = "включена" if auto_assign else "выключена"
         embed = disnake.Embed(
             title="Автовыдача обновлена",
             description=f"Роль {role.mention}: автовыдача {status}",
@@ -166,7 +179,7 @@ class RolesCog(commands.Cog):
             )
             return
 
-        status = "публичная 🟢" if is_public else "скрытая 🔴"
+        status = "публичная" if is_public else "скрытая"
         embed = disnake.Embed(
             title="Публичность обновлена",
             description=f"Роль {role.mention} теперь **{status}**",
@@ -176,19 +189,18 @@ class RolesCog(commands.Cog):
             embed.set_footer(text="Эта роль больше не будет появляться в панелях ролей")
         await ctx.response.send_message(embed=embed, ephemeral=True)
 
-    @commands.slash_command(name="create_panel", description="Создать панель ролей с кнопками")
+    @commands.slash_command(name="create_panel", description="Создать панель ролей с кнопками или реакциями")
     async def create_panel(
         self,
         ctx: disnake.ApplicationCommandInteraction,
         channel: disnake.TextChannel,
         title: str = "Выберите свою роль",
-        description: str = "Нажмите на кнопку ниже, чтобы получить или снять роль",
+        description: str = "Нажмите на кнопку или реакцию ниже, чтобы получить или снять роль",
     ):
         if not ctx.author.guild_permissions.administrator:
             await ctx.response.send_message("Только администраторы", ephemeral=True)
             return
 
-        # Фильтруем только публичные роли, доступные боту
         all_public = await self._role_service.get_public_roles()
         available = []
         for rd in all_public:
@@ -228,11 +240,12 @@ class RolesCog(commands.Cog):
                 f"**Канал:** {channel.mention}\n"
                 f"**Название:** {title}\n\n"
                 "Выберите роли, которые будут отображаться в панели.\n"
-                "Для каждой роли можно задать эмодзи (опционально)."
+                "Для каждой роли можно задать эмодзи (опционально).\n\n"
+                "На следующем шаге вы сможете выбрать тип панели: кнопки или реакции."
             ),
             color=0x5865F2,
         )
-        embed.set_footer(text="После выбора нажмите «Создать панель»")
+        embed.set_footer(text="После выбора ролей нажмите «Создать панель»")
         await ctx.response.send_message(embed=embed, view=view, ephemeral=True)
 
     @commands.slash_command(name="panel_add", description="Добавить роль в существующую панель")
@@ -247,7 +260,7 @@ class RolesCog(commands.Cog):
             return
 
         embed = disnake.Embed(
-            title="➕  Добавить роль в панель",
+            title="Добавить роль в панель",
             description="Выберите панель, в которую хотите добавить роль",
             color=0x57F287,
         )
@@ -271,7 +284,7 @@ class RolesCog(commands.Cog):
             return
 
         embed = disnake.Embed(
-            title="➖  Удалить роль из панели",
+            title="Удалить роль из панели",
             description="Выберите панель, из которой хотите удалить роль",
             color=0xED4245,
         )
@@ -307,7 +320,7 @@ class RolesCog(commands.Cog):
 
         for i, panel in enumerate(panels, 1):
             channel = ctx.guild.get_channel(panel["channel_id"])
-            channel_info = channel.mention if channel else f"*(канал удалён)*"
+            channel_info = channel.mention if channel else "(канал удалён)"
 
             buttons = await self._role_service.get_panel_buttons(panel["message_id"])
             btn_count = len(buttons)
@@ -329,24 +342,24 @@ class RolesCog(commands.Cog):
                 if channel
                 else ""
             )
-            link_text = f"\n🔗 [Перейти к сообщению]({msg_link})" if msg_link else ""
+            link_text = f"\nПерейти к сообщению" if msg_link else ""
 
             role_preview = ""
             if buttons:
                 previews = []
                 for b in buttons[:5]:
-                    emoji = b.get("emoji") or "🔘"
+                    emoji = b.get("emoji") or "■"
                     previews.append(f"{emoji} <@&{b['role_id']}>")
                 if len(buttons) > 5:
-                    previews.append(f"*...и ещё {len(buttons) - 5}*")
+                    previews.append(f"...и ещё {len(buttons) - 5}")
                 role_preview = "\n" + "\n".join(previews)
 
             embed.add_field(
-                name=f"{'─' * 24}",
+                name=f"{'-' * 24}",
                 value=(
                     f"**{i}. {panel.get('embed_title', 'Панель')}**\n"
                     f"Канал: {channel_info}\n"
-                    f"`{panel['message_id']}`\n"
+                    f"ID: `{panel['message_id']}`\n"
                     f"Ролей: **{btn_count}**"
                     f"{ts_str}"
                     f"{link_text}"
@@ -370,8 +383,8 @@ class RolesCog(commands.Cog):
             return
 
         embed = disnake.Embed(
-            title="🗑️  Удалить панель",
-            description="Выберите панель для удаления.\n⚠️ Это действие **необратимо** — сообщение и все кнопки будут удалены.",
+            title="Удалить панель",
+            description="Выберите панель для удаления.\nЭто действие **необратимо** — сообщение и все кнопки будут удалены.",
             color=0xED4245,
         )
         view = PanelSelectView(

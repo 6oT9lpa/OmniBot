@@ -1,13 +1,16 @@
 from presentation.views.base import BaseView
 from presentation.views.role_button import RoleButton
 from presentation.views.role_panel_view import RolePanelView
-from presentation.views.panel_management.create_panel_role_select_view import CreatePanelRoleSelectView
-from presentation.views.panel_management.emoji_input_view import EmojiInputView
-from presentation.views.panel_management.panel_select_view import PanelSelectView
-from presentation.views.panel_management.panel_add_role_view import PanelAddRoleView
-from presentation.views.panel_management.panel_remove_role_view import PanelRemoveRoleView
-from presentation.views.panel_management.delete_panel_confirm_view import DeletePanelConfirmView
-from presentation.views.panel_management.helpers import (
+from presentation.views.roles_panel_management import (
+    RolePanelReactionView,
+    RolePanelHybridView,
+    CreatePanelRoleSelectView,
+    EmojiInputView,
+    PanelSelectView,
+    PanelAddRoleView,
+    PanelRemoveRoleView,
+    DeletePanelConfirmView,
+    PanelModeToggleButton,
     COLOR_BLUE,
     COLOR_GREEN,
     COLOR_RED,
@@ -22,12 +25,15 @@ __all__ = [
     'BaseView',
     'RoleButton',
     'RolePanelView',
+    'RolePanelReactionView',
+    'RolePanelHybridView',
     'CreatePanelRoleSelectView',
     'EmojiInputView',
     'PanelSelectView',
     'PanelAddRoleView',
     'PanelRemoveRoleView',
     'DeletePanelConfirmView',
+    'PanelModeToggleButton',
     'COLOR_BLUE',
     'COLOR_GREEN',
     'COLOR_RED',
