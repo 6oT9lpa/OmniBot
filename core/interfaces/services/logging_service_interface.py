@@ -52,17 +52,6 @@ class LoggingServiceInterface(ABC):
         pass
     
     @abstractmethod
-    async def log_member_event(
-        self,
-        event_type: EventType,
-        member: disnake.Member,
-        *,
-        extra_data: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        """Record member event (join/leave/update)"""
-        pass
-    
-    @abstractmethod
     async def log_channel_event(
         self,
         event_type: EventType,
