@@ -9,7 +9,7 @@ logger = get_logger(__name__)
 class RolePanelReactionView:
     def __init__(self, message: disnake.Message, buttons_data: List[Dict[str, Any]], role_service):
         self._message = message
-        self._buttons_data = buttons_data
+        self._buttons_data = buttons_data[:25]
         self._role_service = role_service
         self._role_emoji_map: Dict[str, int] = {}
 
@@ -20,9 +20,9 @@ class RolePanelReactionView:
                 try:
                     await self._message.add_reaction(emoji)
                     self._role_emoji_map[emoji] = btn_data["role_id"]
-                    logger.info(f"Added reaction {emoji} for role {btn_data['role_id']}")
-                except Exception as e:
-                    logger.error(f"Failed to add reaction {emoji}: {e}")
+                    logger.info("Added reaction %s for role id=%s", emoji, btn_data["role_id"])
+                except Exception as exc:
+                    logger.error("Failed to add reaction %s: %s", emoji, exc)
 
     async def handle_reaction(self, payload: disnake.RawReactionActionEvent):
         if payload.message_id != self._message.id:
@@ -44,25 +44,26 @@ class RolePanelReactionView:
         role = guild.get_role(role_id)
 
         if not role:
-            logger.warning(f"Role {role_id} not found for reaction {emoji}")
+            logger.warning("Role id=%s not found for reaction %s", role_id, emoji)
             return
 
         try:
+            if guild.me.top_role.position <= role.position:
+                logger.warning("Cannot assign role id=%s to member id=%s: bot role is lower", role_id, member.id)
+                return
+
             if role in member.roles:
                 await member.remove_roles(role, reason="Role removed via reaction panel")
-                logger.info(f"Removed role {role.name} from {member} via reaction")
+                logger.info("Removed role id=%s from member id=%s via reaction", role_id, member.id)
             else:
-                if guild.me.top_role.position <= role.position:
-                    logger.warning(f"Cannot assign role {role.name}: bot role is lower")
-                    return
                 await member.add_roles(role, reason="Role assigned via reaction panel")
-                logger.info(f"Assigned role {role.name} to {member} via reaction")
-        except Exception as e:
-            logger.error(f"Error handling reaction for role {role_id}: {e}")
+                logger.info("Assigned role id=%s to member id=%s via reaction", role_id, member.id)
+        except Exception as exc:
+            logger.error("Error handling reaction for role id=%s: %s", role_id, exc)
 
     async def clear_reactions(self):
         try:
             await self._message.clear_reactions()
-            logger.info(f"Cleared reactions for message {self._message.id}")
-        except Exception as e:
-            logger.error(f"Failed to clear reactions: {e}")
+            logger.info("Cleared reactions for message id=%s", self._message.id)
+        except Exception as exc:
+            logger.error("Failed to clear reactions: %s", exc)

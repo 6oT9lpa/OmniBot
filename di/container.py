@@ -8,10 +8,21 @@ from infrastructure.database import (
     ChannelConfigRepository,
     RolePanelMessageRepository,
     RolePanelButtonRepository,
+    MessageLogRepository,
+    GuildEventLogRepository,
+    PunishmentRepository,
 )
-from application.services import RoleService, WelcomeService, ChannelService
+from application.services import (
+    RoleService,
+    WelcomeService,
+    ChannelService,
+    AuditLogService,
+    LoggingService,
+    ModerationHistoryService,
+    ModeratorService,
+)
 from infrastructure.logging import get_logger
-from di.modules import MemberEventsModule
+from di.modules import MemberEventsModule, LoggingModule, ModerationModule
 
 logger = get_logger(__name__)
 
@@ -29,7 +40,16 @@ class Container:
         self._channel_service: Optional[ChannelService] = None
         self._welcome_config_repo: Optional[WelcomeConfigRepository] = None
         self._welcome_service: Optional[WelcomeService] = None
+        self._message_log_repo: Optional[MessageLogRepository] = None
+        self._guild_event_log_repo: Optional[GuildEventLogRepository] = None
+        self._punishment_repo: Optional[PunishmentRepository] = None
+        self._audit_log_service: Optional[AuditLogService] = None
+        self._logging_service: Optional[LoggingService] = None
+        self._moderation_history_service: Optional[ModerationHistoryService] = None
+        self._moderator_service: Optional[ModeratorService] = None
         self._member_events_module: Optional[MemberEventsModule] = None
+        self._logging_module: Optional[LoggingModule] = None
+        self._moderation_module: Optional[ModerationModule] = None
 
         logger.info("DI Container initialized")
 
@@ -71,6 +91,24 @@ class Container:
             self._welcome_config_repo = WelcomeConfigRepository(db)
         return self._welcome_config_repo
 
+    async def get_message_log_repository(self) -> MessageLogRepository:
+        if not self._message_log_repo:
+            db = await self.get_database()
+            self._message_log_repo = MessageLogRepository(db)
+        return self._message_log_repo
+
+    async def get_guild_event_log_repository(self) -> GuildEventLogRepository:
+        if not self._guild_event_log_repo:
+            db = await self.get_database()
+            self._guild_event_log_repo = GuildEventLogRepository(db)
+        return self._guild_event_log_repo
+
+    async def get_punishment_repository(self) -> PunishmentRepository:
+        if not self._punishment_repo:
+            db = await self.get_database()
+            self._punishment_repo = PunishmentRepository(db)
+        return self._punishment_repo
+
     #=============== Service =====================
 
     async def get_role_service(self) -> RoleService:
@@ -99,11 +137,62 @@ class Container:
             self._channel_service = ChannelService(repo)
             logger.info("ChannelService created")
         return self._channel_service
+
+    async def get_audit_log_service(self) -> AuditLogService:
+        if not self._audit_log_service:
+            channel_service = await self.get_channel_service()
+            self._audit_log_service = AuditLogService(self.config, channel_service)
+            logger.info("AuditLogService created")
+        return self._audit_log_service
+
+    async def get_logging_service(self) -> LoggingService:
+        if not self._logging_service:
+            message_repo = await self.get_message_log_repository()
+            guild_event_repo = await self.get_guild_event_log_repository()
+            audit_log_service = await self.get_audit_log_service()
+            self._logging_service = LoggingService(
+                message_repo,
+                guild_event_repo,
+                audit_log_service,
+                self.config,
+            )
+            logger.info("LoggingService created")
+        return self._logging_service
+
+    async def get_moderation_history_service(self) -> ModerationHistoryService:
+        if not self._moderation_history_service:
+            punishment_repo = await self.get_punishment_repository()
+            self._moderation_history_service = ModerationHistoryService(punishment_repo)
+            logger.info("ModerationHistoryService created")
+        return self._moderation_history_service
+
+    async def get_moderator_service(self) -> ModeratorService:
+        if not self._moderator_service:
+            punishment_repo = await self.get_punishment_repository()
+            logging_service = await self.get_logging_service()
+            history_service = await self.get_moderation_history_service()
+            self._moderator_service = ModeratorService(
+                punishment_repo,
+                logging_service,
+                history_service,
+            )
+            logger.info("ModeratorService created")
+        return self._moderator_service
     
     def get_member_events_module(self) -> MemberEventsModule:
         if not self._member_events_module:
             self._member_events_module = MemberEventsModule(self)
         return self._member_events_module
+
+    def get_logging_module(self) -> LoggingModule:
+        if not self._logging_module:
+            self._logging_module = LoggingModule(self)
+        return self._logging_module
+
+    def get_moderation_module(self) -> ModerationModule:
+        if not self._moderation_module:
+            self._moderation_module = ModerationModule(self)
+        return self._moderation_module
     
     async def shutdown(self):
         if self._database:
@@ -111,5 +200,9 @@ class Container:
         
         if self._member_events_module:
             await self._member_events_module.shutdown()
+        if self._logging_module:
+            await self._logging_module.shutdown()
+        if self._moderation_module:
+            await self._moderation_module.shutdown()
         
         logger.info("Container shutdown complete")

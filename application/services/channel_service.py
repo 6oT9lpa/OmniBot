@@ -1,13 +1,19 @@
 from typing import Optional, Dict, Any, List
 
+import disnake
+
 from core.domain.channel_purpose import ChannelPurpose
 from core.interfaces.repositories import ChannelConfigRepositoryInterface
+from core.interfaces.services import ChannelServiceInterface
+from infrastructure.config import BotConfig
+from infrastructure.database.repositories.channel_config_repository import ChannelConfigRepository
 from infrastructure.logging import get_logger
+from infrastructure.database import DatabaseManager
 
 logger = get_logger(__name__)
 
 
-class ChannelService:
+class ChannelService(ChannelServiceInterface):
     def __init__(self, channel_config_repo: ChannelConfigRepositoryInterface):
         self._channel_config_repo = channel_config_repo
 
@@ -36,7 +42,7 @@ class ChannelService:
             auto_delete_after=auto_delete_after,
             custom_name=custom_name,
         )
-        logger.debug(f"Upserted channel_config for channel {channel_id}")
+        logger.debug("Upserted channel_config for channel %s", channel_id)
 
     async def set_purpose(
         self,
@@ -45,7 +51,7 @@ class ChannelService:
         channel_id: int,
     ) -> None:
         await self._channel_config_repo.set_purpose(guild_id, purpose, channel_id)
-        logger.info(f"Set channel purpose '{purpose.value}' -> channel {channel_id}")
+        logger.info("Set channel purpose '%s' -> channel %s", purpose.value, channel_id)
 
     async def remove_purpose(self, guild_id: int, purpose: ChannelPurpose) -> bool:
         return await self._channel_config_repo.remove_purpose(guild_id, purpose)
@@ -55,3 +61,13 @@ class ChannelService:
 
     async def get_all_purposes(self, guild_id: int) -> Dict[str, int]:
         return await self._channel_config_repo.get_all_purposes(guild_id)
+
+    async def get_log_channel(
+        self,
+        guild_id: int,
+        purpose: ChannelPurpose,
+    ) -> Optional[disnake.abc.GuildChannel]:
+        channel_id = await self.get_purpose_channel(guild_id, purpose)
+        if not channel_id:
+            return None
+        return channel_id

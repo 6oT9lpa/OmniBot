@@ -1,6 +1,9 @@
 from typing import List, Optional, Dict, Any
 import disnake
 from datetime import datetime, timezone, timedelta
+from hashlib import sha256
+from ipaddress import ip_address
+from urllib.parse import urlparse
 
 from core.interfaces.repositories import RoleRepositoryInterface
 from core.interfaces.services import RoleServiceInterface
@@ -8,9 +11,10 @@ from infrastructure.config import BotConfig
 from infrastructure.database.repositories.role_panel_message_repository import RolePanelMessageRepository
 from infrastructure.database.repositories.role_panel_button_repository import RolePanelButtonRepository
 from infrastructure.logging import get_logger
-from presentation.views.role_panel_view import RolePanelView
 
 logger = get_logger(__name__)
+
+MAX_PANEL_ITEMS = 25
 
 
 def get_msk_timestamp() -> str:
@@ -54,11 +58,11 @@ class RoleService(RoleServiceInterface):
                     try:
                         await member.add_roles(role, reason="Автовыдача при входе")
                         assigned.append(role)
-                        logger.info(f"Assigned role {role.name} to {member}")
-                    except Exception as e:
-                        logger.error(f"Failed to assign role {role_id}: {e}")
+                        logger.info("Assigned role id=%s to member id=%s", role_id, member.id)
+                    except Exception as exc:
+                        logger.error("Failed to assign role id=%s to member id=%s: %s", role_id, member.id, exc)
                 else:
-                    logger.warning(f"Cannot assign role {role.name}: bot role is lower")
+                    logger.warning("Cannot assign role id=%s to member id=%s: bot role is lower", role_id, member.id)
 
         return assigned
 
@@ -77,8 +81,9 @@ class RoleService(RoleServiceInterface):
                 "permissions": role.permissions.value,
             })
 
-        return await self.role_repo.sync_from_discord(discord_roles)
-
+        synced_count = await self.role_repo.sync_from_discord(discord_roles)
+        logger.info("Synced %s roles for guild id=%s", synced_count, guild.id)
+        return synced_count
 
     async def get_all_roles(self) -> List[Dict[str, Any]]:
         return await self.role_repo.get_all_roles()
@@ -95,11 +100,21 @@ class RoleService(RoleServiceInterface):
     async def set_role_public(self, role_id: int, is_public: bool) -> bool:
         existing = await self.role_repo.get_role(role_id)
         if not existing:
-            logger.warning(f"set_role_public: role {role_id} not found in DB")
+            logger.warning("set_role_public: role id=%s not found in DB", role_id)
             return False
         await self.role_repo.set_public(role_id, is_public)
-        logger.info(f"Role {role_id} public set to {is_public}")
+        logger.info("Role id=%s public set to %s", role_id, is_public)
         return True
+
+    async def get_panels(self, guild_id: int) -> List[Dict[str, Any]]:
+        if not self._panel_message_repo:
+            raise ValueError("Panel message repository not set")
+        return await self._panel_message_repo.get_by_guild(guild_id)
+
+    async def get_panel(self, message_id: int) -> Optional[Dict[str, Any]]:
+        if not self._panel_message_repo:
+            raise ValueError("Panel message repository not set")
+        return await self._panel_message_repo.get_by_message(message_id)
 
     async def create_role_panel(
         self,
@@ -110,12 +125,19 @@ class RoleService(RoleServiceInterface):
         embed_description: str,
         embed_color: int,
         created_by: int,
+        interaction_mode: str = "buttons",
     ) -> int:
         if not self._panel_message_repo:
             raise ValueError("Panel message repository not set")
         return await self._panel_message_repo.create(
-            guild_id, channel_id, message_id,
-            embed_title, embed_description, embed_color, created_by,
+            guild_id,
+            channel_id,
+            message_id,
+            embed_title,
+            embed_description,
+            embed_color,
+            created_by,
+            interaction_mode,
         )
 
     async def delete_panel(self, message_id: int) -> bool:
@@ -123,7 +145,7 @@ class RoleService(RoleServiceInterface):
             raise ValueError("Panel message repository not set")
         panel = await self._panel_message_repo.get_by_message(message_id)
         if not panel:
-            logger.warning(f"delete_panel: panel {message_id} not found")
+            logger.warning("delete_panel: panel id=%s not found", message_id)
             return False
         return await self._panel_message_repo.delete_by_message(message_id)
 
@@ -139,10 +161,15 @@ class RoleService(RoleServiceInterface):
 
         panel = await self._panel_message_repo.get_by_message(message_id)
         if not panel:
-            logger.warning(f"Panel not found for message {message_id}")
+            logger.warning("Panel not found for message id=%s", message_id)
             return False
 
+        buttons = await self._panel_button_repo.get_all(panel["id"])
+        if len(buttons) >= MAX_PANEL_ITEMS:
+            raise ValueError(f"Panel cannot contain more than {MAX_PANEL_ITEMS} buttons or reactions")
+
         await self._panel_button_repo.add(panel["id"], role_id, role_name, emoji)
+        await self.rebuild_panel_fingerprint(message_id)
         return True
 
     async def remove_button_from_panel(self, message_id: int, role_id: int) -> bool:
@@ -153,7 +180,10 @@ class RoleService(RoleServiceInterface):
         if not panel:
             return False
 
-        return await self._panel_button_repo.remove(panel["id"], role_id)
+        result = await self._panel_button_repo.remove(panel["id"], role_id)
+        if result:
+            await self.rebuild_panel_fingerprint(message_id)
+        return result
 
     async def get_panel_buttons(self, message_id: int) -> List[Dict[str, Any]]:
         if not self._panel_button_repo or not self._panel_message_repo:
@@ -165,11 +195,46 @@ class RoleService(RoleServiceInterface):
 
         return await self._panel_button_repo.get_all(panel["id"])
 
+    async def rebuild_panel_fingerprint(self, message_id: int) -> None:
+        if not self._panel_message_repo:
+            raise ValueError("Panel message repository not set")
+
+        buttons = await self.get_panel_buttons(message_id)
+        fingerprint = self.calculate_buttons_fingerprint(buttons)
+        await self._panel_message_repo.update_fingerprint(
+            message_id,
+            view_fingerprint=fingerprint,
+        )
+
+    async def ensure_panel_fingerprint(self, panel: Dict[str, Any]) -> Optional[str]:
+        message_id = panel["message_id"]
+        if panel.get("view_fingerprint"):
+            return panel["view_fingerprint"]
+
+        buttons = await self.get_panel_buttons(message_id)
+        fingerprint = self.calculate_buttons_fingerprint(buttons)
+        await self._update_panel_fingerprint(message_id, fingerprint)
+        return fingerprint
+
+    async def mark_panel_rendered(self, message_id: int, fingerprint: Optional[str]) -> None:
+        if not self._panel_message_repo:
+            raise ValueError("Panel message repository not set")
+        await self._panel_message_repo.update_fingerprint(
+            message_id,
+            view_fingerprint=fingerprint,
+            last_rendered_fingerprint=fingerprint,
+        )
+
     async def refresh_panel_view(self, message_id: int, channel: disnake.TextChannel) -> bool:
         if not self._bot:
             return False
 
         try:
+            panel = await self.get_panel(message_id)
+            if not panel:
+                return False
+
+            fingerprint = await self.ensure_panel_fingerprint(panel)
             message = await channel.fetch_message(message_id)
             if not message:
                 return False
@@ -178,11 +243,64 @@ class RoleService(RoleServiceInterface):
             if not buttons:
                 return False
 
+            current_components = getattr(message, "components", None)
+            if current_components and panel.get("last_rendered_fingerprint") == fingerprint:
+                logger.debug("Skip unchanged panel render message_id=%s", message_id)
+                return True
+
+            from presentation.views.role_panel_view import RolePanelView
+            from presentation.views.roles_panel_management.helpers import rebuild_panel_embed
+
             view = RolePanelView(buttons, message_id, self)
-            await message.edit(view=view)
-            logger.info(f"Refreshed panel view for message {message_id}")
+            panel_embed = await rebuild_panel_embed(self, channel.guild, panel, buttons)
+            await message.edit(embed=panel_embed, view=view)
+            await self.mark_panel_rendered(message_id, fingerprint)
+            logger.info("Refreshed panel view for message id=%s", message_id)
             return True
 
-        except Exception as e:
-            logger.error(f"Failed to refresh panel view: {e}")
+        except Exception as exc:
+            logger.error("Failed to refresh panel view message_id=%s: %s", message_id, exc)
             return False
+
+    async def _update_panel_fingerprint(self, message_id: int, fingerprint: Optional[str]) -> None:
+        if not self._panel_message_repo:
+            raise ValueError("Panel message repository not set")
+        await self._panel_message_repo.update_fingerprint(
+            message_id,
+            view_fingerprint=fingerprint,
+        )
+
+    @staticmethod
+    def calculate_buttons_fingerprint(buttons: List[Dict[str, Any]]) -> Optional[str]:
+        if not buttons:
+            return None
+
+        parts = []
+        for button in sorted(buttons, key=lambda item: (item.get("position", 0), item.get("id", 0))):
+            parts.append(f"{button['role_id']}:{button.get('emoji') or ''}")
+        return sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def validate_image_url(url: Optional[str]) -> Optional[str]:
+        if not url:
+            return None
+
+        parsed = urlparse(url.strip())
+        if parsed.scheme.lower() != "https":
+            raise ValueError("Only HTTPS image URLs are allowed")
+        if not parsed.netloc:
+            raise ValueError("Image URL must include a host")
+
+        host = parsed.hostname
+        if not host:
+            raise ValueError("Image URL must include a host")
+
+        try:
+            ip = ip_address(host)
+        except ValueError:
+            return url.strip()
+
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise ValueError("Private, loopback, link-local, and reserved IP addresses are not allowed")
+
+        return url.strip()

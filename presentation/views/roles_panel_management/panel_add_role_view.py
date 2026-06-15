@@ -42,7 +42,7 @@ class PanelAddRoleView(disnake.ui.View):
 
         self.role_select = disnake.ui.StringSelect(
             custom_id="add_role_select",
-            placeholder="Select a role...",
+            placeholder="Выберите роль...",
             options=role_options,
             min_values=1,
             max_values=1,
@@ -50,40 +50,53 @@ class PanelAddRoleView(disnake.ui.View):
         self.role_select.callback = self._on_role_select
         self.add_item(self.role_select)
 
+    def _build_emoji_select(self) -> disnake.ui.StringSelect:
         emoji_options = [
             disnake.SelectOption(label=e, value=e, emoji=e)
             for e in COMMON_EMOJIS
         ]
-        self.emoji_select = disnake.ui.StringSelect(
+        select = disnake.ui.StringSelect(
             custom_id="add_emoji_select",
-            placeholder="Select an emoji (optional)...",
+            placeholder="Выберите эмодзи (необязательно)...",
             options=emoji_options,
             min_values=0,
             max_values=1,
         )
-        self.emoji_select.callback = self._on_emoji_select
-        self.add_item(self.emoji_select)
+        select.callback = self._on_emoji_select
+        return select
 
-        self.confirm_btn = disnake.ui.Button(
-            label="Add to panel",
+    def _build_confirm_button(self) -> disnake.ui.Button:
+        btn = disnake.ui.Button(
+            label="Добавить на панель",
             style=disnake.ButtonStyle.green,
             custom_id="add_confirm",
-            disabled=True,
         )
-        self.confirm_btn.callback = self._on_confirm
+        btn.callback = self._on_confirm
+        return btn
+
+    def _show_step2(self):
+        self.clear_items()
+        self.add_item(self.role_select)
+
+        self.emoji_select = self._build_emoji_select()
+        self.add_item(self.emoji_select)
+
+        self.confirm_btn = self._build_confirm_button()
         self.add_item(self.confirm_btn)
 
     async def _on_role_select(self, interaction: disnake.MessageInteraction):
         self._selected_role_id = int(interaction.data.get("values", [0])[0])
         role = self._guild.get_role(self._selected_role_id)
-        self.confirm_btn.disabled = False
+
+        self._show_step2()
+
         await interaction.response.edit_message(
             embed=disnake.Embed(
-                title="Add role",
+                title="Добавление роли",
                 description=(
-                    f"Selected role: **{role.name if role else self._selected_role_id}**\n"
-                    f"Emoji: {self._selected_emoji or '🎭 (default)'}\n\n"
-                    "Select an emoji from the list or click **Add to panel**"
+                    f"Выбрана роль: **{role.name if role else self._selected_role_id}**\n"
+                    f"Эмодзи: {self._selected_emoji or '🎭 (по умолчанию)'}\n\n"
+                    "Теперь выберите эмодзи или сразу нажмите **Добавить на панель**"
                 ),
                 color=COLOR_GREEN,
             ),
@@ -94,12 +107,13 @@ class PanelAddRoleView(disnake.ui.View):
         values = interaction.data.get("values", [])
         self._selected_emoji = values[0] if values else None
         role = self._guild.get_role(self._selected_role_id) if self._selected_role_id else None
+
         await interaction.response.edit_message(
             embed=disnake.Embed(
-                title="Add role",
+                title="Добавление роли",
                 description=(
-                    f"Role: **{role.name if role else '(not selected)'}**\n"
-                    f"Emoji: {self._selected_emoji or '🎭 (default)'}"
+                    f"Роль: **{role.name if role else '(не выбрана)'}**\n"
+                    f"Эмодзи: {self._selected_emoji or '🎭 (по умолчанию)'}"
                 ),
                 color=COLOR_GREEN,
             ),
@@ -108,7 +122,7 @@ class PanelAddRoleView(disnake.ui.View):
 
     async def _on_confirm(self, interaction: disnake.MessageInteraction):
         if not self._selected_role_id:
-            await interaction.response.send_message("Please select a role first", ephemeral=True)
+            await interaction.response.send_message("Сначала выберите роль", ephemeral=True)
             return
 
         await interaction.response.defer()
@@ -116,7 +130,7 @@ class PanelAddRoleView(disnake.ui.View):
         role = self._guild.get_role(self._selected_role_id)
         if not role:
             await interaction.edit_original_response(
-                embed=disnake.Embed(title="Role not found", color=COLOR_RED), view=None
+                embed=disnake.Embed(title="Роль не найдена", color=COLOR_RED), view=None
             )
             return
 
@@ -131,7 +145,7 @@ class PanelAddRoleView(disnake.ui.View):
             )
             if not success:
                 await interaction.edit_original_response(
-                    embed=disnake.Embed(title="Panel not found", color=COLOR_RED), view=None
+                    embed=disnake.Embed(title="Панель не найдена", color=COLOR_RED), view=None
                 )
                 return
 
@@ -148,8 +162,8 @@ class PanelAddRoleView(disnake.ui.View):
 
             await interaction.edit_original_response(
                 embed=disnake.Embed(
-                    title="Role added",
-                    description=f"{emoji} {role.mention} added to panel **{self._panel.get('embed_title', '')}**",
+                    title="Роль добавлена",
+                    description=f"{emoji} {role.mention} добавлена на панель **{self._panel.get('embed_title', '')}**",
                     color=COLOR_GREEN,
                 ),
                 view=None,
@@ -159,5 +173,5 @@ class PanelAddRoleView(disnake.ui.View):
         except Exception as e:
             logger.error(f"Error adding role to panel: {e}")
             await interaction.edit_original_response(
-                embed=disnake.Embed(title="Error", description=str(e), color=COLOR_RED), view=None
+                embed=disnake.Embed(title="Ошибка", description=str(e), color=COLOR_RED), view=None
             )

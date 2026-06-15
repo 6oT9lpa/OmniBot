@@ -1,4 +1,5 @@
 from presentation.views.base import BaseView
+from presentation.views.moderation_views import PunishmentListView
 from presentation.views.role_button import RoleButton
 from presentation.views.role_panel_view import RolePanelView
 from presentation.views.roles_panel_management import (
@@ -24,6 +25,8 @@ from presentation.views.roles_panel_management import (
 __all__ = [
     'BaseView',
     'RoleButton',
+    'MuteModal',
+    'PunishmentListView',
     'RolePanelView',
     'RolePanelReactionView',
     'RolePanelHybridView',

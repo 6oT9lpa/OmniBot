@@ -19,6 +19,9 @@ class Bootstrap:
     async def run(self):
         try:
             self._role_service = await self.container.get_role_service()
+            audit_log_service = await self.container.get_audit_log_service()
+            logging_service = await self.container.get_logging_service()
+            moderator_service = await self.container.get_moderator_service()
 
             if self._role_service is None:
                 logger.error("Failed to get role service from container!")
@@ -30,9 +33,14 @@ class Bootstrap:
                 config=self.container.config,
                 role_service=self._role_service
             )
+            audit_log_service.set_bot(self.bot)
+            logging_service.set_bot(self.bot)
+            moderator_service.set_bot(self.bot)
             
             await self._register_commands()
             await self._register_member_events_cog()
+            await self._register_logging_cog()
+            await self._register_moderation_cog()
             
             self._setup_signal_handlers()
             
@@ -92,6 +100,26 @@ class Bootstrap:
             logger.info("WelcomeConfigCommands registered")
         else:
             logger.warning("Failed to register WelcomeConfigCommands")
+
+    async def _register_logging_cog(self):
+        logger.info("Registering logging cog...")
+        logging_module = self.container.get_logging_module()
+        cog = await logging_module.get_cog(self.bot)
+        if cog:
+            self.bot.add_cog(cog)
+            logger.info("LoggingCog registered")
+        else:
+            logger.warning("Failed to register LoggingCog")
+
+    async def _register_moderation_cog(self):
+        logger.info("Registering moderation cog...")
+        moderation_module = self.container.get_moderation_module()
+        cog = await moderation_module.get_cog(self.bot)
+        if cog:
+            self.bot.add_cog(cog)
+            logger.info("ModerationCog registered")
+        else:
+            logger.warning("Failed to register ModerationCog")
         
     async def _shutdown(self):
         logger.info("Shutting down...")

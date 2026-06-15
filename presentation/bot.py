@@ -57,6 +57,36 @@ class DiscordBot(commands.Bot):
                 except Exception as e:
                     logger.error(f"Failed to sync roles: {e}")
 
+    async def on_application_command_error(self, interaction: disnake.Interaction, error: Exception):
+        logger.error("Application command error command=%s error=%s", getattr(interaction, "command", None), error, exc_info=True)
+        if interaction.response.is_done():
+            return
+        embed = disnake.Embed(
+            title="Ошибка команды",
+            description=str(error),
+            color=disnake.Color.red(),
+        )
+        try:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except Exception:
+            logger.exception("Failed to send application command error response")
+
+    async def on_interaction_error(self, interaction: disnake.Interaction, error: Exception):
+        logger.error("Interaction error custom_id=%s error=%s", getattr(interaction, "custom_id", None), error, exc_info=True)
+        if interaction.response.is_done():
+            return
+        try:
+            await interaction.response.send_message(
+                embed=disnake.Embed(
+                    title="Ошибка взаимодействия",
+                    description=str(error),
+                    color=disnake.Color.red(),
+                ),
+                ephemeral=True,
+            )
+        except Exception:
+            logger.exception("Failed to send interaction error response")
+
     async def close(self):
         """Закрытие бота"""
         logger.info("Closing bot...")

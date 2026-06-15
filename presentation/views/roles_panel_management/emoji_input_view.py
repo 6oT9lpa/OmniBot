@@ -4,7 +4,7 @@ import disnake
 
 from infrastructure.logging import get_logger
 from presentation.views.role_panel_view import RolePanelView
-from presentation.views.roles_panel_management.helpers import COLOR_BLUE, COLOR_GREEN, COLOR_RED, COMMON_EMOJIS
+from presentation.views.roles_panel_management.helpers import COLOR_BLUE, COLOR_GREEN, COLOR_RED, COMMON_EMOJIS, MAX_PANEL_ITEMS
 from presentation.views.roles_panel_management.panel_mode_toggle_button import PanelModeToggleButton
 
 logger = get_logger(__name__)
@@ -26,7 +26,7 @@ class EmojiInputView(disnake.ui.View):
         super().__init__(timeout=timeout)
         self._role_service = role_service
         self._guild = guild
-        self._selected_role_ids = selected_role_ids
+        self._selected_role_ids = selected_role_ids[:MAX_PANEL_ITEMS]
         self._available_roles = {rd["role_id"]: rd for rd in available_roles}
         self._target_channel = target_channel
         self._embed_title = embed_title
@@ -35,26 +35,16 @@ class EmojiInputView(disnake.ui.View):
         self._emoji_map: Dict[int, str] = {}
         self._current_role_id: Optional[int] = None
 
-        for rid in selected_role_ids[:25]:
+        for rid in self._selected_role_ids:
             rd = self._available_roles.get(rid, {})
             self._emoji_map[rid] = rd.get("display_emoji") or "🎭"
 
-        role_options = []
-        for rid in selected_role_ids[:25]:
-            role = guild.get_role(rid)
-            if role:
-                role_options.append(
-                    disnake.SelectOption(
-                        label=role.name[:100],
-                        value=str(rid),
-                        emoji=self._emoji_map.get(rid, "🎭"),
-                    )
-                )
+        self._rebuild_role_options()
 
         self.role_picker = disnake.ui.StringSelect(
             custom_id="emoji_role_picker",
             placeholder="Выберите роль для назначения эмодзи...",
-            options=role_options,
+            options=self._role_options,
             min_values=1,
             max_values=1,
             row=0,
@@ -91,14 +81,45 @@ class EmojiInputView(disnake.ui.View):
         self.add_item(create_btn)
 
         logger.debug(
-            f"EmojiInputView created for {len(selected_role_ids)} roles "
-            f"in channel #{target_channel.name}"
+            "EmojiInputView created for %s roles in channel id=%s",
+            len(self._selected_role_ids),
+            target_channel.id,
+        )
+
+    def _rebuild_role_options(self) -> None:
+        self._role_options = []
+        for rid in self._selected_role_ids:
+            role = self._guild.get_role(rid)
+            if role:
+                current = self._emoji_map.get(rid, "🎭")
+                self._role_options.append(
+                    disnake.SelectOption(
+                        label=role.name[:100],
+                        value=str(rid),
+                        emoji=current,
+                    )
+                )
+
+    def _build_summary_embed(self, title: str, color: int) -> disnake.Embed:
+        mode_text = "реакции" if self._mode_toggle.use_reactions else "кнопки"
+        summary = "\n".join(
+            f"{self._emoji_map.get(rid, '🎭')} <@&{rid}>"
+            for rid in self._selected_role_ids
+        ) or "Роли ещё не выбраны"
+        return disnake.Embed(
+            title=title,
+            description=(
+                f"Текущие назначения:\n{summary}\n\n"
+                f"Тип панели: **{mode_text}**\n\n"
+                "Можно продолжить изменять или нажать **Создать панель**"
+            ),
+            color=color,
         )
 
     async def _on_toggle_mode(self, interaction: disnake.MessageInteraction):
         use_reactions = self._mode_toggle.toggle()
         mode_text = "реакции" if use_reactions else "кнопки"
-        logger.debug(f"Panel mode toggled to {mode_text} by {interaction.author}")
+        logger.debug("Panel mode toggled to %s by user id=%s", mode_text, interaction.author.id)
 
         await interaction.response.edit_message(
             embed=disnake.Embed(
@@ -119,7 +140,7 @@ class EmojiInputView(disnake.ui.View):
         role_name = role.name if role else str(self._current_role_id)
         current_emoji = self._emoji_map.get(self._current_role_id, "🎭")
 
-        logger.debug(f"Role selected for emoji assignment: {role_name}")
+        logger.debug("Role id=%s selected for emoji assignment", self._current_role_id)
 
         await interaction.response.edit_message(
             embed=disnake.Embed(
@@ -138,57 +159,35 @@ class EmojiInputView(disnake.ui.View):
         emoji = interaction.data.get("values", ["🎭"])[0]
         if self._current_role_id:
             self._emoji_map[self._current_role_id] = emoji
-            logger.debug(
-                f"Emoji {emoji} assigned to role {self._current_role_id}"
-            )
+            logger.debug("Emoji %s assigned to role id=%s", emoji, self._current_role_id)
 
-        role_options = []
-        for rid in self._selected_role_ids:
-            role = self._guild.get_role(rid)
-            if role:
-                current = self._emoji_map.get(rid, "🎭")
-                role_options.append(
-                    disnake.SelectOption(
-                        label=role.name[:100],
-                        value=str(rid),
-                        emoji=current,
-                    )
-                )
-        self.role_picker.options = role_options
-
-        mode_text = "реакции" if self._mode_toggle.use_reactions else "кнопки"
-        summary = "\n".join(
-            f"{self._emoji_map.get(rid, '🎭')} <@&{rid}>"
-            for rid in self._selected_role_ids
-        )
+        self._rebuild_role_options()
         await interaction.response.edit_message(
-            embed=disnake.Embed(
-                title="Эмодзи ролей",
-                description=(
-                    f"Текущие назначения:\n{summary}\n\n"
-                    f"Тип панели: **{mode_text}**\n\n"
-                    "Можно продолжить изменять или нажать **Создать панель**"
-                ),
-                color=COLOR_GREEN,
-            ),
+            embed=self._build_summary_embed("Эмодзи ролей", COLOR_GREEN),
             view=self,
         )
 
     async def _on_create(self, interaction: disnake.MessageInteraction):
         await interaction.response.defer()
         logger.info(
-            f"Creating panel '{self._embed_title}' "
-            f"in #{self._target_channel.name} by {interaction.author}"
+            "Creating panel '%s' in channel id=%s by user id=%s",
+            self._embed_title,
+            self._target_channel.id,
+            interaction.author.id,
         )
 
         from presentation.views.roles_panel_management.role_panel_reaction_view import RolePanelReactionView
 
         try:
+            if len(self._selected_role_ids) > MAX_PANEL_ITEMS:
+                raise ValueError(f"Panel cannot contain more than {MAX_PANEL_ITEMS} buttons or reactions")
+
             color_value = disnake.Color.green().value
+            visible_role_ids = self._selected_role_ids[:MAX_PANEL_ITEMS]
 
             role_lines = [
                 f"{self._emoji_map.get(rid, '🎭')}  <@&{rid}>"
-                for rid in self._selected_role_ids
+                for rid in visible_role_ids
             ]
 
             panel_embed = disnake.Embed(
@@ -213,7 +212,7 @@ class EmojiInputView(disnake.ui.View):
                 )
 
             message = await self._target_channel.send(embed=panel_embed)
-            logger.debug(f"Panel message sent: {message.id}")
+            logger.debug("Panel message sent: %s", message.id)
 
             await self._role_service.create_role_panel(
                 guild_id=self._guild.id,
@@ -223,9 +222,10 @@ class EmojiInputView(disnake.ui.View):
                 embed_description=self._embed_description,
                 embed_color=color_value,
                 created_by=self._created_by,
+                interaction_mode="reactions" if use_reactions else "buttons",
             )
 
-            for rid in self._selected_role_ids:
+            for rid in visible_role_ids:
                 rd = self._available_roles.get(rid, {})
                 emoji = self._emoji_map.get(rid)
                 await self._role_service.add_button_to_panel(
@@ -242,19 +242,23 @@ class EmojiInputView(disnake.ui.View):
                 await reaction_view.setup()
                 await message.edit(view=None)
                 logger.info(
-                    f"Created reaction panel '{self._embed_title}' "
-                    f"in #{self._target_channel.name}, message {message.id}"
+                    "Created reaction panel '%s' in channel id=%s, message id=%s",
+                    self._embed_title,
+                    self._target_channel.id,
+                    message.id,
                 )
             else:
                 if buttons:
                     panel_view = RolePanelView(buttons, message.id, self._role_service)
                     await message.edit(view=panel_view)
                 logger.info(
-                    f"Created button panel '{self._embed_title}' "
-                    f"in #{self._target_channel.name}, message {message.id}"
+                    "Created button panel '%s' in channel id=%s, message id=%s",
+                    self._embed_title,
+                    self._target_channel.id,
+                    message.id,
                 )
 
-            roles_count = len(self._selected_role_ids)
+            roles_count = len(visible_role_ids)
             panel_type = "реакции" if use_reactions else "кнопки"
             result_embed = disnake.Embed(
                 title="Панель создана",
@@ -271,12 +275,12 @@ class EmojiInputView(disnake.ui.View):
             )
             await interaction.edit_original_response(embed=result_embed, view=None)
 
-        except Exception as e:
-            logger.error(f"Error creating panel '{self._embed_title}': {e}")
+        except Exception as exc:
+            logger.error("Error creating panel '%s': %s", self._embed_title, exc)
             await interaction.edit_original_response(
                 embed=disnake.Embed(
                     title="Ошибка",
-                    description=str(e),
+                    description=str(exc),
                     color=COLOR_RED,
                 ),
                 view=None,
