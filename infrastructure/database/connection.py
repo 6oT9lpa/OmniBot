@@ -1,6 +1,8 @@
+import asyncio
 import sqlite3
 from pathlib import Path
 from typing import Optional
+
 import aiosqlite
 
 from infrastructure.logging import get_logger
@@ -9,19 +11,29 @@ logger = get_logger(__name__)
 
 
 class DatabaseManager:
-    def __init__(self, database_url: str):
+    def __init__(
+        self,
+        database_url: str,
+        *,
+        retry_attempts: int = 5,
+        retry_base_delay: float = 0.1,
+    ):
         if database_url.startswith("sqlite:///"):
-           self.db_path = database_url[10:]
+            self.db_path = database_url[10:]
         else:
             self.db_path = database_url
 
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
 
+        self.database_url = database_url
+        self.retry_attempts = retry_attempts
+        self.retry_base_delay = retry_base_delay
         self._connection: Optional[aiosqlite.Connection] = None
         logger.info(f"Database path: {self.db_path}")
 
     async def initialize(self) -> None:
         await self.connect()
+        #await self.run_migrations()
         await self.enable_wal_mode()
         await self.create_tables()
 
@@ -31,13 +43,14 @@ class DatabaseManager:
         if not self._connection:
             self._connection = await aiosqlite.connect(self.db_path)
             self._connection.row_factory = aiosqlite.Row
-
+            await self._connection.execute("PRAGMA foreign_keys=ON")
+            await self._connection.execute("PRAGMA busy_timeout=5000")
             await self._connection.execute("SELECT datetime('now', 'localtime')")
 
             logger.info("Database connection established")
 
         return self._connection
-    
+
     async def close(self) -> None:
         if self._connection:
             await self._connection.close()
@@ -47,11 +60,140 @@ class DatabaseManager:
     async def enable_wal_mode(self) -> None:
         if not self._connection:
             await self.connect()
-        
+
         async with self._connection.execute("PRAGMA journal_mode=WAL") as cursor:
             result = await cursor.fetchone()
             logger.info(f"Journal mode: {result[0] if result else 'unknown'}")
-    
+
+    async def run_migrations(self) -> None:
+        alembic_ini = Path(__file__).resolve().parents[2] / "alembic.ini"
+        if not alembic_ini.exists():
+            logger.warning("Alembic config not found, skipping migrations")
+            return
+
+        try:
+            from alembic import command
+            from alembic.config import Config as AlembicConfig
+
+            config = AlembicConfig(str(alembic_ini))
+            config.set_main_option("sqlalchemy.url", self.database_url)
+            command.upgrade(config, "head")
+            logger.info("Database migrations applied")
+        except Exception as exc:
+            logger.error(f"Failed to apply database migrations: {exc}", exc_info=True)
+            raise
+
+    async def execute(self, query: str, params: tuple = ()) -> aiosqlite.Cursor:
+        async def _execute() -> aiosqlite.Cursor:
+            conn = await self.connect()
+            return await conn.execute(query, params)
+
+        return await self._with_retry(_execute)
+
+    async def executemany(self, query: str, values_list: list[tuple]) -> aiosqlite.Cursor:
+        async def _executemany() -> aiosqlite.Cursor:
+            conn = await self.connect()
+            return await conn.executemany(query, values_list)
+
+        return await self._with_retry(_executemany)
+
+    async def fetch_one(self, query: str, params: tuple = ()) -> Optional[dict]:
+        async def _fetch_one() -> Optional[dict]:
+            conn = await self.connect()
+            async with conn.execute(query, params) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
+        return await self._with_retry(_fetch_one)
+
+    async def fetch_all(self, query: str, params: tuple = ()) -> list:
+        async def _fetch_all() -> list:
+            conn = await self.connect()
+            async with conn.execute(query, params) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+        return await self._with_retry(_fetch_all)
+
+    async def commit(self) -> None:
+        async def _commit() -> None:
+            if self._connection:
+                await self._connection.commit()
+
+        await self._with_retry(_commit)
+
+    async def cleanup_retention(
+        self,
+        *,
+        message_retention_days: int,
+        punishment_retention_days: int,
+    ) -> dict[str, int]:
+        messages_query = """
+            DELETE FROM messages
+            WHERE timestamp < datetime('now', 'localtime', ?)
+        """
+        punishments_query = """
+            DELETE FROM punishments
+            WHERE active = 0
+              AND expires_at IS NOT NULL
+              AND expires_at < datetime('now', 'localtime', ?)
+        """
+
+        deleted_messages = 0
+        deleted_punishments = 0
+
+        try:
+            message_cursor = await self.execute(
+                messages_query,
+                (f"-{message_retention_days} days",),
+            )
+            deleted_messages = message_cursor.rowcount or 0
+            await self.commit()
+        except Exception as exc:
+            logger.error(f"Failed to cleanup expired messages: {exc}", exc_info=True)
+
+        try:
+            punishment_cursor = await self.execute(
+                punishments_query,
+                (f"-{punishment_retention_days} days",),
+            )
+            deleted_punishments = punishment_cursor.rowcount or 0
+            await self.commit()
+        except Exception as exc:
+            logger.error(f"Failed to cleanup expired punishments: {exc}", exc_info=True)
+
+        return {
+            "messages": deleted_messages,
+            "punishments": deleted_punishments,
+        }
+
+    async def _with_retry(self, operation):
+        delay = self.retry_base_delay
+        last_exc: Optional[BaseException] = None
+
+        for attempt in range(1, self.retry_attempts + 1):
+            try:
+                return await operation()
+            except aiosqlite.OperationalError as exc:
+                last_exc = exc
+                message = str(exc).lower()
+                if "database is locked" not in message and "database is busy" not in message:
+                    raise
+                if attempt >= self.retry_attempts:
+                    break
+                logger.warning(
+                    "SQLite database is locked, retrying in %.2fs (attempt %s/%s)",
+                    delay,
+                    attempt,
+                    self.retry_attempts,
+                )
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 5.0)
+
+        if last_exc:
+            raise last_exc
+        raise sqlite3.OperationalError("database operation failed")
+
     async def create_tables(self) -> None:
         await self._create_messages_table()
         await self._create_punishments_table()
@@ -62,11 +204,15 @@ class DatabaseManager:
         await self._create_user_stats_table()
         await self._create_role_panel_messages_table()
         await self._create_role_panel_buttons_table()
+        await self._create_message_logs_table()
+        await self._create_guild_event_logs_table()
+        await self._ensure_punishment_columns()
+        await self._ensure_role_panel_message_columns()
         await self._create_server_channel_purposes_table()
         await self._create_welcome_config_table()
 
         logger.info("All tables created successfully")
-    
+
     async def _create_messages_table(self) -> None:
         """Таблица сообщений"""
         await self._connection.execute("""
@@ -85,19 +231,19 @@ class DatabaseManager:
             )
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_messages_author 
+            CREATE INDEX IF NOT EXISTS idx_messages_author
             ON messages(author_id)
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_messages_channel 
+            CREATE INDEX IF NOT EXISTS idx_messages_channel
             ON messages(channel_id)
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_messages_timestamp 
+            CREATE INDEX IF NOT EXISTS idx_messages_timestamp
             ON messages(timestamp)
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_messages_deleted 
+            CREATE INDEX IF NOT EXISTS idx_messages_deleted
             ON messages(deleted)
         """)
 
@@ -119,15 +265,15 @@ class DatabaseManager:
             )
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_punishments_user 
+            CREATE INDEX IF NOT EXISTS idx_punishments_user
             ON punishments(user_id)
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_punishments_active 
+            CREATE INDEX IF NOT EXISTS idx_punishments_active
             ON punishments(active)
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_punishments_expires 
+            CREATE INDEX IF NOT EXISTS idx_punishments_expires
             ON punishments(expires_at)
         """)
 
@@ -152,15 +298,15 @@ class DatabaseManager:
             )
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_streamers_user 
+            CREATE INDEX IF NOT EXISTS idx_streamers_user
             ON streamers(user_id)
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_streamers_platform 
+            CREATE INDEX IF NOT EXISTS idx_streamers_platform
             ON streamers(platform)
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_streamers_active 
+            CREATE INDEX IF NOT EXISTS idx_streamers_active
             ON streamers(active)
         """)
 
@@ -184,7 +330,7 @@ class DatabaseManager:
             )
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_stats_date 
+            CREATE INDEX IF NOT EXISTS idx_stats_date
             ON server_stats(date)
         """)
 
@@ -207,11 +353,11 @@ class DatabaseManager:
             )
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_roles_guild 
+            CREATE INDEX IF NOT EXISTS idx_roles_guild
             ON roles(guild_id)
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_roles_auto_assign 
+            CREATE INDEX IF NOT EXISTS idx_roles_auto_assign
             ON roles(is_auto_assign)
         """)
 
@@ -232,11 +378,11 @@ class DatabaseManager:
             )
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_channel_guild 
+            CREATE INDEX IF NOT EXISTS idx_channel_guild
             ON channel_config(guild_id)
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_channel_whitelist 
+            CREATE INDEX IF NOT EXISTS idx_channel_whitelist
             ON channel_config(is_ai_whitelisted)
         """)
 
@@ -257,7 +403,7 @@ class DatabaseManager:
             )
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_user_stats_messages 
+            CREATE INDEX IF NOT EXISTS idx_user_stats_messages
             ON user_stats(messages_count DESC)
         """)
         logger.info("Created user_stats table")
@@ -277,15 +423,18 @@ class DatabaseManager:
                 created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                 updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                 is_active BOOLEAN DEFAULT 1,
+                interaction_mode TEXT NOT NULL DEFAULT 'buttons',
+                view_fingerprint TEXT,
+                last_rendered_fingerprint TEXT,
                 UNIQUE(guild_id, channel_id, message_id)
             )
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_role_panel_messages_guild 
+            CREATE INDEX IF NOT EXISTS idx_role_panel_messages_guild
             ON role_panel_messages(guild_id)
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_role_panel_messages_active 
+            CREATE INDEX IF NOT EXISTS idx_role_panel_messages_active
             ON role_panel_messages(is_active)
         """)
         logger.info("Created role_panel_messages table")
@@ -306,11 +455,96 @@ class DatabaseManager:
             )
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_role_panel_buttons_panel 
+            CREATE INDEX IF NOT EXISTS idx_role_panel_buttons_panel
             ON role_panel_buttons(panel_message_id)
         """)
         logger.info("Created role_panel_buttons table")
-    
+
+    async def _create_message_logs_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS message_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                channel_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                author_id INTEGER NOT NULL,
+                author_name TEXT NOT NULL,
+                content TEXT,
+                event_type TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                retention_until TIMESTAMP
+            )
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_message_logs_guild
+            ON message_logs(guild_id)
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_message_logs_event
+            ON message_logs(event_type)
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_message_logs_retention
+            ON message_logs(retention_until)
+        """)
+        logger.info("Created message_logs table")
+
+    async def _create_guild_event_logs_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS guild_event_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                channel_id INTEGER,
+                actor_id INTEGER,
+                actor_name TEXT,
+                target_id INTEGER,
+                target_name TEXT,
+                event_type TEXT NOT NULL,
+                details TEXT,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                retention_until TIMESTAMP
+            )
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_guild_event_logs_guild
+            ON guild_event_logs(guild_id)
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_guild_event_logs_event
+            ON guild_event_logs(event_type)
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_guild_event_logs_retention
+            ON guild_event_logs(retention_until)
+        """)
+        logger.info("Created guild_event_logs table")
+
+    async def _ensure_punishment_columns(self) -> None:
+        for column in (
+            "guild_id",
+            "moderator_id",
+            "duration_seconds",
+            "is_active",
+            "created_at",
+            "retention_until",
+        ):
+            if not await self._column_exists("punishments", column):
+                await self._connection.execute(f"ALTER TABLE punishments ADD COLUMN {column} TEXT")
+
+    async def _ensure_role_panel_message_columns(self) -> None:
+        for column in (
+            "interaction_mode",
+            "view_fingerprint",
+            "last_rendered_fingerprint",
+        ):
+            if not await self._column_exists("role_panel_messages", column):
+                await self._connection.execute(f"ALTER TABLE role_panel_messages ADD COLUMN {column} TEXT")
+
+    async def _column_exists(self, table: str, column: str) -> bool:
+        async with self._connection.execute(f"PRAGMA table_info({table})") as cursor:
+            rows = await cursor.fetchall()
+        return any(row[1] == column for row in rows)
+
     async def _create_server_channel_purposes_table(self) -> None:
         await self._connection.execute("""
             CREATE TABLE IF NOT EXISTS server_channel_purposes (
@@ -329,7 +563,7 @@ class DatabaseManager:
         """)
         await self._connection.execute("""
             CREATE INDEX IF NOT EXISTS idx_scp_purpose
-            ON server_channel_purposes(guild_id, purpose)
+            ON server_channel_purposes(purpose)
         """)
 
     async def _create_welcome_config_table(self) -> None:
@@ -349,28 +583,5 @@ class DatabaseManager:
                 updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )
         """)
-        logger.info("Created welcome_config table")
 
-    async def execute(self, query: str, params: tuple = ()) -> aiosqlite.Cursor:
-        """Выполнение запроса"""
-        conn = await self.connect()
-        return await conn.execute(query, params)
-    
-    async def fetch_one(self, query: str, params: tuple = ()) -> Optional[dict]:
-        """Получение одной строки"""
-        conn = await self.connect()
-        async with conn.execute(query, params) as cursor:
-            row = await cursor.fetchone()
-            return dict(row) if row else None
-    
-    async def fetch_all(self, query: str, params: tuple = ()) -> list:
-        """Получение всех строк"""
-        conn = await self.connect()
-        async with conn.execute(query, params) as cursor:
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
-    
-    async def commit(self) -> None:
-        """Фиксация транзакции"""
-        if self._connection:
-            await self._connection.commit()
+        logger.info("Created welcome_config table")

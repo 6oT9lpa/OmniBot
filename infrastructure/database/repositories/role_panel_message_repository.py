@@ -15,6 +15,7 @@ class RolePanelMessageRepository(RolePanelMessageRepositoryInterface, BaseReposi
         "id", "guild_id", "channel_id", "message_id",
         "embed_title", "embed_description", "embed_color",
         "created_by", "created_at", "updated_at", "is_active",
+        "interaction_mode", "view_fingerprint", "last_rendered_fingerprint",
     }
 
     def __init__(self, db_manager: DatabaseManager):
@@ -29,6 +30,7 @@ class RolePanelMessageRepository(RolePanelMessageRepositoryInterface, BaseReposi
         embed_description: str,
         embed_color: int,
         created_by: int,
+        interaction_mode: str = "buttons",
     ) -> int:
         data = {
             "guild_id": guild_id,
@@ -38,9 +40,10 @@ class RolePanelMessageRepository(RolePanelMessageRepositoryInterface, BaseReposi
             "embed_description": embed_description,
             "embed_color": embed_color,
             "created_by": created_by,
+            "interaction_mode": interaction_mode,
         }
         row_id = await self.insert(data)
-        logger.info(f"Created panel: message_id={message_id}, guild={guild_id}")
+        logger.info("Created %s panel: message_id=%s, guild=%s", interaction_mode, message_id, guild_id)
         return row_id
 
     async def get_by_message(self, message_id: int) -> Optional[Dict[str, Any]]:
@@ -63,7 +66,32 @@ class RolePanelMessageRepository(RolePanelMessageRepositoryInterface, BaseReposi
         await self.commit()
         deleted = cursor.rowcount > 0
         if deleted:
-            logger.info(f"Deleted panel with message_id={message_id}")
+            logger.info("Deleted panel with message_id=%s", message_id)
         else:
-            logger.warning(f"No panel found to delete with message_id={message_id}")
+            logger.warning("No panel found to delete with message_id=%s", message_id)
         return deleted
+
+    async def update_fingerprint(
+        self,
+        message_id: int,
+        *,
+        view_fingerprint: Optional[str],
+        last_rendered_fingerprint: Optional[str] = None,
+    ) -> None:
+        fields = ["view_fingerprint = ?"]
+        values = [view_fingerprint]
+
+        if last_rendered_fingerprint is not None:
+            fields.append("last_rendered_fingerprint = ?")
+            values.append(last_rendered_fingerprint)
+
+        values.append(message_id)
+        await self.execute(
+            f"""
+            UPDATE role_panel_messages
+            SET {', '.join(fields)}
+            WHERE message_id = ?
+            """,
+            tuple(values),
+        )
+        await self.commit()

@@ -21,6 +21,11 @@ class BotConfig(BaseSettings):
     # Logging
     log_level: str = Field("INFO", env="LOG_LEVEL")
 
+    # Retention
+    message_log_retention_days: int = Field(30, env="MESSAGE_LOG_RETENTION_DAYS")
+    punishment_retention_days: int = Field(365, env="PUNISHMENT_RETENTION_DAYS")
+    retention_cleanup_interval_hours: int = Field(6, env="RETENTION_CLEANUP_INTERVAL_HOURS")
+
     command_prefix: str = Field("!", env="COMMAND_PREFIX")
     activity_name: str = Field("playing in vscode", env="ACTIVITY_NAME")
 
