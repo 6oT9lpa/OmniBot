@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any, Union
+from datetime import datetime
 
 import disnake
 
@@ -36,7 +37,7 @@ class LoggingServiceInterface(ABC):
         self,
         message: disnake.Message,
         *,
-        deleted_by: Optional[disnake.Member] = None, 
+        deleted_by: Optional[disnake.Member] = None,
     ) -> None:
         """Record message deletion"""
         pass
@@ -48,31 +49,83 @@ class LoggingServiceInterface(ABC):
         channel: disnake.TextChannel,
         deleted_by: Optional[disnake.Member] = None,
     ) -> None:
-        """Record bulk message deletion"""
+        """Record bulk message deletion with styled embed"""
         pass
-    
+
     @abstractmethod
-    async def log_channel_event(
+    async def log_channel_create(
         self,
-        event_type: EventType,
-        channel: Union[disnake.TextChannel, disnake.VoiceChannel],
-        *,
-        extra_data: Optional[Dict[str, Any]] = None,
+        channel: Union[disnake.TextChannel, disnake.VoiceChannel, disnake.CategoryChannel, disnake.ForumChannel],
+        moderator: Optional[Union[disnake.Member, disnake.User]] = None,
+        timestamp: Optional[datetime] = None,
     ) -> None:
-        """Record channel event"""
+        """Log channel creation"""
+        pass
+
+    @abstractmethod
+    async def log_channel_delete(
+        self,
+        channel: Union[disnake.TextChannel, disnake.VoiceChannel, disnake.CategoryChannel, disnake.ForumChannel],
+        moderator: Optional[Union[disnake.Member, disnake.User]] = None,
+        timestamp: Optional[datetime] = None,
+    ) -> None:
+        """Log channel deletion"""
+        pass
+
+    @abstractmethod
+    async def log_channel_update(
+        self,
+        before: Union[disnake.TextChannel, disnake.VoiceChannel, disnake.CategoryChannel, disnake.ForumChannel],
+        after: Union[disnake.TextChannel, disnake.VoiceChannel, disnake.CategoryChannel, disnake.ForumChannel],
+        moderator: Optional[Union[disnake.Member, disnake.User]] = None,
+        timestamp: Optional[datetime] = None,
+    ) -> None:
+        """Log channel update with detailed changes"""
         pass
     
     @abstractmethod
-    async def log_role_event(
+    async def log_role_create(
         self,
-        event_type: EventType,
         role: disnake.Role,
-        *,
-        extra_data: Optional[Dict[str, Any]] = None,
+        moderator: Optional[Union[disnake.Member, disnake.User]] = None,
+        timestamp: Optional[datetime] = None,
     ) -> None:
-        """Record role event"""
+        """Log role creation with details"""
         pass
-    
+
+    @abstractmethod
+    async def log_role_delete(
+        self,
+        role: disnake.Role,
+        moderator: Optional[Union[disnake.Member, disnake.User]] = None,
+        timestamp: Optional[datetime] = None,
+    ) -> None:
+        """Log role deletion"""
+        pass
+
+    @abstractmethod
+    async def log_role_update(
+        self,
+        before: disnake.Role,
+        after: disnake.Role,
+        moderator: Optional[Union[disnake.Member, disnake.User]] = None,
+        timestamp: Optional[datetime] = None,
+    ) -> None:
+        """Log role update with detailed changes (name, color, permissions, etc.)"""
+        pass
+
+    @abstractmethod
+    async def log_member_role_update(
+        self,
+        member: disnake.Member,
+        before_roles: List[disnake.Role],
+        after_roles: List[disnake.Role],
+        moderator: Optional[Union[disnake.Member, disnake.User]] = None,
+        timestamp: Optional[datetime] = None,
+    ) -> None:
+        """Log role changes for a member (added/removed roles)"""
+        pass
+
     @abstractmethod
     async def log_voice_event(
         self,
@@ -121,8 +174,10 @@ class LoggingServiceInterface(ABC):
     async def log_audit_ban(
         self,
         moderator: disnake.Member,
-        target: disnake.Member,
+        target: Union[disnake.Member, disnake.User],
         reason: str,
+        *,
+        guild_id: Optional[int] = None,
     ) -> None:
         """Log ban from Discord audit log"""
         pass
@@ -131,8 +186,10 @@ class LoggingServiceInterface(ABC):
     async def log_audit_unban(
         self,
         moderator: disnake.Member,
-        target: disnake.Member,
+        target: Union[disnake.Member, disnake.User],
         reason: str,
+        *,
+        guild_id: Optional[int] = None,
     ) -> None:
         """Log unban from Discord audit log"""
         pass
@@ -144,4 +201,9 @@ class LoggingServiceInterface(ABC):
         reason: str,
     ) -> None:
         """Log kick from Discord audit log"""
+        pass
+
+    @abstractmethod
+    async def cleanup_expired(self) -> None:
+        """Cleanup expired log entries"""
         pass

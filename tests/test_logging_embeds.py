@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timezone
 
-from presentation.embeds.panel_management.logging import (
+from presentation.embeds.logging_embed import (
     VoiceLogEmbedBuilder,
     MessageLogEmbedBuilder,
 )

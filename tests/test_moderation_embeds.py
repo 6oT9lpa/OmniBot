@@ -1,7 +1,6 @@
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-from presentation.embeds.panel_management.moderation import (
+from presentation.embeds import (
     ModerationBanEmbedBuilder,
     ModerationWarnEmbedBuilder,
     ModerationKickEmbedBuilder,

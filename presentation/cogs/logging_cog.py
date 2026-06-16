@@ -1,5 +1,6 @@
 import disnake
 from disnake.ext import commands, tasks
+from datetime import datetime, timezone
 from typing import Optional
 
 from application.services import AuditLogService, LoggingService
@@ -42,9 +43,34 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: disnake.Message):
-        if not getattr(message, "guild", None) or message.author.bot:
+        if not message.guild or message.author.bot:
             return
-        await self._logging_service.log_message_delete(message)
+
+        deleted_by = None
+
+        try:
+            async for entry in message.guild.audit_logs(
+                limit=10,
+                action=disnake.AuditLogAction.message_delete
+            ):
+                if entry.target.id != message.author.id:
+                    continue
+
+                if (
+                    datetime.now(timezone.utc) - entry.created_at
+                ).total_seconds() > 5:
+                    continue
+
+                deleted_by = entry.user
+                break
+
+        except Exception as e:
+            logger.warning("Failed to get audit log for message delete: %s", e)
+
+        await self._logging_service.log_message_delete(
+            message,
+            deleted_by=deleted_by
+        )
 
     @commands.Cog.listener()
     async def on_raw_bulk_delete(self, payload: disnake.RawBulkMessageDeleteEvent):
@@ -55,10 +81,14 @@ class LoggingCog(commands.Cog):
         if not isinstance(channel, disnake.TextChannel):
             return
         deleted_by = None
-        async for entry in guild.audit_logs(limit=5, action=disnake.AuditLogAction.message_delete):
-            if entry.target and entry.target.id == payload.channel_id:
-                deleted_by = guild.get_member(entry.user.id)
-                break
+        try:
+            async for entry in guild.audit_logs(limit=5, action=disnake.AuditLogAction.message_delete):
+                if entry.target and entry.target.id == payload.channel_id:
+                    deleted_by = guild.get_member(entry.user.id)
+                    break
+        except Exception as e:
+            logger.warning("Failed to get audit log for bulk delete: %s", e)
+
         await self._logging_service.log_bulk_delete([], channel, deleted_by=deleted_by)
 
     @commands.Cog.listener()
@@ -67,6 +97,19 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before: disnake.Member, after: disnake.Member):
+        if before.roles != after.roles:
+            added = [r for r in after.roles if r not in before.roles]
+            removed = [r for r in before.roles if r not in after.roles]
+            moderator = None
+            try:
+                async for entry in after.guild.audit_logs(limit=5, action=disnake.AuditLogAction.member_role_update):
+                    if entry.target and entry.target.id == after.id:
+                        moderator = after.guild.get_member(entry.user.id)
+                        break
+            except Exception:
+                pass
+            await self._logging_service.log_member_role_update(after, added, removed, moderator)
+
         changed = []
         if before.nick != after.nick:
             changed.append(f"nick: {before.nick} -> {after.nick}")
@@ -81,35 +124,57 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: disnake.abc.GuildChannel):
-        await self._logging_service.log_channel_event(EventType.CHANNEL_CREATE, channel)
+        moderator = await self._get_audit_log_actor(
+            channel.guild,
+            disnake.AuditLogAction.channel_create,
+            channel.id,
+        )
+        await self._logging_service.log_channel_create(channel, moderator)
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: disnake.abc.GuildChannel):
-        await self._logging_service.log_channel_event(EventType.CHANNEL_DELETE, channel)
+        moderator = await self._get_audit_log_actor(
+            channel.guild,
+            disnake.AuditLogAction.channel_delete,
+            channel.id,
+        )
+        await self._logging_service.log_channel_delete(channel, moderator)
 
     @commands.Cog.listener()
     async def on_guild_channel_update(self, before: disnake.abc.GuildChannel, after: disnake.abc.GuildChannel):
-        await self._logging_service.log_channel_event(
-            EventType.CHANNEL_UPDATE,
-            after,
-            extra_data={"before_name": before.name, "after_name": after.name},
+        moderator = await self._get_audit_log_actor(
+            after.guild,
+            disnake.AuditLogAction.channel_update,
+            after.id,
         )
+        await self._logging_service.log_channel_update(before, after, moderator)
 
     @commands.Cog.listener()
     async def on_guild_role_create(self, role: disnake.Role):
-        await self._logging_service.log_role_event(EventType.ROLE_CREATE, role)
+        moderator = await self._get_audit_log_actor(
+            role.guild,
+            disnake.AuditLogAction.role_create,
+            role.id,
+        )
+        await self._logging_service.log_role_create(role, moderator)
 
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role: disnake.Role):
-        await self._logging_service.log_role_event(EventType.ROLE_DELETE, role)
+        moderator = await self._get_audit_log_actor(
+            role.guild,
+            disnake.AuditLogAction.role_delete,
+            role.id,
+        )
+        await self._logging_service.log_role_delete(role, moderator)
 
     @commands.Cog.listener()
     async def on_guild_role_update(self, before: disnake.Role, after: disnake.Role):
-        await self._logging_service.log_role_event(
-            EventType.ROLE_UPDATE,
-            after,
-            extra_data={"before_name": before.name, "after_name": after.name},
+        moderator = await self._get_audit_log_actor(
+            after.guild,
+            disnake.AuditLogAction.role_update,
+            after.id,
         )
+        await self._logging_service.log_role_update(before, after, moderator)
 
     @commands.Cog.listener()
     async def on_voice_state_update(
@@ -125,18 +190,98 @@ class LoggingCog(commands.Cog):
         if not self._bot:
             return
 
-        action_type = entry.action
+        action = entry.action
+        logger.debug("Audit log entry: action=%s, user=%s, target=%s", action, entry.user, entry.target)
 
-        if action_type == disnake.AuditLogAction.ban:
+        if action == disnake.AuditLogAction.ban:
             target = entry.target
             moderator = entry.user
             if isinstance(target, (disnake.Member, disnake.User)):
-                await self._logging_service.log_audit_ban(moderator=moderator, target=target, reason=entry.reason)
+                guild_id = entry.guild.id
+                await self._logging_service.log_audit_ban(
+                    moderator=moderator,
+                    target=target,
+                    reason=entry.reason or "Не указана",
+                    guild_id=guild_id,
+                )
 
-        elif action_type == disnake.AuditLogAction.kick:
+        elif action == disnake.AuditLogAction.unban:
+            target = entry.target
+            moderator = entry.user
+            if isinstance(target, (disnake.Member, disnake.User)):
+                guild_id = entry.guild.id
+                await self._logging_service.log_audit_unban(
+                    moderator=moderator,
+                    target=target,
+                    reason=entry.reason or "Не указана",
+                    guild_id=guild_id,
+                )
+
+        elif action == disnake.AuditLogAction.kick:
             target = entry.target
             if isinstance(target, disnake.Member):
-                await self._logging_service.log_audit_kick(target, entry.reason)
+                await self._logging_service.log_audit_kick(target, entry.reason or "Не указана")
+
+        elif action == disnake.AuditLogAction.member_update:
+            if not entry.changes:
+                return
+
+            for change in entry.changes:
+                if change.key == "communication_disabled_until":
+                    before_val = change.before
+                    after_val = change.after
+                    target = entry.target
+
+                    if not isinstance(target, disnake.Member):
+                        continue
+
+                    now = datetime.now(timezone.utc)
+
+                    if before_val is None and after_val is not None:
+                        duration_seconds = int((after_val - now).total_seconds())
+                        if duration_seconds < 0:
+                            duration_seconds = 0
+                        await self._logging_service.log_audit_mute(
+                            target,
+                            duration_seconds,
+                            entry.reason or "Таймаут через аудит-лог",
+                        )
+
+                    elif before_val is not None and after_val is None:
+                        await self._logging_service.log_audit_unmute(
+                            target,
+                            0,
+                            entry.reason or "Снятие таймаута через аудит-лог",
+                        )
+
+                    elif before_val is not None and after_val is not None and before_val != after_val:
+                        logger.debug("Timeout duration updated for %s: %s -> %s", target.id, before_val, after_val)
+                    break 
+
+    async def _get_audit_log_actor(
+        self,
+        guild: disnake.Guild,
+        action: disnake.AuditLogAction,
+        target_id: int,
+        limit: int = 10,
+    ) -> disnake.Member:
+        """Ищет в аудит-логе запись с указанным действием и целью, возвращает пользователя."""
+
+        try:
+            async for entry in guild.audit_logs(limit=limit, action=action):
+                if entry.target and entry.target.id == target_id:
+                    logger.debug("Found audit log actor %s for action %s target %s", entry.user.id, action, target_id)
+                    return entry.user
+                
+        except Exception as e:
+            logger.warning("Не удалось получить аудит-лог для действия %s: %s", action, e)
+
+        return None
+
+    def _guild_from_id(self, guild_id: int) -> Optional[disnake.Guild]:
+        if self._bot:
+            return self._bot.get_guild(guild_id)
+        return None
 
     def _guild_from_id(self, guild_id: int) -> Optional[disnake.Guild]:
         if self._bot:

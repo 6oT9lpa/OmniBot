@@ -29,7 +29,7 @@ class ModeratorService(ModeratorServiceInterface):
 
     async def warn_user(
         self,
-        moderator: Union[disnake.Member, disnake.User],
+        moderator: disnake.Member,
         target: disnake.Member,
         reason: str,
         *,
@@ -102,7 +102,7 @@ class ModeratorService(ModeratorServiceInterface):
 
     async def mute_user(
         self,
-        moderator: Union[disnake.Member, disnake.User],
+        moderator: disnake.Member,
         target: disnake.Member,
         reason: str,
         *,
@@ -185,7 +185,7 @@ class ModeratorService(ModeratorServiceInterface):
 
     async def unmute_user(
         self,
-        moderator: Union[disnake.Member, disnake.User],
+        moderator: disnake.Member,
         target: disnake.Member,
         reason: str = "Досрочное снятие мута",
     ) -> bool:
@@ -234,7 +234,7 @@ class ModeratorService(ModeratorServiceInterface):
 
     async def kick_user(
         self,
-        moderator: Union[disnake.Member, disnake.User],
+        moderator: disnake.Member,
         target: disnake.Member,
         reason: str,
         *,
@@ -295,8 +295,8 @@ class ModeratorService(ModeratorServiceInterface):
 
     async def ban_user(
         self,
-        moderator: Union[disnake.Member, disnake.User],
-        target: Union[disnake.Member, disnake.User],
+        moderator: disnake.Member,
+        target: disnake.Member,
         reason: str,
         *,
         delete_message_days: int = 1,
@@ -368,7 +368,7 @@ class ModeratorService(ModeratorServiceInterface):
 
     async def unban_user(
         self,
-        moderator: Union[disnake.Member, disnake.User],
+        moderator: disnake.Member,
         guild: disnake.Guild,
         user_id: int,
         reason: str = "Досрочное снятие бана",
@@ -407,7 +407,7 @@ class ModeratorService(ModeratorServiceInterface):
 
     async def timeout_user(
         self,
-        moderator: Union[disnake.Member, disnake.User],
+        moderator: disnake.Member,
         target: disnake.Member,
         duration: int,
         reason: str,
@@ -437,7 +437,7 @@ class ModeratorService(ModeratorServiceInterface):
 
     async def remove_timeout(
         self,
-        moderator: Union[disnake.Member, disnake.User],
+        moderator: disnake.Member,
         target: disnake.Member,
         reason: str = "Досрочное снятие таймаута",
     ) -> bool:
@@ -463,8 +463,8 @@ class ModeratorService(ModeratorServiceInterface):
 
     async def _create_punishment(
         self,
-        moderator: Union[disnake.Member, disnake.User],
-        target: Union[disnake.Member, disnake.User],
+        moderator: disnake.Member,
+        target: disnake.Member,
         punishment_type: PunishmentType,
         reason: str,
         duration_seconds: Optional[int] = None,
@@ -472,11 +472,15 @@ class ModeratorService(ModeratorServiceInterface):
         guild = self._guild_from_actor(moderator)
         target_guild = getattr(target, "guild", None)
         guild_id = guild.id if guild else target_guild.id if target_guild else 0
+        
         if not guild_id:
             raise ValueError("Cannot create punishment without guild context")
+        
         expires_at = None
+
         if duration_seconds:
             expires_at = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
+            
         return await self._repo.add(
             PunishmentDTO(
                 guild_id=guild_id,
@@ -491,7 +495,7 @@ class ModeratorService(ModeratorServiceInterface):
 
     def _can_moderate(
         self,
-        moderator: Union[disnake.Member, disnake.User],
+        moderator: disnake.Member,
         target: disnake.Member,
     ) -> bool:
         if not isinstance(moderator, disnake.Member):
@@ -507,7 +511,7 @@ class ModeratorService(ModeratorServiceInterface):
 
     def _guild_from_actor(
         self,
-        actor: Union[disnake.Member, disnake.User],
+        actor: disnake.Member,
     ) -> Optional[disnake.Guild]:
         return getattr(actor, "guild", None)
 

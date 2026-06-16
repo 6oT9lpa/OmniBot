@@ -36,9 +36,11 @@ class AuditLogService(AuditLogServiceInterface):
             event_type=event_type,
             channel_id=channel_id,
         )
+
         if not channel:
             logger.debug("No log channel for guild id=%s", guild_id)
             return
+        
         try:
             await channel.send(embed=embed)
         except Exception as exc:
@@ -70,12 +72,6 @@ class AuditLogService(AuditLogServiceInterface):
                     if isinstance(channel, disnake.TextChannel):
                         return channel
 
-        fallback_id = self._config.log_channel_id
-        if fallback_id is not None:
-            channel = guild.get_channel(fallback_id)
-            if isinstance(channel, disnake.TextChannel):
-                return channel
-
         return None
 
     @staticmethod
@@ -85,10 +81,13 @@ class AuditLogService(AuditLogServiceInterface):
         if event_type.startswith("message"):
             return ChannelPurpose.MESSAGE_LOG
         if event_type.startswith("voice"):
-            return ChannelPurpose.VOICE_LOG
+            return ChannelPurpose.CHANNEL_LOG
+        if event_type.startswith("channel"):
+            return ChannelPurpose.CHANNEL_LOG 
         if event_type.startswith("moderation"):
             return ChannelPurpose.MOD_LOG
-        return None
+        
+        return ChannelPurpose.MOD_LOG
 
     async def setup_log_channels(
         self,

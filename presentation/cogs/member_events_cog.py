@@ -159,10 +159,9 @@ class MemberEventsCog(commands.Cog):
                 ChannelPurpose.MEMBER_LOG: "Лог входа/выхода",
                 ChannelPurpose.MOD_LOG: "Лог модерации",
                 ChannelPurpose.MESSAGE_LOG: "Лог сообщений",
-                ChannelPurpose.VOICE_LOG: "Лог голосовых каналов",
+                ChannelPurpose.CHANNEL_LOG: "Лог каналов",
                 ChannelPurpose.STREAM_ANNOUNCE: "Анонсы стримов",
                 ChannelPurpose.DEV_BLOG: "Dev Blog",
-                ChannelPurpose.ADMIN_LOG: "Лог администратора",
             }
             label = purpose_labels.get(purpose_enum, purpose)
 
@@ -210,10 +209,9 @@ class MemberEventsCog(commands.Cog):
                 "member_log": "Лог входа/выхода",
                 "mod_log": "Лог модерации",
                 "message_log": "Лог сообщений",
-                "voice_log": "Лог голосовых каналов",
+                "channel_log": "Лог каналов",
                 "stream_announce": "Анонсы стримов",
                 "dev_blog": "Dev Blog",
-                "admin_log": "Лог администратора",
             }
 
             embed = disnake.Embed(
