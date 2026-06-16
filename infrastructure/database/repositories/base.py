@@ -16,11 +16,8 @@ logger = get_logger(__name__)
 
 
 class BaseRepository:
-    """Базовый репозиторий с общими CRUD операциями"""
-
     def __init__(self, db_manager: DatabaseManager):
         self._db_manager = db_manager
-        self._TABLE_NAME: str = ""
 
     async def execute(self, query: str, params: tuple = ()) -> aiosqlite.Cursor:
         """Выполнить SQL запрос"""
@@ -40,19 +37,26 @@ class BaseRepository:
 
     async def insert(self, data: Dict[str, Any]) -> bool:
         """Вставить новую запись"""
-        columns = ", ".join(data.keys())
+        if not self._TABLE_NAME:
+            raise ValueError("_TABLE_NAME is not set")
+
+        columns = ", ".join(f'"{k}"' for k in data.keys())
         placeholders = ", ".join("?" * len(data))
-        query = f"INSERT INTO {self._TABLE_NAME} ({columns}) VALUES ({placeholders})"
+        query = f'INSERT INTO {self._TABLE_NAME} ({columns}) VALUES ({placeholders})'
+
         try:
-            await self.execute(query, tuple(data.values()))
+            cursor = await self.execute(query, tuple(data.values()))
             await self.commit()
-            return True
+            return cursor.lastrowid if hasattr(cursor, "lastrowid") else None
         except Exception as e:
-            logger.error(f"Insert error: {e}")
-            return False
+            logger.error(f"Insert error in {self._TABLE_NAME}: {e}\nQuery: {query}\nData: {data}")
+            return None
 
     async def upsert(self, data: Dict[str, Any], conflict_column: str = "id") -> bool:
         """Вставить или обновить запись"""
+        if not getattr(self, "_TABLE_NAME", None):
+            raise ValueError("_TABLE_NAME is not set")
+
         columns = ", ".join(data.keys())
         placeholders = ", ".join("?" * len(data))
         
@@ -114,3 +118,8 @@ class BaseRepository:
             query = f"SELECT COUNT(*) as count FROM {self._TABLE_NAME}"
             result = await self.fetch_one(query)
         return result["count"] if result else 0
+
+    async def get_by_id(self, id_value: Any, id_column: str = "id") -> Optional[Dict[str, Any]]:
+        """Получить запись по ID"""
+        query = f"SELECT * FROM {self._TABLE_NAME} WHERE {id_column} = ?"
+        return await self.fetch_one(query, (id_value,))
