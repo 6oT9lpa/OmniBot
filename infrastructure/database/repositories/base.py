@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+)
+
 import aiosqlite
 
 from infrastructure.database.connection import DatabaseManager
