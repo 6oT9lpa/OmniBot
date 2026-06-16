@@ -202,7 +202,6 @@ class DatabaseManager:
         await self._create_roles_table()
         await self._create_channel_config_table()
         await self._create_user_stats_table()
-        await self._create_voice_table()
         await self._create_role_panel_messages_table()
         await self._create_role_panel_buttons_table()
         await self._create_message_logs_table()
@@ -211,6 +210,10 @@ class DatabaseManager:
         await self._ensure_role_panel_message_columns()
         await self._create_server_channel_purposes_table()
         await self._create_welcome_config_table()
+        await self._create_voice_rooms_table()
+        await self._create_voice_config_table()
+        await self._ensure_messages_columns()
+        await self._create_voice_sessions_table()
 
         logger.info("All tables created successfully")
 
@@ -408,16 +411,19 @@ class DatabaseManager:
                 messages_count INTEGER DEFAULT 0,
                 voice_minutes INTEGER DEFAULT 0,
                 warnings_count INTEGER DEFAULT 0,
-                last_message TIMESTAMP DEFAULT NULL,
+                last_message TEXT,
                 joined_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
-                PRIMARY KEY (user_id, guild_id)
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                updated_at TEXT TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                UNIQUE(user_id, guild_id)
             )
         """)
         await self._connection.execute("""
             CREATE INDEX IF NOT EXISTS idx_user_stats_messages
             ON user_stats(messages_count DESC)
         """)
-        
+        await self._connection.commit()
+
         logger.info("Created user_stats table")
 
     async def _create_role_panel_messages_table(self) -> None:
@@ -449,6 +455,7 @@ class DatabaseManager:
             CREATE INDEX IF NOT EXISTS idx_role_panel_messages_active
             ON role_panel_messages(is_active)
         """)
+        await self._connection.commit()
 
         logger.info("Created role_panel_messages table")
 
@@ -471,6 +478,7 @@ class DatabaseManager:
             CREATE INDEX IF NOT EXISTS idx_role_panel_buttons_panel
             ON role_panel_buttons(panel_message_id)
         """)
+        await self._connection.commit()
 
         logger.info("Created role_panel_buttons table")
 
@@ -500,7 +508,8 @@ class DatabaseManager:
         await self._connection.execute("""
             CREATE INDEX IF NOT EXISTS idx_message_logs_retention
             ON message_logs(retention_until)
-        """)
+        """)    
+        await self._connection.commit()
 
         logger.info("Created message_logs table")
 
@@ -532,6 +541,7 @@ class DatabaseManager:
             CREATE INDEX IF NOT EXISTS idx_guild_event_logs_retention
             ON guild_event_logs(retention_until)
         """)
+        await self._connection.commit()
 
         logger.info("Created guild_event_logs table")
 
@@ -555,6 +565,13 @@ class DatabaseManager:
         ):
             if not await self._column_exists("role_panel_messages", column):
                 await self._connection.execute(f"ALTER TABLE role_panel_messages ADD COLUMN {column} TEXT")
+
+    async def _ensure_messages_columns(self) -> None:
+        columns = ("user_id", "deleted", "edited", "edited_content", "ai_flagged", "ai_reason", "reply_to_message_id")
+        for col in columns:
+            if not await self._column_exists("messages", col):
+                await self._connection.execute(f"ALTER TABLE messages ADD COLUMN {col}")
+        await self.commit()
 
     async def _column_exists(self, table: str, column: str) -> bool:
         async with self._connection.execute(f"PRAGMA table_info({table})") as cursor:
@@ -581,6 +598,7 @@ class DatabaseManager:
             CREATE INDEX IF NOT EXISTS idx_scp_purpose
             ON server_channel_purposes(purpose)
         """)
+        await self._connection.commit()
 
         logger.info("Created server_channel_purposes table")
 
@@ -601,5 +619,51 @@ class DatabaseManager:
                 updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )
         """)
+        await self._connection.commit()
 
         logger.info("Created welcome_config table")
+
+    async def _create_voice_rooms_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS voice_rooms (
+                channel_id INTEGER PRIMARY KEY,
+                guild_id INTEGER NOT NULL,
+                owner_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                is_persistent INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+        await self._connection.execute("CREATE INDEX IF NOT EXISTS idx_voice_rooms_guild ON voice_rooms(guild_id)")
+        await self._connection.execute("CREATE INDEX IF NOT EXISTS idx_voice_rooms_owner ON voice_rooms(owner_id)")
+        await self._connection.commit()
+        logger.info("Created voice_rooms table")
+
+    async def _create_voice_config_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS voice_config (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+        await self._connection.commit()
+        logger.info("Created voice_config table")
+
+    async def _create_voice_sessions_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS voice_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                guild_id INTEGER NOT NULL,
+                channel_id INTEGER NOT NULL,
+                joined_at TIMESTAMP NOT NULL,
+                left_at TIMESTAMP,
+                duration_seconds INTEGER DEFAULT 0
+            )
+        """)
+        await self._connection.execute("CREATE INDEX IF NOT EXISTS idx_vs_guild ON voice_sessions(guild_id)")
+        await self._connection.execute("CREATE INDEX IF NOT EXISTS idx_vs_user ON voice_sessions(user_id)")
+        await self._connection.execute("CREATE INDEX IF NOT EXISTS idx_vs_channel ON voice_sessions(channel_id)")
+        await self._connection.execute("CREATE INDEX IF NOT EXISTS idx_vs_left ON voice_sessions(left_at)")
+        await self.commit()
+        logger.info("Created voice_sessions table")

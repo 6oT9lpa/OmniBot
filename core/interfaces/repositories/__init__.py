@@ -6,6 +6,8 @@ from core.interfaces.repositories.welcome_config_repository_interface import Wel
 from core.interfaces.repositories.guild_event_log_repository_interface import GuildEventLogRepositoryInterface
 from core.interfaces.repositories.message_log_repository_interface import MessageLogRepositoryInterface
 from core.interfaces.repositories.punishment_repository_interface import PunishmentRepositoryInterface
+from core.interfaces.repositories.stats_repository_interface import StatsRepositoryInterface
+from core.interfaces.repositories.voice_repository_interface import VoiceRepositoryInterface
 
 
 __all__ = [
@@ -16,5 +18,7 @@ __all__ = [
     'RoleRepositoryInterface',
     'GuildEventLogRepositoryInterface',
     'MessageLogRepositoryInterface',
-    'PunishmentRepositoryInterface'
+    'PunishmentRepositoryInterface',
+    'StatsRepositoryInterface',
+    'VoiceRepositoryInterface'
 ]

@@ -5,6 +5,8 @@ from core.interfaces.services.moderation_history_service_interface import Modera
 from core.interfaces.services.audit_log_service_interface import AuditLogServiceInterface
 from core.interfaces.services.logging_service_interface import LoggingServiceInterface
 from core.interfaces.services.channel_service_interface import ChannelServiceInterface
+from core.interfaces.services.stats_service_interface import StatsServiceInterface
+from core.interfaces.services.voice_service_interface import VoiceServiceInterface
 
 
 __all__ = [
@@ -15,4 +17,6 @@ __all__ = [
     'AuditLogServiceInterface',
     'LoggingServiceInterface',
     'ChannelServiceInterface',
+    'StatsServiceInterface',
+    'VoiceServiceInterface'
 ]

@@ -117,8 +117,32 @@ class Container:
             db = await self.get_database()
             self._punishment_repo = PunishmentRepository(db)
         return self._punishment_repo
+    
+    async def get_stats_repository(self) -> StatsRepository:
+        if not self._stats_repo:
+            db = await self.get_database()
+            self._stats_repo = StatsRepository(db)
+        return self._stats_repo
+    
+    async def get_voice_repository(self) -> VoiceRepository:
+        if not self._voice_repo:
+            db = await self.get_database()
+            self._voice_repo = VoiceRepository(db)
+        return self._voice_repo
 
     #=============== Service =====================
+
+    async def get_stats_service(self) -> StatsService:
+        if not self._stats_service:
+            repo = await self.get_stats_repository()
+            self._stats_service = StatsService(repo)
+        return self._stats_service
+    
+    async def get_voice_service(self) -> VoiceService:
+        if not self._voice_service:
+            repo = await self.get_voice_repository()
+            self._voice_service = VoiceService(repo)
+        return self._voice_service
 
     async def get_role_service(self) -> RoleService:
         if not self._role_service:
@@ -132,34 +156,6 @@ class Container:
             logger.info("RoleService created with panel repositories")
             
         return self._role_service
-    
-    async def get_stats_service(self) -> StatsService:
-        """Получить сервис статистики"""
-        if not self._stats_service:
-            repo = await self.get_stats_repository()
-            self._stats_service = StatsService(repo, self.config)  
-        return self._stats_service
-    
-    async def get_stats_repository(self) -> StatsRepository:
-        """Получить репозиторий статистики"""
-        if not self._stats_repo:
-            db = await self.get_database()
-            self._stats_repo = StatsRepository(db)  
-        return self._stats_repo
-    
-    async def get_voice_service(self) -> VoiceService:
-        """Получить сервис войсов"""
-        if not self._voice_service:
-            repo = await self.get_voice_repository()
-            self._voice_service = VoiceService(repo)  
-        return self._voice_service
-    
-    async def get_voice_repository(self) -> VoiceRepository:
-        """Получить репозиторий войсов"""
-        if not self._voice_repo:
-            db = await self.get_database()
-            self._voice_repo = VoiceRepository(db)  
-        return self._voice_repo
 
     async def get_welcome_service(self) -> WelcomeService:
         if not self._welcome_service:

@@ -5,6 +5,9 @@ from application.services.moderation_history_service import ModerationHistorySer
 from application.services.moderator_service import ModeratorService
 from application.services.role_service import RoleService
 from application.services.welcome_service import WelcomeService
+from application.services.stats_service import StatsService
+from application.services.voice_service import VoiceService
+
 
 __all__ = [
     'AuditLogService',
@@ -14,4 +17,6 @@ __all__ = [
     'ModeratorService',
     'RoleService',
     'WelcomeService',
+    'StatsService',
+    'VoiceService'
 ]
