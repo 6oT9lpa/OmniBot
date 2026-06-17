@@ -12,7 +12,6 @@ from application.schemas.voice_schemas import (
     VoiceInviteSchema,
     VoiceLimitSchema,
     VoiceRenameSchema,
-    VoiceRoomCreateSchema,
 )
 from core.interfaces.repositories import VoiceRepositoryInterface
 from core.interfaces.services import VoiceServiceInterface
@@ -70,7 +69,7 @@ class VoiceService(VoiceServiceInterface):
             logger.error("Failed to delete voice room channel_id=%s: %s", channel.id, exc)
             raise
 
-    async def schedule_delete(self, channel: disnake.VoiceChannel, delay: float = 30.0) -> None:
+    async def schedule_delete(self, channel: disnake.VoiceChannel, delay: float = 10.0) -> None:
         """Запланировать удаление пустой комнаты через `delay` секунд."""
         self._cancel_task(channel.id)
 
@@ -256,15 +255,11 @@ class VoiceService(VoiceServiceInterface):
     ) -> Optional[disnake.VoiceChannel]:
         """Создать новую голосовую комнату на Discord и сохранить в БД."""
         guild = member.guild
-        schema = VoiceRoomCreateSchema(
-            channel_id=0,
-            guild_id=guild.id,
-            owner_id=member.id,
-            name=f"🔊 {member.display_name}",
-        )
+        room_name = f"🔊 {member.display_name}"
+
         try:
             channel = await guild.create_voice_channel(
-                name=schema.name,
+                name=room_name,
                 category=trigger_channel.category,
                 overwrites={
                     guild.default_role: disnake.PermissionOverwrite(connect=False),
@@ -282,13 +277,13 @@ class VoiceService(VoiceServiceInterface):
                     channel_id=channel.id,
                     guild_id=guild.id,
                     owner_id=member.id,
-                    name=schema.name,
+                    name=room_name,
                     created_at=datetime.now(_MSK),
                 )
             )
             logger.info(
                 "Voice room created: channel_id=%s name=%s owner=%s",
-                channel.id, schema.name, member.id,
+                channel.id, room_name, member.id,
             )
             return channel
         except Exception as exc:
