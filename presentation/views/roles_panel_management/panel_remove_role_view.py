@@ -111,24 +111,7 @@ class PanelRemoveRoleView(disnake.ui.View):
                     except Exception as e:
                         logger.warning(f"Could not remove role from {member}: {e}")
 
-            channel = self._guild.get_channel(self._panel["channel_id"])
-            if channel:
-                buttons = await self._role_service.get_panel_buttons(self._panel["message_id"])
-                try:
-                    msg = await channel.fetch_message(self._panel["message_id"])
-                    if buttons:
-                        panel_embed = await rebuild_panel_embed(
-                            self._role_service, self._guild, self._panel, buttons
-                        )
-                        panel_view = RolePanelView(buttons, self._panel["message_id"], self._role_service)
-                        await msg.edit(embed=panel_embed, view=panel_view)
-                    else:
-                        panel_embed = await rebuild_panel_embed(
-                            self._role_service, self._guild, self._panel, []
-                        )
-                        await msg.edit(embed=panel_embed, view=None)
-                except Exception as e:
-                    logger.warning(f"Could not update panel message: {e}")
+            await self._update_panel_message()
 
             await interaction.edit_original_response(
                 embed=disnake.Embed(
@@ -148,3 +131,38 @@ class PanelRemoveRoleView(disnake.ui.View):
             await interaction.edit_original_response(
                 embed=disnake.Embed(title="Error", description=str(e), color=COLOR_RED), view=None
             )
+
+    async def _update_panel_message(self):
+        """Обновляет embed и view/реакции панели в зависимости от режима."""
+        panel = await self._role_service.get_panel(self._panel["message_id"])
+        if not panel:
+            return
+
+        channel = self._guild.get_channel(panel["channel_id"])
+        if not channel:
+            return
+
+        buttons = await self._role_service.get_panel_buttons(panel["message_id"])
+        embed = await rebuild_panel_embed(self._role_service, self._guild, panel, buttons)
+
+        try:
+            msg = await channel.fetch_message(panel["message_id"])
+        except Exception as e:
+            logger.warning(f"Could not fetch panel message: {e}")
+            return
+
+        interaction_mode = panel.get("interaction_mode", "buttons")
+        if interaction_mode == "reactions":
+            cog = self._role_service._bot.get_cog("RolesCog") if self._role_service._bot else None
+            if cog:
+                if panel["message_id"] in cog._reaction_panels:
+                    old_view = cog._reaction_panels.pop(panel["message_id"])
+                    await old_view.clear_reactions()
+                await cog.register_reaction_panel(panel["message_id"])
+            await msg.edit(embed=embed, view=None)
+        else:
+            view = RolePanelView(buttons, panel["message_id"], self._role_service)
+            await msg.edit(embed=embed, view=view)
+
+        fingerprint = await self._role_service.ensure_panel_fingerprint(panel)
+        await self._role_service.mark_panel_rendered(panel["message_id"], fingerprint)

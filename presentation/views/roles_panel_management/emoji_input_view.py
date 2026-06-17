@@ -4,7 +4,7 @@ import disnake
 
 from infrastructure.logging import get_logger
 from presentation.views.role_panel_view import RolePanelView
-from presentation.views.roles_panel_management.helpers import COLOR_BLUE, COLOR_GREEN, COLOR_RED, COMMON_EMOJIS, MAX_PANEL_ITEMS
+from presentation.views.roles_panel_management.helpers import COLOR_BLUE, COLOR_GREEN, COLOR_RED, COMMON_EMOJIS, MAX_PANEL_ITEMS, get_emoji_select_options
 from presentation.views.roles_panel_management.panel_mode_toggle_button import PanelModeToggleButton
 
 logger = get_logger(__name__)
@@ -27,6 +27,7 @@ class EmojiInputView(disnake.ui.View):
         self._role_service = role_service
         self._guild = guild
         self._selected_role_ids = selected_role_ids[:MAX_PANEL_ITEMS]
+        # Словарь {role_id: role_dict} для быстрого доступа к данным роли
         self._available_roles = {rd["role_id"]: rd for rd in available_roles}
         self._target_channel = target_channel
         self._embed_title = embed_title
@@ -35,9 +36,14 @@ class EmojiInputView(disnake.ui.View):
         self._emoji_map: Dict[int, str] = {}
         self._current_role_id: Optional[int] = None
 
+        # Инициализация карты эмодзи с защитой от неверных данных
         for rid in self._selected_role_ids:
-            rd = self._available_roles.get(rid, {})
-            self._emoji_map[rid] = rd.get("display_emoji") or "🎭"
+            rd = self._available_roles.get(rid)
+            if rd and isinstance(rd, dict):
+                default_emoji = rd.get("display_emoji") or "🎭"
+            else:
+                default_emoji = "🎭"
+            self._emoji_map[rid] = default_emoji
 
         self._rebuild_role_options()
 
@@ -52,10 +58,7 @@ class EmojiInputView(disnake.ui.View):
         self.role_picker.callback = self._on_role_pick
         self.add_item(self.role_picker)
 
-        emoji_options = [
-            disnake.SelectOption(label=e, value=e, emoji=e)
-            for e in COMMON_EMOJIS
-        ]
+        emoji_options = get_emoji_select_options(self._guild)
         self.emoji_picker = disnake.ui.StringSelect(
             custom_id="emoji_picker",
             placeholder="Выберите эмодзи для роли...",
@@ -226,12 +229,13 @@ class EmojiInputView(disnake.ui.View):
             )
 
             for rid in visible_role_ids:
-                rd = self._available_roles.get(rid, {})
+                role = self._guild.get_role(rid)
+                role_name = role.name if role else str(rid)
                 emoji = self._emoji_map.get(rid)
                 await self._role_service.add_button_to_panel(
                     message_id=message.id,
                     role_id=rid,
-                    role_name=rd.get("name", str(rid)),
+                    role_name=role_name,
                     emoji=emoji,
                 )
 
@@ -241,6 +245,9 @@ class EmojiInputView(disnake.ui.View):
                 reaction_view = RolePanelReactionView(message, buttons, self._role_service)
                 await reaction_view.setup()
                 await message.edit(view=None)
+                cog = self._role_service._bot.get_cog("RolesCog") if self._role_service._bot else None
+                if cog:
+                    await cog.register_reaction_panel(message.id)
                 logger.info(
                     "Created reaction panel '%s' in channel id=%s, message id=%s",
                     self._embed_title,
@@ -257,6 +264,11 @@ class EmojiInputView(disnake.ui.View):
                     self._target_channel.id,
                     message.id,
                 )
+
+            panel = await self._role_service.get_panel(message.id)
+            if panel:
+                fingerprint = await self._role_service.ensure_panel_fingerprint(panel)
+                await self._role_service.mark_panel_rendered(message.id, fingerprint)
 
             roles_count = len(visible_role_ids)
             panel_type = "реакции" if use_reactions else "кнопки"

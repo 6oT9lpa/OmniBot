@@ -4,7 +4,7 @@ import disnake
 
 from infrastructure.logging import get_logger
 from presentation.views.role_panel_view import RolePanelView
-from presentation.views.roles_panel_management.helpers import rebuild_panel_embed, COLOR_GREEN, COLOR_RED, COMMON_EMOJIS
+from presentation.views.roles_panel_management.helpers import get_emoji_select_options, rebuild_panel_embed, COLOR_GREEN, COLOR_RED
 
 logger = get_logger(__name__)
 
@@ -51,10 +51,7 @@ class PanelAddRoleView(disnake.ui.View):
         self.add_item(self.role_select)
 
     def _build_emoji_select(self) -> disnake.ui.StringSelect:
-        emoji_options = [
-            disnake.SelectOption(label=e, value=e, emoji=e)
-            for e in COMMON_EMOJIS
-        ]
+        emoji_options = get_emoji_select_options(self._guild)
         select = disnake.ui.StringSelect(
             custom_id="add_emoji_select",
             placeholder="Выберите эмодзи (необязательно)...",
@@ -149,16 +146,7 @@ class PanelAddRoleView(disnake.ui.View):
                 )
                 return
 
-            channel = self._guild.get_channel(self._panel["channel_id"])
-            if channel:
-                buttons = await self._role_service.get_panel_buttons(self._panel["message_id"])
-                panel_embed = await rebuild_panel_embed(self._role_service, self._guild, self._panel, buttons)
-                panel_view = RolePanelView(buttons, self._panel["message_id"], self._role_service)
-                try:
-                    msg = await channel.fetch_message(self._panel["message_id"])
-                    await msg.edit(embed=panel_embed, view=panel_view)
-                except Exception as e:
-                    logger.warning(f"Could not edit panel message: {e}")
+            await self._update_panel_message()
 
             await interaction.edit_original_response(
                 embed=disnake.Embed(
@@ -175,3 +163,38 @@ class PanelAddRoleView(disnake.ui.View):
             await interaction.edit_original_response(
                 embed=disnake.Embed(title="Ошибка", description=str(e), color=COLOR_RED), view=None
             )
+
+    async def _update_panel_message(self):
+        """Обновляет embed и view/реакции панели в зависимости от режима."""
+        panel = await self._role_service.get_panel(self._panel["message_id"])
+        if not panel:
+            return
+
+        channel = self._guild.get_channel(panel["channel_id"])
+        if not channel:
+            return
+
+        buttons = await self._role_service.get_panel_buttons(panel["message_id"])
+        embed = await rebuild_panel_embed(self._role_service, self._guild, panel, buttons)
+
+        try:
+            msg = await channel.fetch_message(panel["message_id"])
+        except Exception as e:
+            logger.warning(f"Could not fetch panel message: {e}")
+            return
+
+        interaction_mode = panel.get("interaction_mode", "buttons")
+        if interaction_mode == "reactions":
+            cog = self._role_service._bot.get_cog("RolesCog") if self._role_service._bot else None
+            if cog:
+                if panel["message_id"] in cog._reaction_panels:
+                    old_view = cog._reaction_panels.pop(panel["message_id"])
+                    await old_view.clear_reactions()
+                await cog.register_reaction_panel(panel["message_id"])
+            await msg.edit(embed=embed, view=None)
+        else:
+            view = RolePanelView(buttons, panel["message_id"], self._role_service)
+            await msg.edit(embed=embed, view=view)
+
+        fingerprint = await self._role_service.ensure_panel_fingerprint(panel)
+        await self._role_service.mark_panel_rendered(panel["message_id"], fingerprint)

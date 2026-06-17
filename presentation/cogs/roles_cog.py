@@ -8,7 +8,8 @@ from infrastructure.logging import get_logger
 from presentation.views import (
     CreatePanelRoleSelectView,
     PanelSelectView,
-    RolePanelReactionView
+    RolePanelReactionView,
+    RolePanelView
 )
 
 logger = get_logger(__name__)
@@ -19,34 +20,76 @@ class RolesCog(commands.Cog):
         self._bot = bot
         self._role_service = role_service
         self._reaction_panels: Dict[int, RolePanelReactionView] = {}
+        self._button_views: Dict[int, RolePanelView] = {}
         logger.info("RolesCog initialized")
 
     def cog_load(self):
         self.refresh_panels.start()
-        logger.info("Started panel refresh task")
+        self.clean_dead_panels.start()
+        self._bot.loop.create_task(self._register_all_panel_views())
+        logger.info("Started panel refresh, cleanup tasks and registered persistent views")
 
     def cog_unload(self):
         self.refresh_panels.cancel()
-        logger.info("Stopped panel refresh task")
+        self.clean_dead_panels.cancel()
+        logger.info("Stopped panel tasks")
 
     @tasks.loop(minutes=5)
     async def refresh_panels(self):
+        """Обновляет все панели, если изменился fingerprint."""
+
         logger.info("Running scheduled panel refresh")
         try:
             if not self._role_service._panel_message_repo:
                 return
+            
             for guild in self._bot.guilds:
                 panels = await self._role_service._panel_message_repo.get_by_guild(guild.id)
                 for panel in panels:
                     channel = guild.get_channel(panel["channel_id"])
                     if channel:
-                        await self._role_service.refresh_panel_view(panel["message_id"], channel)
+                        await self._refresh_single_panel(panel["message_id"], channel)
+
         except Exception as e:
             logger.error(f"Failed to refresh panels: {e}")
 
     @refresh_panels.before_loop
     async def before_refresh(self):
         await self._bot.wait_until_ready()
+
+    @tasks.loop(hours=1)
+    async def clean_dead_panels(self):
+        """Проверяет все панели, удаляет те, чьи сообщения уже не существуют."""
+        
+        logger.info("Running dead panel cleanup")
+        if not self._role_service._panel_message_repo:
+            return
+        for guild in self._bot.guilds:
+            panels = await self._role_service._panel_message_repo.get_by_guild(guild.id)
+            for panel in panels:
+                channel = guild.get_channel(panel["channel_id"])
+                if not channel:
+                    await self._delete_panel_data(panel["message_id"])
+                    continue
+                try:
+                    await channel.fetch_message(panel["message_id"])
+                except disnake.NotFound:
+                    await self._delete_panel_data(panel["message_id"])
+                except Exception as e:
+                    logger.warning(f"Error checking panel {panel['message_id']}: {e}")
+
+    @clean_dead_panels.before_loop
+    async def before_clean(self):
+        await self._bot.wait_until_ready()
+
+    async def _delete_panel_data(self, message_id: int):
+        """Удаляет панель из БД и очищает view."""
+        await self._role_service.delete_panel(message_id)
+        if message_id in self._button_views:
+            del self._button_views[message_id]
+        if message_id in self._reaction_panels:
+            del self._reaction_panels[message_id]
+        logger.info(f"Cleaned up dead panel {message_id}")
 
     @property
     def role_service(self):
@@ -395,6 +438,127 @@ class RolesCog(commands.Cog):
         )
         await ctx.response.send_message(embed=embed, view=view, ephemeral=True)
 
+    async def _register_all_panel_views(self):
+        """Загрузить все панели с кнопками и зарегистрировать их как постоянные view."""
+
+        if not self._role_service._panel_message_repo:
+            return
+        
+        for guild in self._bot.guilds:
+            panels = await self._role_service._panel_message_repo.get_by_guild(guild.id)
+            for panel in panels:
+                if panel.get("interaction_mode") == "buttons":
+                    message_id = panel["message_id"]
+                    if message_id in self._button_views:
+                        continue
+
+                    buttons = await self._role_service.get_panel_buttons(message_id)
+                    if not buttons:
+                        continue
+
+                    view = RolePanelView(buttons, message_id, self._role_service)
+                    self._button_views[message_id] = view
+                    self._bot.add_view(view, message_id=message_id)
+                    logger.info(f"Registered persistent view for panel message {message_id}")
+                
+                elif panel.get("interaction_mode") == "reactions":
+                    await self._register_reaction_panel(panel["message_id"])
+
+    async def _register_or_update_view(self, message_id: int):
+        """Обновить или зарегистрировать view для конкретной панели."""
+
+        panel = await self._role_service.get_panel(message_id)
+        if not panel:
+            return
+        
+        if panel.get("interaction_mode") != "buttons":
+            if message_id in self._button_views:
+                del self._button_views[message_id]
+            return
+        
+        buttons = await self._role_service.get_panel_buttons(message_id)
+        if not buttons:
+            if message_id in self._button_views:
+                del self._button_views[message_id]
+            return
+        
+        view = RolePanelView(buttons, message_id, self._role_service)
+        self._button_views[message_id] = view
+        self._bot.add_view(view, message_id=message_id)
+        logger.info(f"Updated persistent view for panel message {message_id}")
+
+    async def _refresh_single_panel(self, message_id: int, channel: disnake.TextChannel) -> bool:
+        try:
+            panel = await self._role_service.get_panel(message_id)
+            if not panel:
+                return False
+
+            fingerprint = await self._role_service.ensure_panel_fingerprint(panel)
+            message = await channel.fetch_message(message_id)
+            if not message:
+                return False
+
+            buttons = await self._role_service.get_panel_buttons(message_id)
+            if not buttons:
+                await message.edit(view=None)
+                await self._register_or_update_view(message_id)
+                return True
+
+            current_components = getattr(message, "components", None)
+            if current_components and panel.get("last_rendered_fingerprint") == fingerprint:
+                logger.debug("Skip unchanged panel render message_id=%s", message_id)
+                return True
+
+            from presentation.views.roles_panel_management.helpers import rebuild_panel_embed
+
+            interaction_mode = panel.get("interaction_mode", "buttons")
+            if interaction_mode == "reactions":
+                if message_id in self._reaction_panels:
+                    old = self._reaction_panels.pop(message_id)
+                    await old.clear_reactions()
+                await self._register_reaction_panel(message_id)
+                embed = await rebuild_panel_embed(self._role_service, channel.guild, panel, buttons)
+                await message.edit(embed=embed, view=None)
+            else:
+                view = RolePanelView(buttons, message_id, self._role_service)
+                embed = await rebuild_panel_embed(self._role_service, channel.guild, panel, buttons)
+                await message.edit(embed=embed, view=view)
+                await self._register_or_update_view(message_id)
+
+            await self._role_service.mark_panel_rendered(message_id, fingerprint)
+            logger.info("Refreshed panel view for message id=%s", message_id)
+            return True
+
+        except Exception as exc:
+            logger.error("Failed to refresh panel view message_id=%s: %s", message_id, exc)
+            return False
+
+    async def _register_reaction_panel(self, message_id: int) -> None:
+        if message_id in self._reaction_panels:
+            return
+        panel = await self._role_service.get_panel(message_id)
+        if not panel or panel.get("interaction_mode") != "reactions":
+            return
+        guild = self._bot.get_guild(panel["guild_id"])
+        if not guild:
+            return
+        channel = guild.get_channel(panel["channel_id"])
+        if not channel:
+            return
+        try:
+            message = await channel.fetch_message(message_id)
+        except Exception:
+            return
+        buttons = await self._role_service.get_panel_buttons(message_id)
+        if not buttons:
+            return
+        view = RolePanelReactionView(message, buttons, self._role_service)
+        await view.setup()
+        self._reaction_panels[message_id] = view
+        logger.info("Registered reaction panel for message %s", message_id)
+
+    async def register_reaction_panel(self, message_id: int) -> None:
+        await self._register_reaction_panel(message_id)
 
 def setup(bot: commands.Bot):
     pass

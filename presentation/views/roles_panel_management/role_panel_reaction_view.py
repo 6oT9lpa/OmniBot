@@ -61,7 +61,7 @@ class RolePanelReactionView:
         except Exception as exc:
             logger.error("Error handling reaction for role id=%s: %s", role_id, exc)
 
-    async def clear_reactions(self):
+    async def clear_reactions(self) -> None:
         try:
             await self._message.clear_reactions()
             logger.info("Cleared reactions for message id=%s", self._message.id)
