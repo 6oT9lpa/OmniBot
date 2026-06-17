@@ -23,18 +23,19 @@ class StatsCog(commands.Cog):
         if self._service is not None:
             self._service.set_bot(bot)
 
-        self._snapshot_task.start()
+        self.take_snapshot.start()
         logger.info("StatsCog initialized")
 
     def cog_unload(self) -> None:
-        self._snapshot_task.cancel()
+        self.take_snapshot.cancel()
 
     @tasks.loop(hours=1)
-    async def _snapshot_task(self) -> None:
-        pass
+    async def take_snapshot(self):
+        """Placeholder loop for future server-wide stats snapshots."""
+        logger.debug("Stats snapshot loop tick")
 
-    @_snapshot_task.before_loop
-    async def _before_snapshot(self) -> None:
+    @take_snapshot.before_loop
+    async def before_snapshot(self):
         await self._bot.wait_until_ready()
 
     @commands.Cog.listener()
@@ -67,14 +68,6 @@ class StatsCog(commands.Cog):
             if joined_at:
                 await self._service.log_voice_activity(member, joined_at)
             self._voice_sessions.setdefault(guild_id, {})[user_id] = datetime.now(MSK)
-
-    @commands.Cog.listener()
-    async def on_member_join(self, member: disnake.Member) -> None:
-        await self._service.log_member_join(member)
-
-    @commands.Cog.listener()
-    async def on_member_remove(self, member: disnake.Member) -> None:
-        await self._service.log_member_leave(member)
 
     @commands.slash_command(description="📊 Статистика сервера и участников")
     async def stats(self, inter: disnake.ApplicationCommandInteraction) -> None:
@@ -136,20 +129,4 @@ class StatsCog(commands.Cog):
             await inter.edit_original_response("📊 Нет данных. Напишите что-нибудь в чат!")
             return
         embed = StatsEmbedBuilder.build_leaderboard(top, inter.guild, self._bot)
-        await inter.edit_original_response(embed=embed)
-
-    @stats.sub_command(description="📈 Статистика каналов за последние 24 часа")
-    async def channel_stats(
-        self,
-        inter: disnake.ApplicationCommandInteraction,
-    ) -> None:
-        await inter.response.defer(ephemeral=True)
-        data = await self._service.get_channel_stats_24h(inter.guild.id)
-        embed = StatsEmbedBuilder.build_channel_stats_24h(data, inter.guild)
-        await inter.edit_original_response(embed=embed)
-
-    @commands.slash_command(description="📊 Активность участников за 7 дней")
-    async def status(self, inter: disnake.ApplicationCommandInteraction) -> None:
-        pass
-
-    
+        await inter.edit_original_response(embed=embed)    

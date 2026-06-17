@@ -108,7 +108,7 @@ class LoggingCog(commands.Cog):
                         break
             except Exception:
                 pass
-            await self._logging_service.log_member_role_update(after, added, removed, moderator)
+            await self._logging_service.log_member_role_update(member=after, after_roles=added, before_roles=removed, moderator=moderator)
 
         changed = []
         if before.nick != after.nick:
@@ -276,11 +276,6 @@ class LoggingCog(commands.Cog):
         except Exception as e:
             logger.warning("Не удалось получить аудит-лог для действия %s: %s", action, e)
 
-        return None
-
-    def _guild_from_id(self, guild_id: int) -> Optional[disnake.Guild]:
-        if self._bot:
-            return self._bot.get_guild(guild_id)
         return None
 
     def _guild_from_id(self, guild_id: int) -> Optional[disnake.Guild]:
