@@ -1123,6 +1123,72 @@ input[type="color"] {
   color: var(--muted);
 }
 
+.record-list,
+.settings-list,
+.embed-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.record-list article,
+.settings-list article,
+.embed-editor {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  overflow-wrap: anywhere;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.record-list article {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.record-list span,
+.settings-list span {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.compact-list {
+  margin-top: 14px;
+}
+
+.module-toolbar,
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.module-toolbar input {
+  min-width: 180px;
+  flex: 1;
+}
+
+.module-toolbar select {
+  width: auto;
+  min-width: 150px;
+}
+
+.inline-actions {
+  justify-content: flex-end;
+}
+
+.ghost-button.compact {
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.ghost-button.danger {
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.42);
+}
+
 .empty-module {
   display: grid;
   gap: 8px;
