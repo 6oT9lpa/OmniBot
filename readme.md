@@ -427,9 +427,9 @@ Also check that only one Bot instance is writing to the same SQLite database.
 
 ## Documentation
 
-- [Privacy Policy](./docs/PRIVACY_POLICY.md)
-- [Terms of Service](./docs/TERMS_OF_SERVICE.md)
-- [Knowledge Base](./docs/KNOWLEDGE_BASE.md)
+- [Privacy Policy](https://github.com/6oT9lpa/discord-ai-moderation-bot/blob/main/docs/PRIVACY_POLICY.md)
+- [Terms of Service](https://github.com/6oT9lpa/discord-ai-moderation-bot/blob/main/docs/TERMS_OF_SERVICE.md)
+- [Knowledge Base](https://github.com/6oT9lpa/discord-ai-moderation-bot/blob/main/docs/KNOWLEDGE_BASE.md)
 
 ---
 

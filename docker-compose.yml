@@ -1,0 +1,67 @@
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: omnibot-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: ["python", "main.py"]
+
+  activity-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: omnibot-activity-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "8008:8008"
+    command:
+      [
+        "python",
+        "-m",
+        "uvicorn",
+        "activity.server.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8008",
+      ]
+
+  activity-client:
+    build:
+      context: ./activity/client
+      dockerfile: Dockerfile
+      args:
+        VITE_DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+    container_name: omnibot-activity-client
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - activity-api
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: omnibot-ngrok
+    restart: unless-stopped
+    command:
+      - http
+      - activity-client:80
+      - --log
+      - stdout
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    ports:
+      - "4040:4040"
+    depends_on:
+      - activity-client
