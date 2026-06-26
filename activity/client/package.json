@@ -1,0 +1,23 @@
+{
+  "name": "omnibot-activity",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@discord/embedded-app-sdk": "^2.5.0",
+    "@lucide/vue": "^1.21.0",
+    "pinia": "^2.3.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.7",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.7"
+  }
+}
