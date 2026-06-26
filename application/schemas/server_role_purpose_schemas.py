@@ -16,6 +16,6 @@ class ServerRolePurposeSchema(BaseModel):
         cls,
         value: ServerRolePurpose,
     ) -> ServerRolePurpose:
-        if value not in ServerRolePurpose.activity_member_purposes():
-            raise ValueError("Only streamer and developer roles can be assigned here")
+        if value not in ServerRolePurpose:
+            raise ValueError("Unknown activity role purpose")
         return value

@@ -198,6 +198,7 @@ class DatabaseManager:
         await self._create_messages_table()
         await self._create_punishments_table()
         await self._create_streamers_table()
+        await self._ensure_streamer_columns()
         await self._create_server_stats_table()
         await self._create_roles_table()
         await self._create_channel_config_table()
@@ -215,6 +216,7 @@ class DatabaseManager:
         await self._ensure_messages_columns()
         await self._create_voice_sessions_table()
         await self._create_server_role_purposes_table()
+        await self._create_dev_blog_posts_table()
 
         logger.info("All tables created successfully")
 
@@ -296,6 +298,7 @@ class DatabaseManager:
             CREATE TABLE IF NOT EXISTS streamers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
+                guild_id INTEGER NOT NULL DEFAULT 0,
                 platform TEXT NOT NULL CHECK(platform IN ('twitch', 'youtube', 'kick')),
                 channel_url TEXT NOT NULL,
                 channel_name TEXT,
@@ -305,12 +308,16 @@ class DatabaseManager:
                 last_stream_id TEXT,
                 last_check TIMESTAMP,
                 created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
-                UNIQUE(user_id, platform)
+                UNIQUE(user_id, guild_id, platform)
             )
         """)
         await self._connection.execute("""
             CREATE INDEX IF NOT EXISTS idx_streamers_user
             ON streamers(user_id)
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_streamers_guild
+            ON streamers(guild_id)
         """)
         await self._connection.execute("""
             CREATE INDEX IF NOT EXISTS idx_streamers_platform
@@ -323,6 +330,15 @@ class DatabaseManager:
         await self._connection.commit()
 
         logger.info("Created streamers table")
+
+    async def _ensure_streamer_columns(self) -> None:
+        if not await self._column_exists("streamers", "guild_id"):
+            await self._connection.execute("ALTER TABLE streamers ADD COLUMN guild_id INTEGER NOT NULL DEFAULT 0")
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_streamers_guild
+            ON streamers(guild_id)
+        """)
+        await self.commit()
 
     async def _create_server_stats_table(self) -> None:
         """Таблица статистики сервера"""
@@ -691,3 +707,29 @@ class DatabaseManager:
         """)
         await self.commit()
         logger.info("Created server_role_purposes table")
+
+    async def _create_dev_blog_posts_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS dev_blog_posts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                channel_id INTEGER NOT NULL,
+                message_id INTEGER,
+                author_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'published',
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_dev_blog_posts_guild
+            ON dev_blog_posts(guild_id)
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_dev_blog_posts_author
+            ON dev_blog_posts(author_id)
+        """)
+        await self.commit()
+        logger.info("Created dev_blog_posts table")
