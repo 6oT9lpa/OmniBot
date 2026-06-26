@@ -107,3 +107,92 @@ export type TokenResponse = {
   expires_in: number;
   scope: string;
 };
+
+export type DiscordChannel = {
+  id: string;
+  name: string;
+  type: number;
+  position: number;
+  parent_id?: string | null;
+};
+
+export type DiscordRole = {
+  id: string;
+  name: string;
+  color: number;
+  position: number;
+  managed: boolean;
+  mentionable: boolean;
+};
+
+export type DiscordMember = {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar?: string | null;
+};
+
+export type ActivityRolePurpose = "activity_admin" | "activity_streamer" | "activity_developer";
+
+export type ChannelPurpose =
+  | "welcome"
+  | "member_log"
+  | "mod_log"
+  | "message_log"
+  | "channel_log"
+  | "stream_announce"
+  | "dev_blog"
+  | "admin_log";
+
+export type DevBlogEmbed = {
+  title?: string | null;
+  description: string;
+  image_url?: string | null;
+  color: number;
+};
+
+export type DevBlogDraft = {
+  guild_id: number;
+  title: string;
+  content?: string | null;
+  embeds: DevBlogEmbed[];
+  status: "draft" | "published";
+};
+
+export type CreatorAlertSource = {
+  id?: number;
+  user_id?: number;
+  guild_id: number;
+  platform: "twitch" | "youtube" | "kick";
+  channel_url: string;
+  channel_name?: string | null;
+  template?: string | null;
+  ping_role_id?: number | null;
+  active: boolean;
+};
+
+export type VoiceRoom = {
+  channel_id: number;
+  guild_id: number;
+  owner_id: number;
+  name: string;
+  is_persistent: number;
+  created_at: string;
+  discord?: {
+    id: string;
+    name: string;
+    user_limit?: number;
+    permission_overwrites?: unknown[];
+  } | null;
+};
+
+export type ServerStatsPayload = {
+  summary: Record<string, unknown>;
+  channels: Array<Record<string, unknown>>;
+  hourly: Array<{ hour: number; count: number }>;
+};
+
+export type LogsPayload = {
+  messages: Array<Record<string, unknown>>;
+  audit: Array<Record<string, unknown>>;
+};

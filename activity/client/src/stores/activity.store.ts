@@ -3,11 +3,30 @@ import { DiscordSDK } from "@discord/embedded-app-sdk";
 import type { CommandResponse } from "@discord/embedded-app-sdk";
 import {
   exchangeDiscordCode,
+  createDevBlogPost,
+  deleteVoiceRoom,
   getActivityHealth,
+  getActivityRoles,
   getActivitySession,
+  getBotSettings,
+  getChannelPurposes,
+  getCreatorAlertSources,
+  getDevBlogPosts,
+  getDiscordChannels,
+  getDiscordRoles,
+  getIntegrations,
+  getLogs,
+  getServerStats,
+  getVoiceRooms,
   getWelcomeConfig,
+  previewCreatorAlert,
   resetWelcomeConfig,
+  saveActivityRole,
+  saveChannelPurpose,
+  saveCreatorAlertSource,
   saveWelcomeConfig,
+  searchUserStats,
+  updateVoiceRoom,
 } from "../api/activity.api";
 import {
   administratorPermissions,
@@ -18,13 +37,22 @@ import {
 import type {
   ActivityHealth,
   ActivitySession,
+  ActivityRolePurpose,
   AccessLevel,
+  ChannelPurpose,
+  CreatorAlertSource,
+  DevBlogDraft,
+  DiscordChannel,
+  DiscordRole,
   HealthSignal,
+  LogsPayload,
   ModuleKey,
   PanelSession,
   PermissionLevel,
+  ServerStatsPayload,
   Theme,
   WelcomeConfig,
+  VoiceRoom,
 } from "../types/activity.types";
 
 type Auth = CommandResponse<"authenticate">;
@@ -43,6 +71,22 @@ type State = {
   healthLoading: boolean;
   healthError: string | null;
   lastHealthRefresh: number;
+  moduleLoading: boolean;
+  moduleError: string | null;
+  textChannels: DiscordChannel[];
+  voiceChannels: DiscordChannel[];
+  roles: DiscordRole[];
+  channelPurposes: Partial<Record<ChannelPurpose, number>>;
+  activityRoles: Partial<Record<ActivityRolePurpose, number>>;
+  devBlogPosts: Array<Record<string, unknown>>;
+  creatorSources: CreatorAlertSource[];
+  creatorPreview: Record<string, unknown> | null;
+  voiceRooms: VoiceRoom[];
+  serverStats: ServerStatsPayload | null;
+  userStatsResults: Array<Record<string, unknown>>;
+  logs: LogsPayload | null;
+  botSettings: Record<string, unknown> | null;
+  integrations: Record<string, unknown> | null;
   discordSdk: DiscordSDK | null;
   auth: Auth | null;
 };
@@ -62,6 +106,22 @@ export const useActivityStore = defineStore("activity", {
     healthLoading: false,
     healthError: null,
     lastHealthRefresh: 0,
+    moduleLoading: false,
+    moduleError: null,
+    textChannels: [],
+    voiceChannels: [],
+    roles: [],
+    channelPurposes: {},
+    activityRoles: {},
+    devBlogPosts: [],
+    creatorSources: [],
+    creatorPreview: null,
+    voiceRooms: [],
+    serverStats: null,
+    userStatsResults: [],
+    logs: null,
+    botSettings: null,
+    integrations: null,
     discordSdk: null,
     auth: null,
   }),
@@ -108,6 +168,19 @@ export const useActivityStore = defineStore("activity", {
       this.healthSignals = mockHealthSignals;
       this.botLatencyMs = 42;
       this.healthError = null;
+      this.textChannels = [
+        { id: "1515345327903867114", name: "welcome", type: 0, position: 1 },
+        { id: "1515345327903867115", name: "dev-blog", type: 0, position: 2 },
+        { id: "1515345327903867116", name: "stream-alerts", type: 0, position: 3 },
+      ];
+      this.voiceChannels = [{ id: "1516082233121702031", name: "Create room", type: 2, position: 1 }];
+      this.roles = [
+        { id: "1", name: "Admin", color: 0x5865f2, position: 10, managed: false, mentionable: true },
+        { id: "2", name: "Streamer", color: 0x8b5cf6, position: 9, managed: false, mentionable: true },
+        { id: "3", name: "Developer", color: 0x22c55e, position: 8, managed: false, mentionable: true },
+      ];
+      this.channelPurposes = { welcome: 1515345327903867114, dev_blog: 1515345327903867115, stream_announce: 1515345327903867116 };
+      this.activityRoles = { activity_admin: 1, activity_streamer: 2, activity_developer: 3 };
     },
 
     async bootDiscordActivity() {
@@ -159,6 +232,7 @@ export const useActivityStore = defineStore("activity", {
         this.welcome = await getWelcomeConfig(discordSdk.guildId, token.access_token);
       }
 
+      await this.loadReferenceData();
       await this.refreshHealth(true);
     },
 
@@ -223,6 +297,130 @@ export const useActivityStore = defineStore("activity", {
     applyHealth(health: ActivityHealth) {
       this.healthSignals = health.signals;
       this.botLatencyMs = health.bot_latency_ms;
+    },
+
+    async loadReferenceData() {
+      if (!this.session || !this.token || this.mode === "local") return;
+      const guildId = this.session.guild_id;
+      const [textChannels, voiceChannels, channelPurposes] = await Promise.all([
+        getDiscordChannels(guildId, this.token, "text"),
+        getDiscordChannels(guildId, this.token, "voice"),
+        getChannelPurposes(guildId, this.token),
+      ]);
+      this.textChannels = textChannels;
+      this.voiceChannels = voiceChannels;
+      this.channelPurposes = channelPurposes;
+
+      if (this.isAdmin) {
+        const [roles, activityRoles] = await Promise.all([
+          getDiscordRoles(guildId, this.token),
+          getActivityRoles(guildId, this.token),
+        ]);
+        this.roles = roles;
+        this.activityRoles = activityRoles;
+      }
+    },
+
+    async loadModuleData(module: ModuleKey) {
+      if (!this.session || !this.can(module)) return;
+      if (!this.token || this.mode === "local") return;
+
+      this.moduleLoading = true;
+      this.moduleError = null;
+      try {
+        const guildId = this.session.guild_id;
+        if (module === "dashboard") {
+          await Promise.all([
+            this.refreshHealth(true),
+            getLogs(guildId, this.token).then((logs) => {
+              this.logs = logs;
+            }),
+            getServerStats(guildId, this.token).then((stats) => {
+              this.serverStats = stats;
+            }),
+          ]);
+        } else if (module === "access") {
+          await this.loadReferenceData();
+        } else if (module === "dev-blog") {
+          this.devBlogPosts = await getDevBlogPosts(guildId, this.token);
+        } else if (module === "creator-alerts") {
+          this.creatorSources = await getCreatorAlertSources(guildId, this.token);
+        } else if (module === "voice-rooms") {
+          this.voiceRooms = await getVoiceRooms(guildId, this.token);
+        } else if (module === "server-stats") {
+          this.serverStats = await getServerStats(guildId, this.token);
+        } else if (module === "logs") {
+          this.logs = await getLogs(guildId, this.token);
+        } else if (module === "bot-settings") {
+          this.botSettings = await getBotSettings(guildId, this.token);
+        } else if (module === "integrations") {
+          this.integrations = await getIntegrations(guildId, this.token);
+        } else if (module === "health") {
+          await this.refreshHealth(true);
+        }
+      } catch (error) {
+        this.moduleError = error instanceof Error ? error.message : String(error);
+      } finally {
+        this.moduleLoading = false;
+      }
+    },
+
+    async saveActivityRolePurpose(purpose: ActivityRolePurpose, roleId: string) {
+      if (!this.session || !this.token || this.mode === "local") {
+        this.activityRoles[purpose] = Number(roleId);
+        return;
+      }
+      this.activityRoles = await saveActivityRole(this.session.guild_id, this.token, purpose, roleId);
+    },
+
+    async saveChannelPurposeValue(purpose: ChannelPurpose, channelId: string) {
+      if (!this.session || !this.token || this.mode === "local") {
+        this.channelPurposes[purpose] = Number(channelId);
+        return;
+      }
+      this.channelPurposes = await saveChannelPurpose(this.session.guild_id, this.token, purpose, channelId);
+    },
+
+    async createDevBlog(draft: Omit<DevBlogDraft, "guild_id">) {
+      if (!this.session || !this.token) return;
+      await createDevBlogPost({ guild_id: Number(this.session.guild_id), ...draft }, this.token);
+      await this.loadModuleData("dev-blog");
+    },
+
+    async saveCreatorSource(source: Omit<CreatorAlertSource, "guild_id">) {
+      if (!this.session || !this.token) return;
+      await saveCreatorAlertSource({ guild_id: Number(this.session.guild_id), ...source }, this.token);
+      await this.loadModuleData("creator-alerts");
+    },
+
+    async previewCreatorSource(source: Omit<CreatorAlertSource, "guild_id">) {
+      if (!this.session || !this.token) return;
+      this.creatorPreview = await previewCreatorAlert({ guild_id: Number(this.session.guild_id), ...source }, this.token);
+    },
+
+    async updateVoice(channelId: number, payload: Record<string, unknown>) {
+      if (!this.session || !this.token) return;
+      await updateVoiceRoom(this.session.guild_id, this.token, channelId, payload);
+      await this.loadModuleData("voice-rooms");
+    },
+
+    async deleteVoice(channelId: number) {
+      if (!this.session || !this.token) return;
+      await deleteVoiceRoom(this.session.guild_id, this.token, channelId);
+      await this.loadModuleData("voice-rooms");
+    },
+
+    async searchStatsUsers(query: string) {
+      if (!this.session || !this.token || !query.trim()) {
+        this.userStatsResults = [];
+        return;
+      }
+      this.userStatsResults = await searchUserStats(this.session.guild_id, this.token, query.trim());
+    },
+
+    async loadLogs(source = "all", eventType = "", query = "") {
+      if (!this.session || !this.token || this.mode === "local") return;
+      this.logs = await getLogs(this.session.guild_id, this.token, source, eventType, query);
     },
   },
 });
