@@ -316,10 +316,6 @@ class DatabaseManager:
             ON streamers(user_id)
         """)
         await self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_streamers_guild
-            ON streamers(guild_id)
-        """)
-        await self._connection.execute("""
             CREATE INDEX IF NOT EXISTS idx_streamers_platform
             ON streamers(platform)
         """)
