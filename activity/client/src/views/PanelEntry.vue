@@ -11,6 +11,7 @@ import IntegrationsPanel from "../components/panel/IntegrationsPanel.vue";
 import LogsPanel from "../components/panel/LogsPanel.vue";
 import PanelSidebar from "../components/panel/PanelSidebar.vue";
 import PanelTopbar from "../components/panel/PanelTopbar.vue";
+import RolePanelsPanel from "../components/panel/RolePanelsPanel.vue";
 import ServerStatsPanel from "../components/panel/ServerStatsPanel.vue";
 import VoiceRoomsPanel from "../components/panel/VoiceRoomsPanel.vue";
 import WelcomeModulePanel from "../components/panel/WelcomeModulePanel.vue";
@@ -23,7 +24,9 @@ const route = useRoute();
 const router = useRouter();
 const activity = useActivityStore();
 
-const modules = computed(() => (activity.session ? buildModules(activity.session) : []));
+const modules = computed(() =>
+  activity.session ? buildModules(activity.session).filter((module) => module.permission !== "disabled") : [],
+);
 const activeModule = computed<ModuleKey>(() => {
   const raw = route.params.module;
   const candidate = Array.isArray(raw) ? raw[0] : raw;
@@ -58,13 +61,20 @@ watch(
       <PanelTopbar :title="activeTitle" :subtitle="subtitle" />
 
       <div v-if="!activity.session" class="panel-content">
-        <NoAccessState title="Session is loading" text="Omni is preparing the role-based workspace." />
+        <NoAccessState
+          :title="activity.accessError ? 'Access denied' : 'Session is loading'"
+          :text="activity.accessError?.message || 'Omni is preparing the role-based workspace.'"
+          :action-label="activity.accessError?.can_sync_roles ? 'Sync roles' : undefined"
+          :busy="activity.moduleLoading"
+          @action="activity.syncRolesFromDiscord"
+        />
       </div>
 
       <div v-else class="panel-content">
         <DashboardPanel v-if="activeModule === 'dashboard'" :modules="modules" :active-module="activeModule" />
         <AccessControlPanel v-else-if="activeModule === 'access'" />
         <WelcomeModulePanel v-else-if="activeModule === 'welcome'" />
+        <RolePanelsPanel v-else-if="activeModule === 'role-panels'" />
         <CreatorAlertsPanel v-else-if="activeModule === 'creator-alerts'" />
         <DevBlogPanel v-else-if="activeModule === 'dev-blog'" />
         <VoiceRoomsPanel v-else-if="activeModule === 'voice-rooms'" />

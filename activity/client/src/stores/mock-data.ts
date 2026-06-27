@@ -78,6 +78,7 @@ export const mockSession: PanelSession = {
     is_developer: true,
   },
   access_level: "administrator",
+  activity_roles: ["Administrator"],
   permissions: administratorPermissions,
   available_modules: moduleOrder,
   is_admin: true,
@@ -137,12 +138,13 @@ export const healthSignals: HealthSignal[] = [
 ];
 
 export function buildModules(session: PanelSession): PanelModule[] {
+  const roleLabel = session.activity_roles[0] || session.access_level;
   return moduleOrder.map((key) => {
     const permission = session.permissions[key] ?? "disabled";
     return {
       key,
       title: moduleLabels[key],
-      eyebrow: permission === "manage" ? "Manage" : permission === "disabled" ? "Locked" : "Workspace",
+      eyebrow: permission === "disabled" ? "Locked" : roleLabel,
       description: moduleDescriptions[key],
       permission,
       status: permission === "disabled" ? "locked" : key === "health" ? "online" : key === "dev-blog" ? "draft" : "configured",

@@ -38,10 +38,15 @@ export type ActivitySession = {
   user_type: ActivityUserType;
   access: ActivityAccess;
   is_admin: boolean;
+  access_level?: AccessLevel;
+  activity_roles?: string[];
+  permissions?: Record<ModuleKey, PermissionLevel>;
+  available_modules?: ModuleKey[];
 };
 
 export type PanelSession = ActivitySession & {
   access_level: AccessLevel;
+  activity_roles: string[];
   permissions: Record<ModuleKey, PermissionLevel>;
   available_modules: ModuleKey[];
 };
@@ -73,6 +78,7 @@ export type DashboardMetric = {
   value: string;
   delta: string;
   tone: "neutral" | "success" | "warning" | "danger";
+  key?: "modules" | "ai" | "creators" | "latency";
 };
 
 export type TimelineEvent = {
@@ -121,6 +127,7 @@ export type DiscordRole = {
   name: string;
   color: number;
   position: number;
+  permissions?: number;
   managed: boolean;
   mentionable: boolean;
 };
@@ -195,4 +202,71 @@ export type ServerStatsPayload = {
 export type LogsPayload = {
   messages: Array<Record<string, unknown>>;
   audit: Array<Record<string, unknown>>;
+};
+
+export type AccessDeniedDetail = {
+  code: string;
+  message: string;
+  can_sync_roles?: boolean;
+};
+
+export type ActivityAccessRole = {
+  id: number;
+  guild_id: number;
+  slug: string;
+  name: string;
+  is_builtin: boolean;
+  modules: Record<ModuleKey, PermissionLevel>;
+};
+
+export type ActivitySyncedRole = {
+  role_id: string;
+  guild_id: number;
+  name: string;
+  color: number;
+  position: number;
+  permissions: number;
+  is_admin: boolean;
+  managed: boolean;
+  mentionable: boolean;
+  synced_at?: string | null;
+  access_roles: ActivityAccessRole[];
+};
+
+export type ActivityRoleSyncResponse = {
+  guild_id: number;
+  synced_count: number;
+  admin_roles_count: number;
+  roles: ActivitySyncedRole[];
+};
+
+export type ActivityAuditEvent = {
+  id: number;
+  guild_id: number;
+  actor_id?: number | null;
+  actor_name?: string | null;
+  target_id?: number | null;
+  target_name?: string | null;
+  event_type: string;
+  details?: string | null;
+  created_at: string;
+};
+
+export type ActivityAuditPage = {
+  items: ActivityAuditEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type ActivityDashboardResponse = {
+  metrics: {
+    modules_ready: number;
+    modules_total: number;
+    ai_checks_today: number;
+    ai_flagged_today: number;
+    creator_sources: number;
+    bot_latency_ms: number | null;
+  };
+  audit: ActivityAuditEvent[];
 };

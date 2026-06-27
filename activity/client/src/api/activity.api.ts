@@ -1,8 +1,13 @@
 import { apiRequest } from "./client";
 import type {
   ActivityHealth,
+  ActivityAccessRole,
+  ActivityAuditPage,
+  ActivityDashboardResponse,
+  ActivityRoleSyncResponse,
   ActivityRolePurpose,
   ActivitySession,
+  ActivitySyncedRole,
   ChannelPurpose,
   CreatorAlertSource,
   DevBlogDraft,
@@ -29,6 +34,53 @@ export function getActivitySession(guildId: string, token: string) {
 
 export function getActivityHealth(guildId: string, token: string) {
   return apiRequest<ActivityHealth>(`/api/activity/health?guild_id=${guildId}`, {}, token);
+}
+
+export function getActivityDashboard(guildId: string, token: string) {
+  return apiRequest<ActivityDashboardResponse>(`/api/activity/dashboard?guild_id=${guildId}`, {}, token);
+}
+
+export function getActivityAudit(guildId: string, token: string, params: Record<string, string | number>) {
+  const search = new URLSearchParams({ guild_id: guildId });
+  Object.entries(params).forEach(([key, value]) => {
+    if (String(value)) search.set(key, String(value));
+  });
+  return apiRequest<ActivityAuditPage>(`/api/activity/audit?${search.toString()}`, {}, token);
+}
+
+export function syncActivityRoles(guildId: string, token: string) {
+  return apiRequest<ActivityRoleSyncResponse>(`/api/activity/rbac/roles/sync?guild_id=${guildId}`, {
+    method: "POST",
+  }, token);
+}
+
+export function getActivityAccessRoles(guildId: string, token: string) {
+  return apiRequest<ActivityAccessRole[]>(`/api/activity/rbac/access-roles?guild_id=${guildId}`, {}, token);
+}
+
+export function createActivityAccessRole(guildId: string, token: string, name: string) {
+  return apiRequest<ActivityAccessRole>("/api/activity/rbac/access-roles", {
+    method: "POST",
+    body: JSON.stringify({ guild_id: Number(guildId), name }),
+  }, token);
+}
+
+export function saveActivityAccessRoleModules(guildId: string, token: string, roleId: number, modules: ActivityAccessRole["modules"]) {
+  return apiRequest<ActivityAccessRole>(`/api/activity/rbac/access-roles/${roleId}/modules`, {
+    method: "PUT",
+    body: JSON.stringify({ guild_id: Number(guildId), modules }),
+  }, token);
+}
+
+export function getActivitySyncedRoles(guildId: string, token: string) {
+  return apiRequest<ActivitySyncedRole[]>(`/api/activity/rbac/synced-roles?guild_id=${guildId}`, {}, token);
+}
+
+export function saveActivitySyncedRoleAssignments(guildId: string, token: string, discordRoleId: string, accessRoleIds: number[]) {
+  return apiRequest<ActivitySyncedRole>(`/api/activity/rbac/synced-roles/${discordRoleId}/assignments`, {
+    method: "PUT",
+    body: JSON.stringify({ guild_id: Number(guildId), access_role_ids: accessRoleIds }),
+  }, token);
 }
 
 export function getWelcomeConfig(guildId: string, token: string) {

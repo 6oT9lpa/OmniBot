@@ -4,6 +4,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly detail: unknown = message,
   ) {
     super(message);
     this.name = "ApiError";
@@ -28,8 +29,21 @@ export async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    const detail = await response.text();
-    throw new ApiError(detail || response.statusText, response.status);
+    const rawDetail = await response.text();
+    let detail: unknown = rawDetail;
+    let message = rawDetail || response.statusText;
+    try {
+      const parsed = JSON.parse(rawDetail);
+      detail = parsed.detail ?? parsed;
+      if (typeof detail === "string") {
+        message = detail;
+      } else if (detail && typeof detail === "object" && "message" in detail) {
+        message = String((detail as { message: unknown }).message);
+      }
+    } catch {
+      message = rawDetail || response.statusText;
+    }
+    throw new ApiError(message, response.status, detail);
   }
 
   return response.json() as Promise<T>;

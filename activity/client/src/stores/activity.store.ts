@@ -2,12 +2,17 @@ import { defineStore } from "pinia";
 import { DiscordSDK } from "@discord/embedded-app-sdk";
 import type { CommandResponse } from "@discord/embedded-app-sdk";
 import {
+  createActivityAccessRole,
   exchangeDiscordCode,
   createDevBlogPost,
   deleteVoiceRoom,
+  getActivityAccessRoles,
+  getActivityAudit,
+  getActivityDashboard,
   getActivityHealth,
   getActivityRoles,
   getActivitySession,
+  getActivitySyncedRoles,
   getBotSettings,
   getChannelPurposes,
   getCreatorAlertSources,
@@ -22,12 +27,16 @@ import {
   previewCreatorAlert,
   resetWelcomeConfig,
   saveActivityRole,
+  saveActivityAccessRoleModules,
+  saveActivitySyncedRoleAssignments,
   saveChannelPurpose,
   saveCreatorAlertSource,
   saveWelcomeConfig,
   searchUserStats,
+  syncActivityRoles,
   updateVoiceRoom,
 } from "../api/activity.api";
+import { ApiError } from "../api/client";
 import {
   administratorPermissions,
   healthSignals as mockHealthSignals,
@@ -36,9 +45,14 @@ import {
 } from "./mock-data";
 import type {
   ActivityHealth,
+  ActivityAccessRole,
+  ActivityAuditPage,
+  ActivityDashboardResponse,
   ActivitySession,
   ActivityRolePurpose,
+  ActivitySyncedRole,
   AccessLevel,
+  AccessDeniedDetail,
   ChannelPurpose,
   CreatorAlertSource,
   DevBlogDraft,
@@ -61,6 +75,7 @@ type State = {
   booted: boolean;
   loading: boolean;
   error: string | null;
+  accessError: AccessDeniedDetail | null;
   mode: "local" | "discord";
   theme: Theme;
   token: string | null;
@@ -85,6 +100,10 @@ type State = {
   serverStats: ServerStatsPayload | null;
   userStatsResults: Array<Record<string, unknown>>;
   logs: LogsPayload | null;
+  auditPage: ActivityAuditPage | null;
+  dashboard: ActivityDashboardResponse | null;
+  accessRoles: ActivityAccessRole[];
+  syncedRoles: ActivitySyncedRole[];
   botSettings: Record<string, unknown> | null;
   integrations: Record<string, unknown> | null;
   discordSdk: DiscordSDK | null;
@@ -96,6 +115,7 @@ export const useActivityStore = defineStore("activity", {
     booted: false,
     loading: false,
     error: null,
+    accessError: null,
     mode: "local",
     theme: "dark",
     token: null,
@@ -120,6 +140,10 @@ export const useActivityStore = defineStore("activity", {
     serverStats: null,
     userStatsResults: [],
     logs: null,
+    auditPage: null,
+    dashboard: null,
+    accessRoles: [],
+    syncedRoles: [],
     botSettings: null,
     integrations: null,
     discordSdk: null,
@@ -139,6 +163,7 @@ export const useActivityStore = defineStore("activity", {
 
       this.loading = true;
       this.error = null;
+      this.accessError = null;
 
       try {
         if (!isDiscordActivityLaunch()) {
@@ -149,7 +174,10 @@ export const useActivityStore = defineStore("activity", {
         await this.bootDiscordActivity();
       } catch (error) {
         this.error = error instanceof Error ? error.message : String(error);
-        if (!this.session) {
+        if (error instanceof ApiError && error.status === 403) {
+          this.accessError = normalizeAccessError(error.detail);
+          this.session = null;
+        } else if (!this.session) {
           this.useLocalPreview();
         }
       } finally {
@@ -164,6 +192,7 @@ export const useActivityStore = defineStore("activity", {
       this.auth = null;
       this.discordSdk = null;
       this.session = mockSession;
+      this.accessError = null;
       this.welcome = mockWelcome;
       this.healthSignals = mockHealthSignals;
       this.botLatencyMs = 42;
@@ -218,6 +247,7 @@ export const useActivityStore = defineStore("activity", {
           user: this.auth.user,
           guild_id: "0",
           access_level: "ordinary",
+          activity_roles: [],
           available_modules: [],
           permissions: emptyPermissions(),
           is_admin: false,
@@ -227,6 +257,7 @@ export const useActivityStore = defineStore("activity", {
 
       const activitySession = await getActivitySession(discordSdk.guildId, token.access_token);
       this.session = toPanelSession(activitySession);
+      this.accessError = null;
 
       if (this.session.is_admin) {
         this.welcome = await getWelcomeConfig(discordSdk.guildId, token.access_token);
@@ -331,16 +362,15 @@ export const useActivityStore = defineStore("activity", {
         const guildId = this.session.guild_id;
         if (module === "dashboard") {
           await Promise.all([
-            this.refreshHealth(true),
-            getLogs(guildId, this.token).then((logs) => {
-              this.logs = logs;
-            }),
+            this.loadDashboard(),
             getServerStats(guildId, this.token).then((stats) => {
               this.serverStats = stats;
             }),
           ]);
         } else if (module === "access") {
-          await this.loadReferenceData();
+          await this.loadAccessControl();
+        } else if (module === "role-panels") {
+          await this.loadRolePanels();
         } else if (module === "dev-blog") {
           this.devBlogPosts = await getDevBlogPosts(guildId, this.token);
         } else if (module === "creator-alerts") {
@@ -422,6 +452,85 @@ export const useActivityStore = defineStore("activity", {
       if (!this.session || !this.token || this.mode === "local") return;
       this.logs = await getLogs(this.session.guild_id, this.token, source, eventType, query);
     },
+
+    async loadDashboard() {
+      if (!this.session || !this.token || this.mode === "local") return;
+      this.dashboard = await getActivityDashboard(this.session.guild_id, this.token);
+      this.botLatencyMs = this.dashboard.metrics.bot_latency_ms;
+      this.logs = {
+        messages: this.logs?.messages ?? [],
+        audit: this.dashboard.audit as unknown as Array<Record<string, unknown>>,
+      };
+    },
+
+    async loadAuditPage(params: Record<string, string | number> = {}) {
+      if (!this.session || !this.token || this.mode === "local") return;
+      this.auditPage = await getActivityAudit(this.session.guild_id, this.token, {
+        limit: 20,
+        offset: 0,
+        ...params,
+      });
+    },
+
+    async loadAccessControl() {
+      if (!this.session || !this.token || this.mode === "local") return;
+      const [roles, accessRoles] = await Promise.all([
+        getDiscordRoles(this.session.guild_id, this.token),
+        getActivityAccessRoles(this.session.guild_id, this.token),
+      ]);
+      this.roles = roles;
+      this.accessRoles = accessRoles;
+    },
+
+    async loadRolePanels() {
+      if (!this.session || !this.token || this.mode === "local") return;
+      const [accessRoles, syncedRoles] = await Promise.all([
+        getActivityAccessRoles(this.session.guild_id, this.token),
+        getActivitySyncedRoles(this.session.guild_id, this.token),
+      ]);
+      this.accessRoles = accessRoles;
+      this.syncedRoles = syncedRoles;
+    },
+
+    async syncRolesFromDiscord() {
+      if (!this.token) return;
+      const guildId = this.session?.guild_id || this.discordSdk?.guildId;
+      if (!guildId || this.mode === "local") return;
+      this.moduleLoading = true;
+      this.moduleError = null;
+      try {
+        const result = await syncActivityRoles(guildId, this.token);
+        this.syncedRoles = result.roles;
+        const session = await getActivitySession(guildId, this.token);
+        this.session = toPanelSession(session);
+        this.accessError = null;
+        await Promise.all([this.loadAccessControl(), this.loadDashboard()]);
+      } catch (error) {
+        this.moduleError = error instanceof Error ? error.message : String(error);
+      } finally {
+        this.moduleLoading = false;
+      }
+    },
+
+    async createAccessRole(name: string) {
+      if (!this.session || !this.token || this.mode === "local") return;
+      await createActivityAccessRole(this.session.guild_id, this.token, name);
+      await this.loadAccessControl();
+    },
+
+    async saveAccessRoleModules(roleId: number, modules: Record<ModuleKey, PermissionLevel>) {
+      if (!this.session || !this.token || this.mode === "local") return;
+      await saveActivityAccessRoleModules(this.session.guild_id, this.token, roleId, modules);
+      await this.loadAccessControl();
+      const session = await getActivitySession(this.session.guild_id, this.token);
+      this.session = toPanelSession(session);
+    },
+
+    async saveSyncedRoleAssignments(discordRoleId: string, accessRoleIds: number[]) {
+      if (!this.session || !this.token || this.mode === "local") return;
+      const updated = await saveActivitySyncedRoleAssignments(this.session.guild_id, this.token, discordRoleId, accessRoleIds);
+      this.syncedRoles = this.syncedRoles.map((role) => (role.role_id === discordRoleId ? updated : role));
+    },
   },
 });
 
@@ -431,16 +540,28 @@ function isDiscordActivityLaunch() {
 }
 
 function toPanelSession(session: ActivitySession): PanelSession {
-  const accessLevel = resolveAccessLevel(session);
-  const permissions = resolvePermissions(accessLevel);
+  const accessLevel = session.access_level || resolveAccessLevel(session);
+  const permissions = session.permissions || resolvePermissions(accessLevel);
 
   return {
     ...session,
     access_level: accessLevel,
+    activity_roles: session.activity_roles || [accessLevel],
     permissions,
-    available_modules: Object.entries(permissions)
+    available_modules: session.available_modules || Object.entries(permissions)
       .filter(([, permission]) => permission !== "disabled")
       .map(([module]) => module as ModuleKey),
+  };
+}
+
+function normalizeAccessError(detail: unknown): AccessDeniedDetail {
+  if (detail && typeof detail === "object" && "code" in detail && "message" in detail) {
+    return detail as AccessDeniedDetail;
+  }
+  return {
+    code: "access_denied",
+    message: typeof detail === "string" ? detail : "Activity access is denied.",
+    can_sync_roles: false,
   };
 }
 
