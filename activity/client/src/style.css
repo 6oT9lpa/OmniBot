@@ -449,7 +449,6 @@ a {
   align-items: flex-end;
   justify-content: space-between;
   gap: clamp(32px, 6vw, 88px);
-  max-width: 1240px;
 }
 
 .about-hero h1 {
