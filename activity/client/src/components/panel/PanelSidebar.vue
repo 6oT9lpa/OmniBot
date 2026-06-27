@@ -43,6 +43,7 @@ const icons = {
 <template>
   <aside class="panel-sidebar">
     <RouterLink class="panel-brand" to="/">
+      <img class="panel-brand-logo" src="/omni-logo.png" alt="" />
       <strong>OMNI</strong>
       <span>activity</span>
     </RouterLink>
