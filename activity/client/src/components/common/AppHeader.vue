@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Moon, PanelRightOpen, Sun } from "@lucide/vue";
+import { Moon, Sun } from "@lucide/vue";
 import { useActivityStore } from "../../stores/activity.store";
 import AnimatedNavLink from "./AnimatedNavLink.vue";
 
@@ -9,8 +9,11 @@ const activity = useActivityStore();
 <template>
   <header class="app-header">
     <RouterLink class="wordmark" to="/" aria-label="Omni home">
-      <span class="wordmark-main">OMNI</span>
-      <span class="wordmark-sub">discord bot</span>
+      <img class="wordmark-logo" src="/omni-logo.png" alt="" />
+      <span>
+        <span class="wordmark-main">OMNI</span>
+        <span class="wordmark-sub">discord bot</span>
+      </span>
     </RouterLink>
 
     <nav class="public-nav" aria-label="Primary navigation">
@@ -24,7 +27,6 @@ const activity = useActivityStore();
         <Moon v-else :size="18" />
       </button>
       <RouterLink class="panel-cta" to="/panel">
-        <PanelRightOpen :size="18" />
         See Panel
       </RouterLink>
     </div>

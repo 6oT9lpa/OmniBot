@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import RevealOnScroll from "./RevealOnScroll.vue";
+
 const currentYear = new Date().getFullYear();
 const githubDocsBase =
   "https://github.com/6oT9lpa/discord-ai-moderation-bot/blob/main/docs";
@@ -15,7 +17,7 @@ const team = ["6oT9lpa", "Arnetik", "Jimmy"];
 </script>
 
 <template>
-  <footer class="public-footer">
+  <RevealOnScroll tag="footer" class="public-footer">
     <div class="footer-grid">
       <section>
         <span>Product</span>
@@ -43,5 +45,5 @@ const team = ["6oT9lpa", "Arnetik", "Jimmy"];
         Donate
       </a>
     </div>
-  </footer>
+  </RevealOnScroll>
 </template>

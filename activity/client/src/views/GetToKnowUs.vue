@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import RevealOnScroll from "../components/common/RevealOnScroll.vue";
+import StaggeredHeadline from "../components/common/StaggeredHeadline.vue";
 import AboutModulePanel from "../components/landing/AboutModulePanel.vue";
 import AboutPanel from "../components/landing/AboutPanel.vue";
 
@@ -73,19 +75,19 @@ const modulePanels = [
 
 <template>
   <main class="public-page compact-public">
-    <section class="about-hero">
+    <RevealOnScroll tag="section" class="about-hero">
       <div>
         <span class="eyebrow">Get to Know Us</span>
-        <h1>OMNIBOT IS A CONTROL LAYER FOR COMMUNITIES.</h1>
+        <StaggeredHeadline text="OMNIBOT IS A CONTROL LAYER FOR COMMUNITIES." />
       </div>
       <p>
         OmniBot began as a self-hosted alternative to paid, fragmented Discord bots.
         It is built for growing communities that need automation without losing control
         over data, roles and server decisions.
       </p>
-    </section>
+    </RevealOnScroll>
 
-    <section class="about-grid">
+    <RevealOnScroll tag="section" class="about-grid">
       <AboutPanel
         eyebrow="Who we are"
         title="A practical toolkit for communities that outgrow command-only bots."
@@ -96,13 +98,15 @@ const modulePanels = [
         title="Frontend -> Backend API -> Discord, DB and bot services."
         text="The browser never stores the bot token and never reaches Discord APIs directly. OAuth, permission checks and persistence stay behind the backend boundary."
       />
-    </section>
+    </RevealOnScroll>
 
     <section class="principle-grid" aria-label="What we stand for">
-      <AboutPanel v-for="principle in principles" :key="principle.title" :eyebrow="principle.title" :text="principle.text" />
+      <RevealOnScroll v-for="(principle, index) in principles" :key="principle.title" :delay="index * 55">
+        <AboutPanel :eyebrow="principle.title" :text="principle.text" />
+      </RevealOnScroll>
     </section>
 
-    <section class="about-grid">
+    <RevealOnScroll tag="section" class="about-grid">
       <AboutPanel eyebrow="Product pillars" title="Four areas, one control surface.">
         <ul>
           <li v-for="pillar in pillars" :key="pillar">{{ pillar }}</li>
@@ -116,21 +120,25 @@ const modulePanels = [
           </div>
         </div>
       </AboutPanel>
-    </section>
+    </RevealOnScroll>
 
     <section class="about-module-grid" aria-label="Module previews">
-      <AboutModulePanel
-        v-for="panel in modulePanels"
+      <RevealOnScroll
+        v-for="(panel, index) in modulePanels"
         :key="panel.title"
-        :title="panel.title"
-        :text="panel.text"
-        :rows="panel.rows"
-        :value="panel.value"
-        :label="panel.label"
-      />
+        :delay="index * 70"
+      >
+        <AboutModulePanel
+          :title="panel.title"
+          :text="panel.text"
+          :rows="panel.rows"
+          :value="panel.value"
+          :label="panel.label"
+        />
+      </RevealOnScroll>
     </section>
 
-    <section class="about-grid">
+    <RevealOnScroll tag="section" class="about-grid">
       <AboutPanel eyebrow="Role model" title="Access follows the person opening the Activity.">
         <ul>
           <li>Standard users see public information and allowed self-service modules.</li>
@@ -145,10 +153,10 @@ const modulePanels = [
           permissions, loading states and API client.
         </p>
       </AboutPanel>
-    </section>
+    </RevealOnScroll>
 
-    <section class="module-marquee" aria-label="Supported modules">
+    <RevealOnScroll tag="section" class="module-marquee" aria-label="Supported modules">
       <span v-for="module in modules" :key="module">{{ module }}</span>
-    </section>
+    </RevealOnScroll>
   </main>
 </template>

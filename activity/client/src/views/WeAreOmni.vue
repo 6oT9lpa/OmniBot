@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Bot, RadioTower, ShieldCheck } from "@lucide/vue";
+import RevealOnScroll from "../components/common/RevealOnScroll.vue";
 import FeatureCard from "../components/landing/FeatureCard.vue";
 import HeroText from "../components/landing/HeroText.vue";
 
@@ -39,23 +40,29 @@ const features = [
 
 <template>
   <main class="public-page">
-    <HeroText
-      kicker="OmniBot Activity"
-      title="BE A PART OF SOMETHING MARVELLOUS"
-      body="Omni is a modular Discord bot that combines AI moderation, automation, creator tools, analytics and elegant server management in one ecosystem."
-    />
+    <RevealOnScroll>
+      <HeroText
+        kicker="OmniBot Activity"
+        title="BE A PART OF SOMETHING MARVELLOUS"
+        body="Omni is a modular Discord bot that combines AI moderation, automation, creator tools, analytics and elegant server management in one ecosystem."
+      />
+    </RevealOnScroll>
 
     <section class="feature-grid" aria-label="Why Omni">
-      <FeatureCard
+      <RevealOnScroll
         v-for="feature in features"
         :key="feature.index"
-        :index="feature.index"
-        :title="feature.title"
-        :text="feature.text"
-      />
+        :delay="Number(feature.index) * 45"
+      >
+        <FeatureCard
+          :index="feature.index"
+          :title="feature.title"
+          :text="feature.text"
+        />
+      </RevealOnScroll>
     </section>
 
-    <section class="showcase-band">
+    <RevealOnScroll tag="section" class="showcase-band">
       <div class="showcase-copy">
         <span class="eyebrow">Control without clutter</span>
         <h2>One Activity. Many workspaces. Zero token leaks.</h2>
@@ -71,6 +78,6 @@ const features = [
         <div><RadioTower :size="20" /> Creator Alerts</div>
         <div><Bot :size="20" /> AI Metrics</div>
       </div>
-    </section>
+    </RevealOnScroll>
   </main>
 </template>
