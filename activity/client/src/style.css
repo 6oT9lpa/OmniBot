@@ -299,7 +299,7 @@ a {
   grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
   gap: clamp(32px, 5vw, 88px);
   align-items: end;
-  padding-bottom: 48px;
+  padding-bottom: 125px;
 }
 
 .eyebrow,
@@ -319,7 +319,6 @@ a {
 .about-hero h1 {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 0.22em;
   max-width: 980px;
   margin: 0;
   font-size: clamp(2.5rem, 8vw, 7rem);

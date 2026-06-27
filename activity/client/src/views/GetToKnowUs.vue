@@ -78,7 +78,7 @@ const modulePanels = [
     <RevealOnScroll tag="section" class="about-hero">
       <div>
         <span class="eyebrow">Get to Know Us</span>
-        <StaggeredHeadline text="OMNIBOT IS A CONTROL LAYER FOR COMMUNITIES." />
+        <StaggeredHeadline text="OMNIBOT IS A CONTROL LAYER FOR COMMUNITIES" />
       </div>
       <p>
         OmniBot began as a self-hosted alternative to paid, fragmented Discord bots.
