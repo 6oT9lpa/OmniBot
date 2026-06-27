@@ -11,8 +11,20 @@ const legalLinks = [
   { label: "Knowledge Base", href: `${githubDocsBase}/KNOWLEDGE_BASE.md` },
 ];
 
-const productLinks = ["Welcome", "Role Panels", "Voice Rooms", "Server Stats"];
-const communityLinks = ["Creator Alerts", "Dev Blog", "AI Moderation", "Logging"];
+const knowledgeBaseUrl = `${githubDocsBase}/KNOWLEDGE_BASE.md`;
+
+const productLinks = [
+  { label: "Welcome", href: `${knowledgeBaseUrl}#welcome-module` },
+  { label: "Role Panels", href: `${knowledgeBaseUrl}#role-panels` },
+  { label: "Voice Rooms", href: `${knowledgeBaseUrl}#voice-rooms` },
+  { label: "Server Stats", href: `${knowledgeBaseUrl}#server-stats` },
+];
+const communityLinks = [
+  { label: "Creator Alerts", href: `${knowledgeBaseUrl}#creator-alerts` },
+  { label: "Dev Blog", href: `${knowledgeBaseUrl}#dev-blog` },
+  { label: "AI Moderation", href: `${knowledgeBaseUrl}#ai-moderation` },
+  { label: "Logging", href: `${knowledgeBaseUrl}#logging` },
+];
 const team = ["6oT9lpa", "Arnetik", "Jimmy"];
 </script>
 
@@ -21,7 +33,9 @@ const team = ["6oT9lpa", "Arnetik", "Jimmy"];
     <div class="footer-grid">
       <section>
         <span>Product</span>
-        <a v-for="item in productLinks" :key="item" href="/about">{{ item }}</a>
+        <a v-for="link in productLinks" :key="link.label" :href="link.href" target="_blank" rel="noreferrer">
+          {{ link.label }}
+        </a>
       </section>
       <section>
         <span>Legal</span>
@@ -31,7 +45,9 @@ const team = ["6oT9lpa", "Arnetik", "Jimmy"];
       </section>
       <section>
         <span>Community</span>
-        <a v-for="item in communityLinks" :key="item" href="/about">{{ item }}</a>
+        <a v-for="link in communityLinks" :key="link.label" :href="link.href" target="_blank" rel="noreferrer">
+          {{ link.label }}
+        </a>
       </section>
       <section>
         <span>Team</span>

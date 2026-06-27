@@ -600,11 +600,24 @@ a {
   display: grid;
   gap: 24px;
   width: min(1440px, 100%);
-  margin: 0 auto;
+  margin: 0 auto 32px;
   padding: 44px clamp(20px, 4vw, 64px);
   color: var(--soft);
-  background: var(--bg);
+  background:
+    linear-gradient(135deg, rgba(88, 101, 242, 0.08), rgba(139, 92, 246, 0.08)),
+    var(--surface);
   border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 24px 80px var(--shadow);
+}
+
+.theme-light .public-footer {
+  background:
+    linear-gradient(135deg, rgba(88, 101, 242, 0.08), rgba(139, 92, 246, 0.08)),
+    var(--surface);
 }
 
 .footer-grid {
