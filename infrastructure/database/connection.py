@@ -216,6 +216,10 @@ class DatabaseManager:
         await self._ensure_messages_columns()
         await self._create_voice_sessions_table()
         await self._create_server_role_purposes_table()
+        await self._create_activity_synced_roles_table()
+        await self._create_activity_access_roles_table()
+        await self._create_activity_access_role_modules_table()
+        await self._create_activity_synced_role_assignments_table()
         await self._create_dev_blog_posts_table()
 
         logger.info("All tables created successfully")
@@ -703,6 +707,96 @@ class DatabaseManager:
         """)
         await self.commit()
         logger.info("Created server_role_purposes table")
+
+    async def _create_activity_synced_roles_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS activity_synced_roles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                role_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                color INTEGER DEFAULT 0,
+                position INTEGER DEFAULT 0,
+                permissions INTEGER DEFAULT 0,
+                is_admin BOOLEAN DEFAULT 0,
+                managed BOOLEAN DEFAULT 0,
+                mentionable BOOLEAN DEFAULT 0,
+                synced_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                UNIQUE(guild_id, role_id)
+            )
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_activity_synced_roles_guild
+            ON activity_synced_roles(guild_id)
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_activity_synced_roles_admin
+            ON activity_synced_roles(guild_id, is_admin)
+        """)
+        await self.commit()
+        logger.info("Created activity_synced_roles table")
+
+    async def _create_activity_access_roles_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS activity_access_roles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                slug TEXT NOT NULL,
+                name TEXT NOT NULL,
+                is_builtin BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                UNIQUE(guild_id, slug),
+                UNIQUE(guild_id, name)
+            )
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_activity_access_roles_guild
+            ON activity_access_roles(guild_id)
+        """)
+        await self.commit()
+        logger.info("Created activity_access_roles table")
+
+    async def _create_activity_access_role_modules_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS activity_access_role_modules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                access_role_id INTEGER NOT NULL,
+                module_key TEXT NOT NULL,
+                permission TEXT NOT NULL,
+                UNIQUE(access_role_id, module_key),
+                FOREIGN KEY(access_role_id)
+                    REFERENCES activity_access_roles(id)
+                    ON DELETE CASCADE
+            )
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_activity_access_role_modules_role
+            ON activity_access_role_modules(access_role_id)
+        """)
+        await self.commit()
+        logger.info("Created activity_access_role_modules table")
+
+    async def _create_activity_synced_role_assignments_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS activity_synced_role_assignments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                discord_role_id INTEGER NOT NULL,
+                access_role_id INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                UNIQUE(guild_id, discord_role_id, access_role_id),
+                FOREIGN KEY(access_role_id)
+                    REFERENCES activity_access_roles(id)
+                    ON DELETE CASCADE
+            )
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_activity_synced_role_assignments_guild_role
+            ON activity_synced_role_assignments(guild_id, discord_role_id)
+        """)
+        await self.commit()
+        logger.info("Created activity_synced_role_assignments table")
 
     async def _create_dev_blog_posts_table(self) -> None:
         await self._connection.execute("""

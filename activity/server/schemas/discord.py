@@ -16,6 +16,7 @@ class DiscordRole(BaseModel):
     name: str
     color: int = 0
     position: int = 0
+    permissions: int = 0
     managed: bool = False
     mentionable: bool = False
 

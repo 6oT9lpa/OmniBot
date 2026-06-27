@@ -75,6 +75,7 @@ class DiscordService:
                 name=role.get("name", "unknown"),
                 color=role.get("color", 0),
                 position=role.get("position", 0),
+                permissions=int(role.get("permissions") or 0),
                 managed=role.get("managed", False),
                 mentionable=role.get("mentionable", False),
             )

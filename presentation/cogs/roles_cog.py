@@ -560,5 +560,9 @@ class RolesCog(commands.Cog):
     async def register_reaction_panel(self, message_id: int) -> None:
         await self._register_reaction_panel(message_id)
 
+    @commands.slash_command(name="sync_role", description="Sync Discord roles for OmniBot Activity")
+    async def sync_role(self, ctx: disnake.ApplicationCommandInteraction):
+        await self.sync_roles(ctx)
+
 def setup(bot: commands.Bot):
     pass

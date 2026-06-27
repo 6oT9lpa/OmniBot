@@ -15,4 +15,8 @@ class ActivitySessionService:
             user_type=resolve_user_type(access),
             access=ActivityAccess(**access),
             is_admin=access["is_admin"],
+            access_level=access["access_level"],
+            activity_roles=access["activity_roles"],
+            permissions=access["permissions"],
+            available_modules=access["available_modules"],
         )

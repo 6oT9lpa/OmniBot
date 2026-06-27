@@ -27,6 +27,10 @@ class ActivitySession(BaseModel):
     user_type: ActivityUserType
     access: ActivityAccess
     is_admin: bool
+    access_level: str
+    activity_roles: list[str] = Field(default_factory=list)
+    permissions: dict[str, str] = Field(default_factory=dict)
+    available_modules: list[str] = Field(default_factory=list)
 
 
 class ActivityRolePayload(BaseModel):

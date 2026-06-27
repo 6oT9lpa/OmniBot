@@ -6,11 +6,13 @@ from activity.server.routers import (
     bot_settings,
     channel_purposes,
     creator_alerts,
+    dashboard,
     dev_blog,
     discord,
     health,
     integrations,
     logs,
+    rbac,
     session,
     stats,
     voice_rooms,
@@ -21,6 +23,8 @@ from activity.server.routers import (
 def include_activity_routers(app: FastAPI) -> None:
     app.include_router(auth.router)
     app.include_router(session.router)
+    app.include_router(rbac.router)
+    app.include_router(dashboard.router)
     app.include_router(welcome.router)
     app.include_router(activity_roles.router)
     app.include_router(discord.router)
