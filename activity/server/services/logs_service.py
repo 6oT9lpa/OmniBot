@@ -29,6 +29,27 @@ class LogsService:
             "audit": [] if normalized_source == "messages" else await self._query_audit_logs(guild_id, normalized_source, event_type, query, limit),
         }
 
+    async def list_actors(self, guild_id: int, access_token: str) -> list[dict[str, str]]:
+        logger.info("Listing Activity log actors guild_id=%s", guild_id)
+        await self._access_service.ensure_module_access(access_token, str(guild_id), "logs")
+        actors: dict[str, str] = {}
+        for row in await self._safe_fetch_all(
+            """
+            SELECT actor_id AS id, actor_name AS name FROM guild_event_logs
+            WHERE guild_id = ? AND actor_id IS NOT NULL
+            UNION
+            SELECT author_id AS id, author_name AS name FROM message_logs
+            WHERE guild_id = ? AND author_id IS NOT NULL
+            ORDER BY name
+            """,
+            (guild_id, guild_id),
+            "log actor list",
+        ):
+            actor_id = str(row.get("id") or "")
+            if actor_id:
+                actors[actor_id] = str(row.get("name") or actor_id)
+        return [{"id": actor_id, "name": name} for actor_id, name in actors.items()]
+
     async def _query_message_logs(
         self,
         guild_id: int,
@@ -46,7 +67,7 @@ class LogsService:
             like = f"%{query.strip()}%"
             params.extend([like, like])
         params.append(limit)
-        return await get_db().fetch_all(
+        return await self._safe_fetch_all(
             f"""
             SELECT * FROM message_logs
             WHERE {' AND '.join(clauses)}
@@ -54,6 +75,7 @@ class LogsService:
             LIMIT ?
             """,
             tuple(params),
+            "message logs",
         )
 
     async def _query_audit_logs(
@@ -84,7 +106,7 @@ class LogsService:
             like = f"%{query.strip()}%"
             params.extend([like, like, like])
         params.append(limit)
-        return await get_db().fetch_all(
+        return await self._safe_fetch_all(
             f"""
             SELECT * FROM guild_event_logs
             WHERE {' AND '.join(clauses)}
@@ -92,4 +114,12 @@ class LogsService:
             LIMIT ?
             """,
             tuple(params),
+            "audit logs",
         )
+
+    async def _safe_fetch_all(self, query: str, params: tuple[Any, ...], label: str) -> list[dict[str, Any]]:
+        try:
+            return await get_db().fetch_all(query, params)
+        except Exception as exc:
+            logger.warning("Activity %s unavailable error=%s", label, exc)
+            return []

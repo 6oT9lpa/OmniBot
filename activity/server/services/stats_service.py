@@ -21,6 +21,7 @@ class ActivityStatsService:
             "summary": await self._query_server_stats(guild_id, period),
             "channels": await self._query_channel_stats(guild_id, period),
             "hourly": await self._query_hourly_stats(guild_id, period),
+            "daily": await self._query_daily_stats(guild_id, min(period, 30)),
         }
 
     async def search_user_stats(self, guild_id: int, query: str, access_token: str) -> list[dict[str, Any]]:
@@ -38,7 +39,7 @@ class ActivityStatsService:
 
     async def _query_server_stats(self, guild_id: int, period: int) -> dict[str, Any]:
         cutoff = f"-{period} days"
-        messages = await get_db().fetch_one(
+        messages = await self._fetch_one_or_empty(
             """
             SELECT COUNT(*) AS total_messages,
                    COUNT(DISTINCT user_id) AS active_users,
@@ -47,8 +48,9 @@ class ActivityStatsService:
             WHERE guild_id = ? AND timestamp >= datetime('now', 'localtime', ?) AND deleted = 0
             """,
             (guild_id, cutoff),
+            "server message stats",
         )
-        voice = await get_db().fetch_one(
+        voice = await self._fetch_one_or_empty(
             """
             SELECT COUNT(DISTINCT user_id) AS voice_users,
                    SUM(voice_minutes) AS total_voice_minutes
@@ -56,8 +58,9 @@ class ActivityStatsService:
             WHERE guild_id = ? AND voice_minutes > 0
             """,
             (guild_id,),
+            "server voice stats",
         )
-        joins = await get_db().fetch_one(
+        joins = await self._fetch_one_or_empty(
             """
             SELECT SUM(CASE WHEN event_type = 'member_join' THEN 1 ELSE 0 END) AS joins,
                    SUM(CASE WHEN event_type = 'member_leave' THEN 1 ELSE 0 END) AS leaves
@@ -65,6 +68,7 @@ class ActivityStatsService:
             WHERE guild_id = ? AND created_at >= datetime('now', 'localtime', ?)
             """,
             (guild_id, cutoff),
+            "server join stats",
         )
         return {
             **(messages or {}),
@@ -74,7 +78,7 @@ class ActivityStatsService:
         }
 
     async def _query_channel_stats(self, guild_id: int, period: int) -> list[dict[str, Any]]:
-        rows = await get_db().fetch_all(
+        rows = await self._fetch_all_or_empty(
             """
             SELECT channel_id, COUNT(*) AS messages
             FROM messages
@@ -84,6 +88,7 @@ class ActivityStatsService:
             LIMIT 100
             """,
             (guild_id, f"-{period} days"),
+            "channel message stats",
         )
         channels = {
             channel["id"]: channel
@@ -98,7 +103,7 @@ class ActivityStatsService:
         ]
 
     async def _query_hourly_stats(self, guild_id: int, period: int) -> list[dict[str, int]]:
-        rows = await get_db().fetch_all(
+        rows = await self._fetch_all_or_empty(
             """
             SELECT CAST(substr(timestamp, 12, 2) AS INTEGER) AS hour, COUNT(*) AS count
             FROM messages
@@ -107,8 +112,43 @@ class ActivityStatsService:
             ORDER BY hour
             """,
             (guild_id, f"-{period} days"),
+            "hourly message stats",
         )
         values = {hour: 0 for hour in range(24)}
         for row in rows:
             values[int(row["hour"])] = int(row["count"])
         return [{"hour": hour, "count": count} for hour, count in values.items()]
+
+    async def _query_daily_stats(self, guild_id: int, days: int) -> list[dict[str, Any]]:
+        rows = await self._fetch_all_or_empty(
+            """
+            SELECT date(timestamp) AS day, COUNT(*) AS count
+            FROM messages
+            WHERE guild_id = ? AND timestamp >= datetime('now', 'localtime', ?) AND deleted = 0
+            GROUP BY day
+            ORDER BY day
+            """,
+            (guild_id, f"-{days - 1} days"),
+            "daily message stats",
+        )
+        counts = {str(row["day"]): int(row["count"]) for row in rows}
+        series = []
+        for index in range(days - 1, -1, -1):
+            day_row = await get_db().fetch_one("SELECT date('now', 'localtime', ?) AS day", (f"-{index} days",))
+            day = str(day_row["day"])
+            series.append({"date": day, "count": counts.get(day, 0)})
+        return series
+
+    async def _fetch_one_or_empty(self, query: str, params: tuple[Any, ...], label: str) -> dict[str, Any]:
+        try:
+            return await get_db().fetch_one(query, params) or {}
+        except Exception as exc:
+            logger.warning("Activity %s unavailable error=%s", label, exc)
+            return {}
+
+    async def _fetch_all_or_empty(self, query: str, params: tuple[Any, ...], label: str) -> list[dict[str, Any]]:
+        try:
+            return await get_db().fetch_all(query, params)
+        except Exception as exc:
+            logger.warning("Activity %s unavailable error=%s", label, exc)
+            return []

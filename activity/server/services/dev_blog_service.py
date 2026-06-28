@@ -77,7 +77,15 @@ class DevBlogService:
                 message_id,
                 int(user["id"]),
                 payload.title,
-                json.dumps(message_payload, ensure_ascii=False),
+                json.dumps(
+                    {
+                        "content": payload.content,
+                        "embeds": [embed.model_dump() for embed in payload.embeds],
+                        "image_render_mode": payload.image_render_mode,
+                        "message": message_payload,
+                    },
+                    ensure_ascii=False,
+                ),
                 payload.status,
             ),
         )

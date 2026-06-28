@@ -10,3 +10,7 @@ class VoiceRoomUpdatePayload(BaseModel):
     locked: Optional[bool] = None
     owner_id: Optional[int] = Field(default=None, gt=0)
     persistent: Optional[bool] = None
+    rtc_region: Optional[str] = Field(default=None, max_length=32)
+    invite_user_id: Optional[int] = Field(default=None, gt=0)
+    kick_user_id: Optional[int] = Field(default=None, gt=0)
+    ban_user_id: Optional[int] = Field(default=None, gt=0)

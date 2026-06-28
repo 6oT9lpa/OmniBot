@@ -26,7 +26,7 @@ class ActivityDashboardService:
         _, access = await self._access_service.ensure_module_access(access_token, str(guild_id), "dashboard")
         metrics = await self._build_metrics(guild_id, access)
         audit = await self._query_audit_events(guild_id, limit=5, offset=0)
-        return ActivityDashboardResponse(metrics=metrics, audit=audit["items"])
+        return ActivityDashboardResponse(metrics=metrics, audit=audit.items)
 
     async def list_audit_events(
         self,
@@ -68,23 +68,37 @@ class ActivityDashboardService:
         )
 
     async def _count_messages_today(self, guild_id: int, flagged: Optional[bool] = None) -> int:
+        # Dashboard must stay available even while optional analytics tables are absent.
         clauses = ["guild_id = ?", "date(timestamp) = date('now', 'localtime')"]
         params: list[Any] = [guild_id]
         if flagged is not None:
             clauses.append("ai_flagged = ?")
             params.append(1 if flagged else 0)
-        row = await get_db().fetch_one(
-            f"SELECT COUNT(*) AS total FROM messages WHERE {' AND '.join(clauses)}",
-            tuple(params),
-        )
-        return int(row["total"] if row else 0)
+        try:
+            row = await get_db().fetch_one(
+                f"SELECT COUNT(*) AS total FROM messages WHERE {' AND '.join(clauses)}",
+                tuple(params),
+            )
+            return int(row["total"] if row else 0)
+        except Exception as exc:
+            logger.warning(
+                "Dashboard message metric unavailable guild_id=%s flagged=%s error=%s",
+                guild_id,
+                flagged,
+                exc,
+            )
+            return 0
 
     async def _count_creator_sources(self, guild_id: int) -> int:
-        row = await get_db().fetch_one(
-            "SELECT COUNT(*) AS total FROM streamers WHERE guild_id = ?",
-            (guild_id,),
-        )
-        return int(row["total"] if row else 0)
+        try:
+            row = await get_db().fetch_one(
+                "SELECT COUNT(*) AS total FROM streamers WHERE guild_id = ?",
+                (guild_id,),
+            )
+            return int(row["total"] if row else 0)
+        except Exception as exc:
+            logger.warning("Dashboard creator metric unavailable guild_id=%s error=%s", guild_id, exc)
+            return 0
 
     async def _query_audit_events(
         self,
@@ -116,20 +130,25 @@ class ActivityDashboardService:
             params.append(date_to.strip())
 
         where_sql = " AND ".join(clauses)
-        total_row = await get_db().fetch_one(
-            f"SELECT COUNT(*) AS total FROM guild_event_logs WHERE {where_sql}",
-            tuple(params),
-        )
-        rows = await get_db().fetch_all(
-            f"""
-            SELECT id, guild_id, actor_id, actor_name, target_id, target_name, event_type, details, created_at
-            FROM guild_event_logs
-            WHERE {where_sql}
-            ORDER BY created_at DESC, id DESC
-            LIMIT ? OFFSET ?
-            """,
-            (*params, limit, offset),
-        )
+        try:
+            total_row = await get_db().fetch_one(
+                f"SELECT COUNT(*) AS total FROM guild_event_logs WHERE {where_sql}",
+                tuple(params),
+            )
+            rows = await get_db().fetch_all(
+                f"""
+                SELECT id, guild_id, actor_id, actor_name, target_id, target_name, event_type, details, created_at
+                FROM guild_event_logs
+                WHERE {where_sql}
+                ORDER BY created_at DESC, id DESC
+                LIMIT ? OFFSET ?
+                """,
+                (*params, limit, offset),
+            )
+        except Exception as exc:
+            logger.warning("Dashboard audit stream unavailable guild_id=%s error=%s", guild_id, exc)
+            total_row = {"total": 0}
+            rows = []
         return ActivityAuditPage(
             items=[ActivityAuditEvent(**row) for row in rows],
             total=int(total_row["total"] if total_row else 0),

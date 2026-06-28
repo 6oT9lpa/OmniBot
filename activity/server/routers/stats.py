@@ -12,7 +12,7 @@ service = ActivityStatsService()
 @router.get("/api/stats/server")
 async def get_activity_server_stats(
     guild_id: int = Query(gt=0),
-    period: int = Query(default=7, ge=1, le=365),
+    period: int = Query(default=30, ge=1, le=365),
     access_token: str = Depends(require_bearer_token),
 ) -> dict[str, Any]:
     return await service.get_server_stats(guild_id, period, access_token)

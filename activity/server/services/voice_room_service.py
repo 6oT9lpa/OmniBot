@@ -7,7 +7,7 @@ from activity.server.schemas.voice_rooms import VoiceRoomUpdatePayload
 from activity.server.services.access_service import ActivityAccessService
 from activity.server.services.audit_service import ActivityAuditService
 from activity.server.services.discord_service import DiscordService
-from activity.server.utils.voice_permissions import build_voice_lock_overwrites
+from activity.server.utils.voice_permissions import build_member_connect_overwrites, build_voice_lock_overwrites
 from infrastructure.logging import get_logger
 
 
@@ -36,7 +36,7 @@ class VoiceRoomService:
         results = []
         for room in rooms:
             channel = await self._discord.safe_bot_request("GET", f"/channels/{room['channel_id']}")
-            results.append({**room, "discord": channel})
+            results.append(self._serialize_room(room, channel))
         return results
 
     async def update_room(self, channel_id: int, payload: VoiceRoomUpdatePayload, access_token: str) -> dict[str, Any]:
@@ -48,11 +48,33 @@ class VoiceRoomService:
             patch["name"] = payload.name
         if payload.user_limit is not None:
             patch["user_limit"] = payload.user_limit
+        if payload.rtc_region is not None:
+            patch["rtc_region"] = payload.rtc_region or None
         if payload.locked is not None:
             channel = await self._discord.bot_request("GET", f"/channels/{channel_id}")
             patch["permission_overwrites"] = build_voice_lock_overwrites(channel, payload.guild_id, payload.locked)
+        if payload.invite_user_id is not None:
+            channel = await self._discord.bot_request("GET", f"/channels/{channel_id}")
+            patch["permission_overwrites"] = build_member_connect_overwrites(
+                channel,
+                payload.invite_user_id,
+                allowed=True,
+            )
+        if payload.ban_user_id is not None:
+            channel = await self._discord.bot_request("GET", f"/channels/{channel_id}")
+            patch["permission_overwrites"] = build_member_connect_overwrites(
+                channel,
+                payload.ban_user_id,
+                allowed=False,
+            )
         if patch:
             await self._discord.bot_request("PATCH", f"/channels/{channel_id}", json_body=patch)
+        if payload.kick_user_id is not None:
+            await self._discord.bot_request(
+                "PATCH",
+                f"/guilds/{payload.guild_id}/members/{payload.kick_user_id}",
+                json_body={"channel_id": None},
+            )
         if payload.owner_id is not None:
             await get_db().execute("UPDATE voice_rooms SET owner_id = ? WHERE channel_id = ?", (payload.owner_id, channel_id))
         if payload.persistent is not None:
@@ -113,3 +135,14 @@ class VoiceRoomService:
 
     def _display_name(self, user: dict[str, Any]) -> str:
         return user.get("global_name") or user.get("username") or str(user.get("id"))
+
+    def _serialize_room(self, room: dict[str, Any], channel: dict[str, Any] | None) -> dict[str, Any]:
+        logger.info("Serializing Activity voice room channel_id=%s", room.get("channel_id"))
+        return {
+            **room,
+            "channel_id": str(room["channel_id"]),
+            "guild_id": str(room["guild_id"]),
+            "owner_id": str(room["owner_id"]),
+            "is_persistent": bool(room.get("is_persistent")),
+            "discord": channel,
+        }

@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class DevBlogEmbedPayload(BaseModel):
@@ -16,3 +16,14 @@ class DevBlogPostPayload(BaseModel):
     content: Optional[str] = Field(default=None, max_length=2000)
     embeds: list[DevBlogEmbedPayload] = Field(min_length=1, max_length=10)
     status: Literal["draft", "published"] = "published"
+    image_render_mode: Literal["gallery_bottom", "inline_between_text"] = "gallery_bottom"
+
+    @model_validator(mode="after")
+    def validate_discord_components_v2_budget(self) -> "DevBlogPostPayload":
+        total = len(self.title) + len(self.content or "")
+        for embed in self.embeds:
+            total += len(embed.title or "")
+            total += len(embed.description)
+        if total > 4000:
+            raise ValueError("Discord Components V2 text display allows up to 4000 characters")
+        return self
