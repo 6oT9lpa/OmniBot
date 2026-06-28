@@ -303,6 +303,75 @@ class MessageDeleteLogEmbedBuilder:
         builder.set_footer(text=f"Время: {format_datetime(timestamp)}")
 
         return builder.build()
+
+
+class VoiceLogEmbedBuilder:
+    @staticmethod
+    def build_join(
+        member: disnake.Member,
+        channel_name: str,
+        timestamp: Optional[datetime] = None,
+    ) -> disnake.Embed:
+        builder = EmbedBuilder(color=0x57F287)
+        builder.set_title(f"{member} ({member.id})")
+        builder.set_description("Joined voice channel")
+        builder.add_field("Channel:", channel_name, inline=False)
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+        builder.set_footer(text=f"Time: {format_datetime(timestamp)}")
+        return builder.build()
+
+    @staticmethod
+    def build_leave(
+        member: disnake.Member,
+        channel_name: str,
+        timestamp: Optional[datetime] = None,
+    ) -> disnake.Embed:
+        builder = EmbedBuilder(color=0xED4245)
+        builder.set_title(f"{member} ({member.id})")
+        builder.set_description("Left voice channel")
+        builder.add_field("Channel:", channel_name, inline=False)
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+        builder.set_footer(text=f"Time: {format_datetime(timestamp)}")
+        return builder.build()
+
+    @staticmethod
+    def build_move(
+        member: disnake.Member,
+        from_channel: str,
+        to_channel: str,
+        timestamp: Optional[datetime] = None,
+    ) -> disnake.Embed:
+        builder = EmbedBuilder(color=0x5865F2)
+        builder.set_title(f"{member} ({member.id})")
+        builder.set_description("Moved between voice channels")
+        builder.add_field("Before Channel:", from_channel, inline=True)
+        builder.add_field("After Channel:", to_channel, inline=True)
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+        builder.set_footer(text=f"Time: {format_datetime(timestamp)}")
+        return builder.build()
+
+
+class MessageLogEmbedBuilder:
+    @staticmethod
+    def build_delete(author, timestamp: Optional[datetime] = None) -> disnake.Embed:
+        builder = EmbedBuilder(color=0xED4245)
+        builder.set_title(f"{author} ({author.id})")
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+        builder.set_footer(text=f"Time: {format_datetime(timestamp)}")
+        return builder.build()
+
+    @staticmethod
+    def build_edit(author, timestamp: Optional[datetime] = None) -> disnake.Embed:
+        builder = EmbedBuilder(color=0xFEE75C)
+        builder.set_title(f"{author} ({author.id})")
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+        builder.set_footer(text=f"Time: {format_datetime(timestamp)}")
+        return builder.build()
     
 class BulkDeleteEmbedBuilder:
     @staticmethod

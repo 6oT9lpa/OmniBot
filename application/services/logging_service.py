@@ -319,6 +319,9 @@ class LoggingService(LoggingServiceInterface):
         *,
         extra_data: Optional[Dict[str, Any]] = None,
     ) -> None:
+        if event_type == EventType.MEMBER_JOIN:
+            logger.debug("Skipping generic member_join log for member %s", member.id)
+            return
         await self._persist_and_send(
             guild_id=member.guild.id,
             event_type=event_type.value,
@@ -621,9 +624,16 @@ class LoggingService(LoggingServiceInterface):
             embed = self._build_embed(event_type, details)
 
         if guild_id is not None:
-            await self._audit_log_service.send_to_log_channel(
-                guild_id, embed, channel_id=None, event_type=event_type
-            )
+            try:
+                await self._audit_log_service.send_to_log_channel(
+                    guild_id, embed, channel_id=None, event_type=event_type
+                )
+            except TypeError as exc:
+                if "event_type" not in str(exc):
+                    raise
+                await self._audit_log_service.send_to_log_channel(
+                    guild_id, embed, channel_id=None
+                )
 
         logger.debug("Persisted and sent event %s for guild %s", event_type, guild_id)
 

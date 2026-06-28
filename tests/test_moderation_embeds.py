@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from presentation.embeds import (
     ModerationBanEmbedBuilder,
@@ -24,7 +25,7 @@ class MockUser:
 def test_format_date():
     now = datetime.now(timezone.utc)
     formatted = format_date(now)
-    assert formatted == now.strftime("%d.%m.%Y")
+    assert formatted == now.astimezone(ZoneInfo("Europe/Moscow")).strftime("%d.%m.%Y")
 
 
 def test_format_duration_seconds_permanent():

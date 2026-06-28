@@ -10,6 +10,7 @@ class LoggerManager:
     _config: BotConfig = get_config()
     _instance: Optional['LoggerManager'] = None
     LOGGER_NAMES = ("discord_bot", "infrastructure", "application", "presentation")
+    ACTIVITY_LOGGER_NAMES = ("activity",)
 
     def __new__(cls):
         if cls._instance is None:
@@ -28,6 +29,7 @@ class LoggerManager:
         log_dir = Path("logs")
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "discord_bot.log"
+        activity_log_file = log_dir / "activity.log"
 
         handlers = {}
         active_handlers = []
@@ -51,6 +53,16 @@ class LoggerManager:
         }
         active_handlers.append("file")
 
+        handlers["activity_file"] = {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": log_level,
+            "formatter": "default",
+            "filename": str(activity_log_file),
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 5,
+            "encoding": "utf-8",
+        }
+
         dictConfig({
             "version": 1,
             "disable_existing_loggers": False,
@@ -62,12 +74,22 @@ class LoggerManager:
             },
             "handlers": handlers,
             "loggers": {
-                logger_name: {
-                    "level": log_level,
-                    "handlers": active_handlers,
-                    "propagate": False,
-                }
-                for logger_name in self.LOGGER_NAMES
+                **{
+                    logger_name: {
+                        "level": log_level,
+                        "handlers": active_handlers,
+                        "propagate": False,
+                    }
+                    for logger_name in self.LOGGER_NAMES
+                },
+                **{
+                    logger_name: {
+                        "level": log_level,
+                        "handlers": ["console", "activity_file"],
+                        "propagate": False,
+                    }
+                    for logger_name in self.ACTIVITY_LOGGER_NAMES
+                },
             },
             "root": {
                 "level": log_level,
