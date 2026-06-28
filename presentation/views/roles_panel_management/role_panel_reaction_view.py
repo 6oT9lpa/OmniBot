@@ -14,15 +14,49 @@ class RolePanelReactionView:
         self._role_emoji_map: Dict[str, int] = {}
 
     async def setup(self):
-        for btn_data in self._buttons_data:
+        self._role_emoji_map = self._build_role_emoji_map(self._buttons_data)
+        await self._ensure_reactions(self._role_emoji_map.keys())
+
+    async def reload(self, message: disnake.Message, buttons_data: List[Dict[str, Any]]) -> None:
+        """Refresh listener data without clearing all user reactions."""
+
+        old_emojis = set(self._role_emoji_map)
+        self._message = message
+        self._buttons_data = buttons_data[:25]
+        self._role_emoji_map = self._build_role_emoji_map(self._buttons_data)
+
+        removed_emojis = old_emojis - set(self._role_emoji_map)
+        for emoji in removed_emojis:
+            await self._clear_reaction(emoji)
+
+        await self._ensure_reactions(self._role_emoji_map.keys())
+        logger.info("Reloaded reaction panel for message id=%s", self._message.id)
+
+    def _build_role_emoji_map(self, buttons_data: List[Dict[str, Any]]) -> Dict[str, int]:
+        role_emoji_map: Dict[str, int] = {}
+        for btn_data in buttons_data:
             emoji = btn_data.get("emoji") or "🎭"
             if isinstance(emoji, str):
-                try:
-                    await self._message.add_reaction(emoji)
-                    self._role_emoji_map[emoji] = btn_data["role_id"]
-                    logger.info("Added reaction %s for role id=%s", emoji, btn_data["role_id"])
-                except Exception as exc:
-                    logger.error("Failed to add reaction %s: %s", emoji, exc)
+                if emoji in role_emoji_map:
+                    logger.warning("Duplicate reaction emoji %s skipped for role id=%s", emoji, btn_data["role_id"])
+                    continue
+                role_emoji_map[emoji] = btn_data["role_id"]
+        return role_emoji_map
+
+    async def _ensure_reactions(self, emojis) -> None:
+        for emoji in emojis:
+            try:
+                await self._message.add_reaction(emoji)
+                logger.info("Ensured reaction %s for message id=%s", emoji, self._message.id)
+            except Exception as exc:
+                logger.error("Failed to add reaction %s: %s", emoji, exc)
+
+    async def _clear_reaction(self, emoji: str) -> None:
+        try:
+            await self._message.clear_reaction(emoji)
+            logger.info("Cleared stale reaction %s for message id=%s", emoji, self._message.id)
+        except Exception as exc:
+            logger.error("Failed to clear reaction %s: %s", emoji, exc)
 
     async def handle_reaction(self, payload: disnake.RawReactionActionEvent):
         if payload.message_id != self._message.id:
@@ -61,9 +95,3 @@ class RolePanelReactionView:
         except Exception as exc:
             logger.error("Error handling reaction for role id=%s: %s", role_id, exc)
 
-    async def clear_reactions(self) -> None:
-        try:
-            await self._message.clear_reactions()
-            logger.info("Cleared reactions for message id=%s", self._message.id)
-        except Exception as exc:
-            logger.error("Failed to clear reactions: %s", exc)

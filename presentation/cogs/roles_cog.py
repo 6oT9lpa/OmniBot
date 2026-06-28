@@ -505,20 +505,23 @@ class RolesCog(commands.Cog):
                 return True
 
             current_components = getattr(message, "components", None)
-            if current_components and panel.get("last_rendered_fingerprint") == fingerprint:
+            interaction_mode = panel.get("interaction_mode", "buttons")
+            if panel.get("last_rendered_fingerprint") == fingerprint:
+                if interaction_mode == "reactions":
+                    await self._register_reaction_panel(message_id)
+                    logger.debug("Skip unchanged reaction panel render message_id=%s", message_id)
+                    return True
+                if current_components:
+                    logger.debug("Skip unchanged panel render message_id=%s", message_id)
+                    return True
                 logger.debug("Skip unchanged panel render message_id=%s", message_id)
-                return True
 
             from presentation.views.roles_panel_management.helpers import rebuild_panel_embed
 
-            interaction_mode = panel.get("interaction_mode", "buttons")
             if interaction_mode == "reactions":
-                if message_id in self._reaction_panels:
-                    old = self._reaction_panels.pop(message_id)
-                    await old.clear_reactions()
-                await self._register_reaction_panel(message_id)
                 embed = await rebuild_panel_embed(self._role_service, channel.guild, panel, buttons)
                 await message.edit(embed=embed, view=None)
+                await self._register_reaction_panel(message_id)
             else:
                 view = RolePanelView(buttons, message_id, self._role_service)
                 embed = await rebuild_panel_embed(self._role_service, channel.guild, panel, buttons)
@@ -534,8 +537,6 @@ class RolesCog(commands.Cog):
             return False
 
     async def _register_reaction_panel(self, message_id: int) -> None:
-        if message_id in self._reaction_panels:
-            return
         panel = await self._role_service.get_panel(message_id)
         if not panel or panel.get("interaction_mode") != "reactions":
             return
@@ -551,6 +552,14 @@ class RolesCog(commands.Cog):
             return
         buttons = await self._role_service.get_panel_buttons(message_id)
         if not buttons:
+            if message_id in self._reaction_panels:
+                await self._reaction_panels[message_id].reload(message, [])
+                del self._reaction_panels[message_id]
+                logger.info("Removed empty reaction panel listener for message %s", message_id)
+            return
+        if message_id in self._reaction_panels:
+            await self._reaction_panels[message_id].reload(message, buttons)
+            logger.info("Updated reaction panel for message %s", message_id)
             return
         view = RolePanelReactionView(message, buttons, self._role_service)
         await view.setup()

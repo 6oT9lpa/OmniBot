@@ -187,9 +187,6 @@ class PanelAddRoleView(disnake.ui.View):
         if interaction_mode == "reactions":
             cog = self._role_service._bot.get_cog("RolesCog") if self._role_service._bot else None
             if cog:
-                if panel["message_id"] in cog._reaction_panels:
-                    old_view = cog._reaction_panels.pop(panel["message_id"])
-                    await old_view.clear_reactions()
                 await cog.register_reaction_panel(panel["message_id"])
             await msg.edit(embed=embed, view=None)
         else:
