@@ -48,7 +48,7 @@ class RoleService(RoleServiceInterface):
             logger.error("Bot not set in RoleService")
             return []
 
-        auto_role_ids = await self.role_repo.get_auto_assign_roles()
+        auto_role_ids = await self.role_repo.get_auto_assign_roles(member.guild.id)
         assigned = []
 
         for role_id in auto_role_ids:
@@ -83,32 +83,36 @@ class RoleService(RoleServiceInterface):
                 "mentionable": role.mentionable,
             })
 
-        synced_count = await self.role_repo.sync_from_discord(discord_roles)
+        synced_count = await self.role_repo.sync_from_discord(guild.id, discord_roles)
         sync_activity_roles = getattr(self.role_repo, "sync_activity_roles_from_discord", None)
         if sync_activity_roles:
             await sync_activity_roles(guild.id, discord_roles)
         logger.info("Synced %s roles for guild id=%s", synced_count, guild.id)
         return synced_count
 
-    async def get_all_roles(self) -> List[Dict[str, Any]]:
-        return await self.role_repo.get_all_roles()
+    async def get_all_roles(self, guild_id: int) -> List[Dict[str, Any]]:
+        logger.debug("Fetching all roles through service for guild id=%s", guild_id)
+        return await self.role_repo.get_all_roles(guild_id)
 
-    async def get_public_roles(self) -> List[Dict[str, Any]]:
-        return await self.role_repo.get_public_roles()
+    async def get_public_roles(self, guild_id: int) -> List[Dict[str, Any]]:
+        logger.debug("Fetching public roles through service for guild id=%s", guild_id)
+        return await self.role_repo.get_public_roles(guild_id)
 
-    async def get_role(self, role_id: int) -> Optional[Dict[str, Any]]:
-        return await self.role_repo.get_role(role_id)
+    async def get_role(self, role_id: int, guild_id: int) -> Optional[Dict[str, Any]]:
+        logger.debug("Fetching role id=%s through service for guild id=%s", role_id, guild_id)
+        return await self.role_repo.get_role(role_id, guild_id)
 
-    async def set_auto_assign(self, role_id: int, is_auto_assign: bool) -> bool:
-        return await self.role_repo.set_auto_assign(role_id, is_auto_assign)
+    async def set_auto_assign(self, role_id: int, is_auto_assign: bool, guild_id: int) -> None:
+        logger.info("Setting auto-assign for role id=%s guild id=%s to %s", role_id, guild_id, is_auto_assign)
+        return await self.role_repo.set_auto_assign(role_id, is_auto_assign, guild_id)
 
-    async def set_role_public(self, role_id: int, is_public: bool) -> bool:
-        existing = await self.role_repo.get_role(role_id)
+    async def set_role_public(self, role_id: int, is_public: bool, guild_id: int) -> bool:
+        existing = await self.role_repo.get_role(role_id, guild_id)
         if not existing:
-            logger.warning("set_role_public: role id=%s not found in DB", role_id)
+            logger.warning("set_role_public: role id=%s not found in DB for guild id=%s", role_id, guild_id)
             return False
-        await self.role_repo.set_public(role_id, is_public)
-        logger.info("Role id=%s public set to %s", role_id, is_public)
+        await self.role_repo.set_public(role_id, is_public, guild_id)
+        logger.info("Role id=%s guild id=%s public set to %s", role_id, guild_id, is_public)
         return True
 
     async def get_panels(self, guild_id: int) -> List[Dict[str, Any]]:

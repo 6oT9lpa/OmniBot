@@ -68,7 +68,7 @@ class PanelSelectView(disnake.ui.View):
         existing_buttons = await self._role_service.get_panel_buttons(panel["message_id"])
         existing_ids = {b["role_id"] for b in existing_buttons}
 
-        all_public = await self._role_service.get_public_roles()
+        all_public = await self._role_service.get_public_roles(self._guild.id)
         available = []
         for rd in all_public:
             if rd["role_id"] in existing_ids:

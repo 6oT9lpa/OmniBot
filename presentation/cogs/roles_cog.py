@@ -153,7 +153,7 @@ class RolesCog(commands.Cog):
             )
             return
 
-        await self.role_service.set_auto_assign(role.id, auto_assign)
+        await self.role_service.set_auto_assign(role.id, auto_assign, ctx.guild.id)
         status = "включена" if auto_assign else "выключена"
         embed = disnake.Embed(
             title="Автовыдача обновлена",
@@ -168,7 +168,7 @@ class RolesCog(commands.Cog):
             await ctx.response.send_message("Только администраторы", ephemeral=True)
             return
 
-        roles = await self.role_service.get_all_roles()
+        roles = await self.role_service.get_all_roles(ctx.guild.id)
         if not roles:
             await ctx.response.send_message(
                 "Роли не найдены. Используйте `/sync_roles`.", ephemeral=True
@@ -215,7 +215,7 @@ class RolesCog(commands.Cog):
             await ctx.response.send_message("Только администраторы", ephemeral=True)
             return
 
-        success = await self.role_service.set_role_public(role.id, is_public)
+        success = await self.role_service.set_role_public(role.id, is_public, ctx.guild.id)
         if not success:
             await ctx.response.send_message(
                 "Роль не найдена в БД. Выполните `/sync_roles` сначала.", ephemeral=True
@@ -244,7 +244,7 @@ class RolesCog(commands.Cog):
             await ctx.response.send_message("Только администраторы", ephemeral=True)
             return
 
-        all_public = await self._role_service.get_public_roles()
+        all_public = await self._role_service.get_public_roles(ctx.guild.id)
         available = []
         for rd in all_public:
             role = ctx.guild.get_role(rd["role_id"])

@@ -4,7 +4,9 @@ from dataclasses import dataclass
 
 import disnake
 from disnake.ext import commands, tasks
+from disnake.ext.commands.flags import CommandSyncFlags
 
+from application.services.global_application_command_sync_service import GlobalApplicationCommandSyncService
 from infrastructure.config import BotConfig
 from infrastructure.logging import get_logger
 from infrastructure.network import install_aiohttp_discord_proxy
@@ -32,6 +34,8 @@ class DiscordBot(commands.Bot):
         self._stats_service = stats_service
         self._presence_items = self._load_presence_items()
         self._presence_index = random.randrange(len(self._presence_items))
+        self._global_command_sync_service = GlobalApplicationCommandSyncService()
+        self._global_commands_synced = False
 
         intents = disnake.Intents.default()
         intents.message_content = True
@@ -45,7 +49,8 @@ class DiscordBot(commands.Bot):
             intents=intents,
             activity=self._build_activity(initial_presence),
             status=initial_presence.status,
-            test_guilds=[self._config.discord_guild_id],
+            # Slash commands must stay global; passing test_guilds makes them visible only in one guild.
+            command_sync_flags=self._build_command_sync_flags(),
             proxy=self._config.discord_proxy_url,
         )
 
@@ -53,6 +58,12 @@ class DiscordBot(commands.Bot):
 
         if self._role_service:
             self._role_service.set_bot(self)  
+
+    def _build_command_sync_flags(self) -> CommandSyncFlags:
+        flags = CommandSyncFlags.default()
+        flags.sync_global_commands = False
+        flags.sync_guild_commands = False
+        return flags
 
     async def on_ready(self):
         if not self._ready.is_set():
@@ -62,21 +73,40 @@ class DiscordBot(commands.Bot):
             logger.info(f"Bot: {self.user.name}")
             logger.info(f"ID: {self.user.id}")
             
-            if self.guilds:
-                guild = self.guilds[0]
-                logger.info(f"Guild: {guild.name}")
-                logger.info(f"Members: {guild.member_count}")
+            logger.info("Guilds connected: %s", len(self.guilds))
+            for guild in self.guilds:
+                logger.info("Guild: %s id=%s members=%s", guild.name, guild.id, guild.member_count)
             
             logger.info("=" * 50)
+            await self._ensure_global_commands_synced()
+            await self._global_command_sync_service.remove_legacy_guild_commands(self)
             
             # Синхронизируем роли при старте
             if self.guilds and self._role_service:
-                try:
-                    await self._role_service.sync_roles(self.guilds[0])
-                except Exception as e:
-                    logger.error(f"Failed to sync roles: {e}")
+                for guild in self.guilds:
+                    try:
+                        await self._role_service.sync_roles(guild)
+                    except Exception as e:
+                        logger.error("Failed to sync roles for guild id=%s: %s", guild.id, e)
 
             await self._start_presence_rotation()
+
+    async def on_connect(self):
+        await self._ensure_global_commands_synced()
+
+    async def _ensure_global_commands_synced(self) -> None:
+        if self._global_commands_synced:
+            return
+
+        try:
+            commands = await self._global_command_sync_service.sync_global_commands(self)
+        except Exception:
+            logger.exception("Manual global application command sync failed")
+            return
+
+        if commands:
+            self._global_commands_synced = True
+            await self._global_command_sync_service.remove_legacy_guild_commands(self, commands)
 
     async def on_application_command_error(self, interaction: disnake.Interaction, error: Exception):
         logger.error("Application command error command=%s error=%s", getattr(interaction, "command", None), error, exc_info=True)

@@ -1,6 +1,4 @@
 from typing import List, Optional, Dict, Any
-from datetime import datetime
-
 from core.domain.activity_access import BUILTIN_ACCESS_ROLES, DISCORD_ADMINISTRATOR_PERMISSION
 from core.interfaces.repositories import RoleRepositoryInterface
 from infrastructure.database.connection import DatabaseManager
@@ -18,9 +16,17 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
         "created_at", "updated_at"
     }
 
-    def __init__(self, db_manager: DatabaseManager, guild_id: int):
+    def __init__(self, db_manager: DatabaseManager, default_guild_id: Optional[int] = None):
         super().__init__(db_manager)
-        self._guild_id = guild_id
+        self._default_guild_id = default_guild_id
+
+    def _resolve_guild_id(self, guild_id: Optional[int]) -> int:
+        # Role state is isolated per guild because one global bot instance can serve many servers.
+        resolved_guild_id = guild_id or self._default_guild_id
+        if not resolved_guild_id:
+            logger.error("Role repository operation requires guild_id")
+            raise ValueError("guild_id is required for role operations")
+        return int(resolved_guild_id)
 
     async def add_role(
         self, 
@@ -31,9 +37,11 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
         is_auto_assign: bool = False,
         is_public: bool = True,
         display_emoji: Optional[str] = None,
+        guild_id: Optional[int] = None,
     ) -> bool:
         """Добавление или обновление ролей"""
-        existing = await self.get_role(role_id)
+        resolved_guild_id = self._resolve_guild_id(guild_id)
+        existing = await self.get_role(role_id, resolved_guild_id)
         
         if existing:
             needs_update = False
@@ -53,21 +61,24 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
                 needs_update = True
             
             if needs_update:
-                update_data["updated_at"] = "CURRENT_TIMESTAMP"
-                for key, value in update_data.items():
-                    await self.update(
-                        data={key: value},
-                        where_column="role_id",
-                        where_value=role_id
-                    )
-                logger.debug(f"Updated role {name} ({role_id})")
+                set_parts = ", ".join(f"{key} = ?" for key in update_data)
+                await self.execute(
+                    f"""
+                    UPDATE roles
+                    SET {set_parts}, updated_at = datetime('now', 'localtime')
+                    WHERE role_id = ? AND guild_id = ?
+                    """,
+                    (*update_data.values(), role_id, resolved_guild_id),
+                )
+                await self.commit()
+                logger.debug("Updated role %s (%s) for guild id=%s", name, role_id, resolved_guild_id)
             else:
-                logger.debug(f"Role {name} ({role_id}) unchanged, skipping update")
+                logger.debug("Role %s (%s) unchanged for guild id=%s", name, role_id, resolved_guild_id)
 
         else:
             data = {
                 "role_id": role_id,
-                "guild_id": self._guild_id,
+                "guild_id": resolved_guild_id,
                 "name": name,
                 "color": color,
                 "position": position,
@@ -76,40 +87,52 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
                 "display_emoji": display_emoji,
             }
             await self.insert(data)
-            logger.info(f"Added new role: {name} ({role_id})")
+            logger.info("Added new role %s (%s) for guild id=%s", name, role_id, resolved_guild_id)
         
         return True
         
-    async def get_auto_assign_roles(self) -> List[int]:
+    async def get_auto_assign_roles(self, guild_id: Optional[int] = None) -> List[int]:
         """Получить ID ролей для автовыдачи"""
+        resolved_guild_id = self._resolve_guild_id(guild_id)
         query = """
             SELECT role_id FROM roles 
             WHERE guild_id = ? AND is_auto_assign = 1
         """
-        rows = await self.fetch_all(query, (self._guild_id,))
-        logger.debug(f"Auto-assign roles for guild {self._guild_id}: {[row['role_id'] for row in rows]}")
+        rows = await self.fetch_all(query, (resolved_guild_id,))
+        logger.debug("Auto-assign roles for guild id=%s: %s", resolved_guild_id, [row["role_id"] for row in rows])
         return [row["role_id"] for row in rows]
     
-    async def set_auto_assign(self, role_id: int, is_auto_assign: bool) -> None:
+    async def set_auto_assign(self, role_id: int, is_auto_assign: bool, guild_id: Optional[int] = None) -> None:
         """Установить флаг автовыдачи"""
-        await self.update(
-            data={"is_auto_assign": 1 if is_auto_assign else 0},
-            where_column="role_id",
-            where_value=role_id
+        resolved_guild_id = self._resolve_guild_id(guild_id)
+        await self.execute(
+            """
+            UPDATE roles
+            SET is_auto_assign = ?, updated_at = datetime('now', 'localtime')
+            WHERE role_id = ? AND guild_id = ?
+            """,
+            (1 if is_auto_assign else 0, role_id, resolved_guild_id),
         )
-        logger.info(f"Auto assign for role {role_id} set to {is_auto_assign}")
+        await self.commit()
+        logger.info("Auto assign for role %s in guild id=%s set to %s", role_id, resolved_guild_id, is_auto_assign)
     
-    async def set_public(self, role_id: int, is_public: bool) -> None:
+    async def set_public(self, role_id: int, is_public: bool, guild_id: Optional[int] = None) -> None:
         """Скрыть/показать роль в панели"""
-        await self.update(
-            data={"is_public": 1 if is_public else 0},
-            where_column="role_id",
-            where_value=role_id
+        resolved_guild_id = self._resolve_guild_id(guild_id)
+        await self.execute(
+            """
+            UPDATE roles
+            SET is_public = ?, updated_at = datetime('now', 'localtime')
+            WHERE role_id = ? AND guild_id = ?
+            """,
+            (1 if is_public else 0, role_id, resolved_guild_id),
         )
-        logger.info(f"Public visibility for role {role_id} set to {is_public}")
+        await self.commit()
+        logger.info("Public visibility for role %s in guild id=%s set to %s", role_id, resolved_guild_id, is_public)
     
-    async def get_all_roles(self) -> List[Dict[str, Any]]:
+    async def get_all_roles(self, guild_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """Получить все роли сервера"""
+        resolved_guild_id = self._resolve_guild_id(guild_id)
         query = """
             SELECT role_id, name, color, position, 
                    is_auto_assign, is_public, display_emoji
@@ -117,26 +140,31 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
             WHERE guild_id = ?
             ORDER BY position ASC
         """
-        logger.debug(f"Fetching all roles for guild {self._guild_id}")
-        return await self.fetch_all(query, (self._guild_id,))
+        logger.debug("Fetching all roles for guild id=%s", resolved_guild_id)
+        return await self.fetch_all(query, (resolved_guild_id,))
     
-    async def get_public_roles(self) -> List[Dict[str, Any]]:
+    async def get_public_roles(self, guild_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """Получить публичные роли (для панели)"""
+        resolved_guild_id = self._resolve_guild_id(guild_id)
         query = """
             SELECT role_id, name, color, display_emoji
             FROM roles 
             WHERE guild_id = ? AND is_public = 1
             ORDER BY position ASC
         """
-        logger.debug(f"Fetching public roles for guild {self._guild_id}")
-        return await self.fetch_all(query, (self._guild_id,))
+        logger.debug("Fetching public roles for guild id=%s", resolved_guild_id)
+        return await self.fetch_all(query, (resolved_guild_id,))
     
-    async def get_role(self, role_id: int) -> Optional[Dict[str, Any]]:
+    async def get_role(self, role_id: int, guild_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """Получить роль по ID"""
-        logger.debug(f"Fetching role {role_id} for guild {self._guild_id}")
-        return await self.get_by_id(role_id, id_column="role_id")
+        resolved_guild_id = self._resolve_guild_id(guild_id)
+        logger.debug("Fetching role %s for guild id=%s", role_id, resolved_guild_id)
+        return await self.fetch_one(
+            "SELECT * FROM roles WHERE role_id = ? AND guild_id = ?",
+            (role_id, resolved_guild_id),
+        )
     
-    async def sync_from_discord(self, discord_roles: List[Dict[str, Any]]) -> int:
+    async def sync_from_discord(self, guild_id: int, discord_roles: List[Dict[str, Any]]) -> int:
         """Синхронизировать роли из Discord (для админки)"""
         synced_count = 0
         for role in discord_roles:
@@ -147,11 +175,12 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
                 position=role.get("position"),
                 is_auto_assign=False,
                 is_public=True,
-                display_emoji=None
+                display_emoji=None,
+                guild_id=guild_id,
             )
             synced_count += 1
         
-        logger.info(f"Synced {len(discord_roles)} roles from Discord")
+        logger.info("Synced %s roles from Discord for guild id=%s", len(discord_roles), guild_id)
         return synced_count
     
     async def sync_activity_roles_from_discord(self, guild_id: int, discord_roles: List[Dict[str, Any]]) -> int:
@@ -268,10 +297,12 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
         """Удалить роль из БД"""
         return await self.delete(where_column="role_id", where_value=role_id)
     
-    async def get_auto_assign_count(self) -> int:
+    async def get_auto_assign_count(self, guild_id: Optional[int] = None) -> int:
         """Получить количество ролей для автовыдачи"""
+        resolved_guild_id = self._resolve_guild_id(guild_id)
         result = await self.fetch_one(
             "SELECT COUNT(*) as count FROM roles WHERE guild_id = ? AND is_auto_assign = 1",
-            (self._guild_id,),
+            (resolved_guild_id,),
         )
+        logger.debug("Auto-assign role count for guild id=%s: %s", resolved_guild_id, result["count"] if result else 0)
         return result["count"] if result else 0

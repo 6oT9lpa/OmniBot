@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings
 class BotConfig(BaseSettings):
     # Discord
     discord_token: SecretStr = Field(..., env="DISCORD_TOKEN")
-    discord_guild_id: int = Field(..., env="DISCORD_GUILD_ID")
+    discord_guild_id: Optional[int] = Field(None, env="DISCORD_GUILD_ID")
     discord_owner_id: int = Field(..., env="DISCORD_OWNER_ID")
     discord_proxy_url: Optional[str] = Field(None, env="DISCORD_PROXY_URL")
 
@@ -43,16 +43,21 @@ class BotConfig(BaseSettings):
     # Validators
     @field_validator('discord_guild_id', 'discord_owner_id')
     @classmethod
-    def validate_positive(cls, v: int) -> int:
+    def validate_positive(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return v
         if v <= 0:
             raise ValueError(f'ID must be positive: {v}')
         return v
     
-    @field_validator('auto_role_id', 'log_channel_id', 'welcome_channel_id', mode='before')
+    @field_validator('discord_guild_id', 'auto_role_id', 'log_channel_id', 'welcome_channel_id', mode='before')
     @classmethod
     def parse_id(cls, v):
         if isinstance(v, str):
-            return int(v.strip())
+            stripped = v.strip()
+            if not stripped:
+                return None
+            return int(stripped)
         return v
 
     @field_validator('activity_rotation_interval_seconds')

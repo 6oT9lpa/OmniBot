@@ -77,7 +77,7 @@ class Container:
     async def get_role_repository(self) -> RoleRepository:
         if not self._role_repo:
             db = await self.get_database()
-            self._role_repo = RoleRepository(db, self.config.discord_guild_id)
+            self._role_repo = RoleRepository(db, default_guild_id=self.config.discord_guild_id)
         return self._role_repo
     
     async def get_panel_message_repository(self) -> RolePanelMessageRepository:
