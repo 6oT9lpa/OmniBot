@@ -179,6 +179,7 @@ export type DevBlogDraft = {
   content?: string | null;
   embeds: DevBlogEmbed[];
   status: "draft" | "published";
+  image_render_mode?: "gallery_bottom" | "inline_between_text";
 };
 
 export type CreatorAlertSource = {
@@ -194,16 +195,17 @@ export type CreatorAlertSource = {
 };
 
 export type VoiceRoom = {
-  channel_id: number;
+  channel_id: string;
   guild_id: string | number;
-  owner_id: number;
+  owner_id: string;
   name: string;
-  is_persistent: number;
+  is_persistent: boolean;
   created_at: string;
   discord?: {
     id: string;
     name: string;
     user_limit?: number;
+    rtc_region?: string | null;
     permission_overwrites?: unknown[];
   } | null;
 };
@@ -212,11 +214,17 @@ export type ServerStatsPayload = {
   summary: Record<string, unknown>;
   channels: Array<Record<string, unknown>>;
   hourly: Array<{ hour: number; count: number }>;
+  daily: Array<{ date: string; count: number }>;
 };
 
 export type LogsPayload = {
   messages: Array<Record<string, unknown>>;
   audit: Array<Record<string, unknown>>;
+};
+
+export type LogActor = {
+  id: string;
+  name: string;
 };
 
 export type AccessDeniedDetail = {

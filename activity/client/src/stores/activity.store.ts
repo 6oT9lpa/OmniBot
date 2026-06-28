@@ -20,6 +20,7 @@ import {
   getDiscordChannels,
   getDiscordRoles,
   getIntegrations,
+  getLogActors,
   getLogs,
   getRolePanelsData,
   getServerStats,
@@ -61,6 +62,7 @@ import type {
   DiscordChannel,
   DiscordRole,
   HealthSignal,
+  LogActor,
   LogsPayload,
   ModuleKey,
   PanelSession,
@@ -103,6 +105,7 @@ type State = {
   serverStats: ServerStatsPayload | null;
   userStatsResults: Array<Record<string, unknown>>;
   logs: LogsPayload | null;
+  logActors: LogActor[];
   auditPage: ActivityAuditPage | null;
   dashboard: ActivityDashboardResponse | null;
   accessRoles: ActivityAccessRole[];
@@ -144,6 +147,7 @@ export const useActivityStore = defineStore("activity", {
     serverStats: null,
     userStatsResults: [],
     logs: null,
+    logActors: [],
     auditPage: null,
     dashboard: null,
     accessRoles: [],
@@ -263,12 +267,13 @@ export const useActivityStore = defineStore("activity", {
     },
 
     async saveWelcome(next: WelcomeConfig) {
+      const payload = this.session ? { ...next, guild_id: this.session.guild_id } : next;
       if (!this.token || this.mode === "local") {
-        this.welcome = next;
+        this.welcome = payload;
         return;
       }
 
-      this.welcome = await saveWelcomeConfig(next, this.token);
+      this.welcome = await saveWelcomeConfig(payload, this.token);
     },
 
     async resetWelcome() {
@@ -374,6 +379,7 @@ export const useActivityStore = defineStore("activity", {
           this.serverStats = await getServerStats(guildId, this.token);
         } else if (module === "logs") {
           this.logs = await getLogs(guildId, this.token);
+          this.logActors = await getLogActors(guildId, this.token);
         } else if (module === "bot-settings") {
           const settings = await getBotSettings(guildId, this.token);
           this.botSettings = settings;
@@ -428,13 +434,13 @@ export const useActivityStore = defineStore("activity", {
       this.creatorPreview = await previewCreatorAlert({ ...source, guild_id: this.session.guild_id }, this.token);
     },
 
-    async updateVoice(channelId: number, payload: Record<string, unknown>) {
+    async updateVoice(channelId: string, payload: Record<string, unknown>) {
       if (!this.session || !this.token) return;
       await updateVoiceRoom(this.session.guild_id, this.token, channelId, payload);
       await this.loadModuleData("voice-rooms");
     },
 
-    async deleteVoice(channelId: number) {
+    async deleteVoice(channelId: string) {
       if (!this.session || !this.token) return;
       await deleteVoiceRoom(this.session.guild_id, this.token, channelId);
       await this.loadModuleData("voice-rooms");
@@ -451,6 +457,9 @@ export const useActivityStore = defineStore("activity", {
     async loadLogs(source = "all", eventType = "", query = "") {
       if (!this.session || !this.token || this.mode === "local") return;
       this.logs = await getLogs(this.session.guild_id, this.token, source, eventType, query);
+      if (!this.logActors.length) {
+        this.logActors = await getLogActors(this.session.guild_id, this.token);
+      }
     },
 
     async loadDashboard() {

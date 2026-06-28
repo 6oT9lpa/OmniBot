@@ -15,6 +15,7 @@ import type {
   DiscordChannel,
   DiscordMember,
   DiscordRole,
+  LogActor,
   LogsPayload,
   ServerStatsPayload,
   TokenResponse,
@@ -204,20 +205,20 @@ export function getVoiceRooms(guildId: string, token: string) {
   return apiRequest<VoiceRoom[]>(`/api/voice/rooms?guild_id=${guildId}`, {}, token);
 }
 
-export function updateVoiceRoom(guildId: string, token: string, channelId: number, payload: Record<string, unknown>) {
+export function updateVoiceRoom(guildId: string, token: string, channelId: string, payload: Record<string, unknown>) {
   return apiRequest<Record<string, unknown>>(`/api/voice/rooms/${channelId}`, {
     method: "PATCH",
     body: JSON.stringify({ guild_id: guildId, ...payload }),
   }, token);
 }
 
-export function deleteVoiceRoom(guildId: string, token: string, channelId: number) {
+export function deleteVoiceRoom(guildId: string, token: string, channelId: string) {
   return apiRequest<Record<string, unknown>>(`/api/voice/rooms/${channelId}?guild_id=${guildId}`, {
     method: "DELETE",
   }, token);
 }
 
-export function getServerStats(guildId: string, token: string, period = 7) {
+export function getServerStats(guildId: string, token: string, period = 30) {
   return apiRequest<ServerStatsPayload>(`/api/stats/server?guild_id=${guildId}&period=${period}`, {}, token);
 }
 
@@ -229,6 +230,10 @@ export function getLogs(guildId: string, token: string, source = "all", eventTyp
   const params = new URLSearchParams({ guild_id: guildId, source, q: query });
   if (eventType) params.set("event_type", eventType);
   return apiRequest<LogsPayload>(`/api/logs?${params.toString()}`, {}, token);
+}
+
+export function getLogActors(guildId: string, token: string) {
+  return apiRequest<LogActor[]>(`/api/logs/actors?guild_id=${guildId}`, {}, token);
 }
 
 export function getBotSettings(guildId: string, token: string) {
