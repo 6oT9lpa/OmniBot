@@ -13,11 +13,16 @@ from activity.server.services.access_service import ActivityAccessService
 from activity.server.services.audit_service import ActivityAuditService
 from activity.server.services.discord_service import DiscordService
 from activity.server.utils.rbac import (
+    ACCESS_ROLE_CONFIGURABLE_MODULES,
     MODULE_ORDER,
     normalize_access_role_slug,
     normalize_module_permissions,
     normalize_permission,
 )
+from infrastructure.logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class ActivityRbacService:
@@ -27,12 +32,10 @@ class ActivityRbacService:
         self._discord = DiscordService()
 
     async def sync_roles(self, guild_id: int, access_token: str) -> ActivityRoleSyncResponse:
-        actor = await self._access_service.ensure_admin(access_token, str(guild_id))
+        actor = await self._access_service.ensure_discord_administrator(access_token, str(guild_id))
+        logger.info("Starting Activity role sync guild_id=%s actor_id=%s", guild_id, actor.get("id"))
         roles = await self._discord.list_roles(str(guild_id))
         admin_role = await self._get_access_role_by_slug(guild_id, "administrator")
-        if admin_role is None:
-            await self._access_service.ensure_admin(access_token, str(guild_id))
-            admin_role = await self._get_access_role_by_slug(guild_id, "administrator")
 
         seen_role_ids: list[int] = []
         admin_roles_count = 0
@@ -104,6 +107,12 @@ class ActivityRbacService:
             )
 
         await get_db().commit()
+        logger.info(
+            "Activity role sync completed guild_id=%s synced=%s admin_roles=%s",
+            guild_id,
+            len(roles),
+            admin_roles_count,
+        )
         await self._audit_service.log_action(
             guild_id=guild_id,
             actor_id=int(actor["id"]),
@@ -122,6 +131,26 @@ class ActivityRbacService:
 
     async def list_access_roles(self, guild_id: int, access_token: str) -> list[ActivityAccessRole]:
         await self._access_service.ensure_admin(access_token, str(guild_id))
+        await self._access_service.ensure_builtin_access_roles(guild_id)
+        logger.info("Listing Activity access roles guild_id=%s", guild_id)
+        return await self._list_access_roles_unchecked(guild_id)
+
+    async def get_access_control(self, guild_id: int, access_token: str) -> dict[str, Any]:
+        await self._access_service.ensure_admin(access_token, str(guild_id))
+        await self._access_service.ensure_builtin_access_roles(guild_id)
+        logger.info("Loading aggregated Access Control data guild_id=%s", guild_id)
+        return {"access_roles": await self._list_access_roles_unchecked(guild_id)}
+
+    async def get_role_panels(self, guild_id: int, access_token: str) -> dict[str, Any]:
+        await self._access_service.ensure_admin(access_token, str(guild_id))
+        await self._access_service.ensure_builtin_access_roles(guild_id)
+        logger.info("Loading aggregated Role Panels data guild_id=%s", guild_id)
+        return {
+            "access_roles": await self._list_access_roles_unchecked(guild_id),
+            "synced_roles": await self._list_synced_roles_unchecked(guild_id),
+        }
+
+    async def _list_access_roles_unchecked(self, guild_id: int) -> list[ActivityAccessRole]:
         rows = await get_db().fetch_all(
             """
             SELECT * FROM activity_access_roles
@@ -135,6 +164,7 @@ class ActivityRbacService:
     async def create_access_role(self, guild_id: int, name: str, access_token: str) -> ActivityAccessRole:
         actor = await self._access_service.ensure_admin(access_token, str(guild_id))
         clean_name = name.strip()
+        logger.info("Creating custom Activity access role guild_id=%s actor_id=%s name=%s", guild_id, actor.get("id"), clean_name)
         if await self._name_exists(guild_id, clean_name):
             raise HTTPException(status_code=409, detail="Activity role name already exists")
 
@@ -159,6 +189,29 @@ class ActivityRbacService:
         row = await get_db().fetch_one("SELECT * FROM activity_access_roles WHERE id = ?", (cursor.lastrowid,))
         return await self._to_access_role(row)
 
+    async def delete_access_role(self, guild_id: int, role_id: int, access_token: str) -> dict[str, Any]:
+        actor = await self._access_service.ensure_admin(access_token, str(guild_id))
+        row = await self._get_access_role(guild_id, role_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Activity role not found")
+        if row["is_builtin"]:
+            logger.warning("Blocked built-in Activity role deletion guild_id=%s role_id=%s", guild_id, role_id)
+            raise HTTPException(status_code=400, detail="Built-in Activity roles cannot be deleted")
+
+        await get_db().execute("DELETE FROM activity_access_roles WHERE guild_id = ? AND id = ?", (guild_id, role_id))
+        await get_db().commit()
+        logger.info("Deleted custom Activity access role guild_id=%s role_id=%s actor_id=%s", guild_id, role_id, actor.get("id"))
+        await self._audit_service.log_action(
+            guild_id=guild_id,
+            actor_id=int(actor["id"]),
+            actor_name=self._display_name(actor),
+            target_id=role_id,
+            target_name=row["name"],
+            event_type="activity_access_role_deleted",
+            details=f"Deleted Activity role {row['name']}.",
+        )
+        return {"role_id": role_id, "deleted": True}
+
     async def update_access_role_modules(
         self,
         guild_id: int,
@@ -170,6 +223,9 @@ class ActivityRbacService:
         row = await self._get_access_role(guild_id, role_id)
         if row is None:
             raise HTTPException(status_code=404, detail="Activity role not found")
+        if row["slug"] == "administrator":
+            logger.warning("Blocked administrator Activity role update guild_id=%s role_id=%s", guild_id, role_id)
+            raise HTTPException(status_code=400, detail="Administrator Activity role permissions are immutable")
 
         normalized = normalize_module_permissions(modules)
         for module_key, permission in normalized.items():
@@ -187,6 +243,12 @@ class ActivityRbacService:
             (role_id,),
         )
         await get_db().commit()
+        logger.info(
+            "Updated Activity role modules guild_id=%s role_id=%s modules=%s",
+            guild_id,
+            role_id,
+            ",".join(ACCESS_ROLE_CONFIGURABLE_MODULES),
+        )
         await self._audit_service.log_action(
             guild_id=guild_id,
             actor_id=int(actor["id"]),
@@ -200,6 +262,10 @@ class ActivityRbacService:
 
     async def list_synced_roles(self, guild_id: int, access_token: str) -> list[ActivitySyncedRole]:
         await self._access_service.ensure_admin(access_token, str(guild_id))
+        logger.info("Listing synced Discord roles guild_id=%s", guild_id)
+        return await self._list_synced_roles_unchecked(guild_id)
+
+    async def _list_synced_roles_unchecked(self, guild_id: int) -> list[ActivitySyncedRole]:
         rows = await get_db().fetch_all(
             """
             SELECT * FROM activity_synced_roles
@@ -218,6 +284,13 @@ class ActivityRbacService:
         access_token: str,
     ) -> ActivitySyncedRole:
         actor = await self._access_service.ensure_admin(access_token, str(guild_id))
+        logger.info(
+            "Updating synced role assignments guild_id=%s discord_role_id=%s actor_id=%s access_role_ids=%s",
+            guild_id,
+            discord_role_id,
+            actor.get("id"),
+            access_role_ids,
+        )
         synced_role = await get_db().fetch_one(
             "SELECT * FROM activity_synced_roles WHERE guild_id = ? AND role_id = ?",
             (guild_id, discord_role_id),

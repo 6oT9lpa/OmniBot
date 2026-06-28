@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
+from core.domain.activity_access import BUILTIN_ACCESS_ROLES, DISCORD_ADMINISTRATOR_PERMISSION
 from core.interfaces.repositories import RoleRepositoryInterface
 from infrastructure.database.connection import DatabaseManager
 from infrastructure.database.repositories.base import BaseRepository
@@ -153,6 +154,116 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
         logger.info(f"Synced {len(discord_roles)} roles from Discord")
         return synced_count
     
+    async def sync_activity_roles_from_discord(self, guild_id: int, discord_roles: List[Dict[str, Any]]) -> int:
+        # /sync_roles must populate Activity RBAC too; otherwise the Activity keeps returning roles_not_synced.
+        logger.info("Syncing Activity RBAC Discord roles for guild_id=%s count=%s", guild_id, len(discord_roles))
+        administrator_role_id = await self._ensure_activity_builtin_roles(guild_id)
+        seen_role_ids: list[int] = []
+
+        for role in discord_roles:
+            role_id = int(role["id"])
+            permissions = int(role.get("permissions") or 0)
+            is_admin = bool(permissions & DISCORD_ADMINISTRATOR_PERMISSION)
+            seen_role_ids.append(role_id)
+            await self.execute(
+                """
+                INSERT INTO activity_synced_roles (
+                    guild_id,
+                    role_id,
+                    name,
+                    color,
+                    position,
+                    permissions,
+                    is_admin,
+                    managed,
+                    mentionable,
+                    synced_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+                ON CONFLICT(guild_id, role_id)
+                DO UPDATE SET
+                    name = excluded.name,
+                    color = excluded.color,
+                    position = excluded.position,
+                    permissions = excluded.permissions,
+                    is_admin = excluded.is_admin,
+                    managed = excluded.managed,
+                    mentionable = excluded.mentionable,
+                    synced_at = excluded.synced_at
+                """,
+                (
+                    guild_id,
+                    role_id,
+                    role["name"],
+                    role.get("color"),
+                    role.get("position"),
+                    permissions,
+                    is_admin,
+                    int(bool(role.get("managed", False))),
+                    int(bool(role.get("mentionable", False))),
+                ),
+            )
+
+            if is_admin and administrator_role_id:
+                await self.execute(
+                    """
+                    INSERT INTO activity_synced_role_assignments (guild_id, discord_role_id, access_role_id)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(guild_id, discord_role_id, access_role_id) DO NOTHING
+                    """,
+                    (guild_id, role_id, administrator_role_id),
+                )
+
+        if seen_role_ids:
+            placeholders = ",".join("?" for _ in seen_role_ids)
+            await self.execute(
+                f"""
+                DELETE FROM activity_synced_roles
+                WHERE guild_id = ?
+                  AND role_id NOT IN ({placeholders})
+                """,
+                (guild_id, *seen_role_ids),
+            )
+        await self.commit()
+        logger.info("Activity RBAC Discord roles synced for guild_id=%s count=%s", guild_id, len(discord_roles))
+        return len(discord_roles)
+
+    async def _ensure_activity_builtin_roles(self, guild_id: int) -> Optional[int]:
+        administrator_role_id: Optional[int] = None
+        for definition in BUILTIN_ACCESS_ROLES:
+            row = await self.fetch_one(
+                "SELECT id FROM activity_access_roles WHERE guild_id = ? AND slug = ?",
+                (guild_id, definition["slug"]),
+            )
+            if row:
+                role_id = int(row["id"])
+            else:
+                cursor = await self.execute(
+                    """
+                    INSERT INTO activity_access_roles (guild_id, slug, name, is_builtin)
+                    VALUES (?, ?, ?, 1)
+                    """,
+                    (guild_id, definition["slug"], definition["name"]),
+                )
+                role_id = int(cursor.lastrowid)
+
+            for module_key, permission in dict(definition["modules"]).items():
+                await self.execute(
+                    """
+                    INSERT INTO activity_access_role_modules (access_role_id, module_key, permission)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(access_role_id, module_key)
+                    DO UPDATE SET permission = excluded.permission
+                    """,
+                    (role_id, module_key, permission),
+                )
+
+            if definition["slug"] == "administrator":
+                administrator_role_id = role_id
+
+        await self.commit()
+        return administrator_role_id
+
     async def remove_role(self, role_id: int) -> bool:
         """Удалить роль из БД"""
         return await self.delete(where_column="role_id", where_value=role_id)

@@ -79,9 +79,14 @@ class RoleService(RoleServiceInterface):
                 "color": role.color.value,
                 "position": role.position,
                 "permissions": role.permissions.value,
+                "managed": role.managed,
+                "mentionable": role.mentionable,
             })
 
         synced_count = await self.role_repo.sync_from_discord(discord_roles)
+        sync_activity_roles = getattr(self.role_repo, "sync_activity_roles_from_discord", None)
+        if sync_activity_roles:
+            await sync_activity_roles(guild.id, discord_roles)
         logger.info("Synced %s roles for guild id=%s", synced_count, guild.id)
         return synced_count
 

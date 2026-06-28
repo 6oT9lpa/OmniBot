@@ -31,12 +31,37 @@ async def list_activity_access_roles(
     return await service.list_access_roles(guild_id, access_token)
 
 
+@router.get("/api/activity/rbac/access-control")
+async def get_activity_access_control(
+    guild_id: int = Query(gt=0),
+    access_token: str = Depends(require_bearer_token),
+) -> dict[str, object]:
+    return await service.get_access_control(guild_id, access_token)
+
+
+@router.get("/api/activity/rbac/role-panels")
+async def get_activity_role_panels(
+    guild_id: int = Query(gt=0),
+    access_token: str = Depends(require_bearer_token),
+) -> dict[str, object]:
+    return await service.get_role_panels(guild_id, access_token)
+
+
 @router.post("/api/activity/rbac/access-roles", response_model=ActivityAccessRole)
 async def create_activity_access_role(
     payload: ActivityAccessRoleCreate,
     access_token: str = Depends(require_bearer_token),
 ) -> ActivityAccessRole:
     return await service.create_access_role(payload.guild_id, payload.name, access_token)
+
+
+@router.delete("/api/activity/rbac/access-roles/{role_id}")
+async def delete_activity_access_role(
+    role_id: int = Path(gt=0),
+    guild_id: int = Query(gt=0),
+    access_token: str = Depends(require_bearer_token),
+) -> dict[str, object]:
+    return await service.delete_access_role(guild_id, role_id, access_token)
 
 
 @router.put("/api/activity/rbac/access-roles/{role_id}/modules", response_model=ActivityAccessRole)

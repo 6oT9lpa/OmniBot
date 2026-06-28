@@ -2,31 +2,12 @@ from __future__ import annotations
 
 import re
 
-
-MODULE_ORDER = (
-    "dashboard",
-    "access",
-    "welcome",
-    "role-panels",
-    "creator-alerts",
-    "dev-blog",
-    "ai-moderator",
-    "logs",
-    "server-stats",
-    "voice-rooms",
-    "bot-settings",
-    "integrations",
-    "health",
-)
-
-PERMISSION_ORDER = ("disabled", "view", "edit", "publish", "manage")
-
-BUILTIN_ACCESS_ROLES: tuple[dict[str, object], ...] = (
-    {"slug": "user", "name": "User", "modules": {"dashboard": "view", "health": "view"}},
-    {"slug": "creator", "name": "Creator", "modules": {"dashboard": "view", "creator-alerts": "edit", "health": "view"}},
-    {"slug": "developer", "name": "Developer", "modules": {"dashboard": "view", "dev-blog": "publish", "health": "view"}},
-    {"slug": "moderator", "name": "Moderator", "modules": {"dashboard": "view", "ai-moderator": "view", "logs": "view", "health": "view"}},
-    {"slug": "administrator", "name": "Administrator", "modules": {key: "manage" for key in MODULE_ORDER}},
+from core.domain.activity_access import (
+    ACCESS_ROLE_CONFIGURABLE_MODULES,
+    BUILTIN_ACCESS_ROLES,
+    DEFAULT_VISIBLE_MODULES,
+    MODULE_ORDER,
+    PERMISSION_ORDER,
 )
 
 
@@ -40,8 +21,10 @@ def normalize_permission(permission: str) -> str:
 
 
 def normalize_module_permissions(modules: dict[str, str]) -> dict[str, str]:
-    normalized: dict[str, str] = {}
-    for key in MODULE_ORDER:
+    normalized: dict[str, str] = {key: "disabled" for key in MODULE_ORDER}
+    for key in DEFAULT_VISIBLE_MODULES:
+        normalized[key] = "view"
+    for key in ACCESS_ROLE_CONFIGURABLE_MODULES:
         normalized[key] = normalize_permission(modules.get(key, "disabled"))
     return normalized
 

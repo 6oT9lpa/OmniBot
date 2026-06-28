@@ -5,6 +5,10 @@ from activity.server.dependencies import get_db
 from activity.server.schemas.activity import ActivityHealthResponse, ActivityHealthSignal
 from activity.server.services.access_service import ActivityAccessService
 from activity.server.services.discord_service import DiscordService
+from infrastructure.logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class ActivityHealthService:
@@ -13,7 +17,8 @@ class ActivityHealthService:
         self._discord = DiscordService()
 
     async def get_health(self, guild_id: str, access_token: str) -> ActivityHealthResponse:
-        await self._access_service.fetch_user_and_access_state(access_token, guild_id)
+        logger.info("Loading Activity health guild_id=%s", guild_id)
+        await self._access_service.ensure_module_access(access_token, guild_id, "health")
 
         discord_latency = await self._discord.measure_latency()
         database_latency = await self._measure_database_latency()
@@ -57,5 +62,8 @@ class ActivityHealthService:
         try:
             await get_db().fetch_one("SELECT 1 AS ok")
         except Exception:
+            logger.exception("Activity database latency probe failed")
             return None
-        return round((time.perf_counter() - started) * 1000)
+        latency = round((time.perf_counter() - started) * 1000)
+        logger.info("Activity database latency measured latency_ms=%s", latency)
+        return latency

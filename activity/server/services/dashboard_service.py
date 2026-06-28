@@ -10,6 +10,10 @@ from activity.server.schemas.rbac import (
 from activity.server.services.access_service import ActivityAccessService
 from activity.server.services.discord_service import DiscordService
 from activity.server.utils.rbac import MODULE_ORDER
+from infrastructure.logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class ActivityDashboardService:
@@ -18,7 +22,8 @@ class ActivityDashboardService:
         self._discord = DiscordService()
 
     async def get_dashboard(self, guild_id: int, access_token: str) -> ActivityDashboardResponse:
-        _, access = await self._access_service.ensure_panel_access(access_token, str(guild_id))
+        logger.info("Loading Activity dashboard guild_id=%s", guild_id)
+        _, access = await self._access_service.ensure_module_access(access_token, str(guild_id), "dashboard")
         metrics = await self._build_metrics(guild_id, access)
         audit = await self._query_audit_events(guild_id, limit=5, offset=0)
         return ActivityDashboardResponse(metrics=metrics, audit=audit["items"])
@@ -35,7 +40,8 @@ class ActivityDashboardService:
         limit: int = 20,
         offset: int = 0,
     ) -> ActivityAuditPage:
-        await self._access_service.ensure_panel_access(access_token, str(guild_id))
+        logger.info("Listing Activity audit events guild_id=%s limit=%s offset=%s", guild_id, limit, offset)
+        await self._access_service.ensure_module_access(access_token, str(guild_id), "logs")
         return await self._query_audit_events(
             guild_id,
             query=query,

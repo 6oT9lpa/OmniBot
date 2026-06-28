@@ -6,6 +6,10 @@ from activity.server.dependencies import get_db
 from activity.server.schemas.creator_alerts import CreatorAlertSourcePayload, CreatorAlertTestPayload
 from activity.server.services.access_service import ActivityAccessService
 from activity.server.utils.creator_alert_messages import build_creator_alert_message
+from infrastructure.logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class CreatorAlertService:
@@ -13,8 +17,10 @@ class CreatorAlertService:
         self._access_service = ActivityAccessService()
 
     async def list_sources(self, guild_id: int, access_token: str) -> list[dict[str, Any]]:
-        user, access = await self._access_service.fetch_user_and_access_state(access_token, str(guild_id))
+        logger.info("Listing creator alert sources guild_id=%s", guild_id)
+        user, access = await self._access_service.ensure_module_access(access_token, str(guild_id), "creator-alerts")
         if not (access["is_admin"] or access["is_streamer"]):
+            logger.warning("Creator alert list denied guild_id=%s user_id=%s", guild_id, user.get("id"))
             raise HTTPException(status_code=403, detail="Creator or administrator access is required")
 
         clauses = ["guild_id = ?"]
@@ -35,8 +41,10 @@ class CreatorAlertService:
         )
 
     async def save_source(self, payload: CreatorAlertSourcePayload, access_token: str) -> dict[str, Any]:
-        user, access = await self._access_service.fetch_user_and_access_state(access_token, str(payload.guild_id))
+        logger.info("Saving creator alert source guild_id=%s platform=%s", payload.guild_id, payload.platform)
+        user, access = await self._access_service.ensure_module_access(access_token, str(payload.guild_id), "creator-alerts", "edit")
         if not (access["is_admin"] or access["is_streamer"]):
+            logger.warning("Creator alert save denied guild_id=%s user_id=%s", payload.guild_id, user.get("id"))
             raise HTTPException(status_code=403, detail="Creator or administrator access is required")
 
         owner_id = payload.user_id if access["is_admin"] and payload.user_id else int(user["id"])
@@ -95,7 +103,8 @@ class CreatorAlertService:
         }
 
     async def preview_alert(self, payload: CreatorAlertTestPayload, access_token: str) -> dict[str, Any]:
-        _, access = await self._access_service.fetch_user_and_access_state(access_token, str(payload.guild_id))
+        logger.info("Previewing creator alert guild_id=%s platform=%s", payload.guild_id, payload.platform)
+        _, access = await self._access_service.ensure_module_access(access_token, str(payload.guild_id), "creator-alerts", "edit")
         if not (access["is_admin"] or access["is_streamer"]):
             raise HTTPException(status_code=403, detail="Creator or administrator access is required")
         return build_creator_alert_message(payload)

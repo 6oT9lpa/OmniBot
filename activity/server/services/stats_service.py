@@ -3,6 +3,10 @@ from typing import Any
 from activity.server.dependencies import get_db
 from activity.server.services.access_service import ActivityAccessService
 from activity.server.services.discord_service import DiscordService
+from infrastructure.logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class ActivityStatsService:
@@ -11,7 +15,8 @@ class ActivityStatsService:
         self._discord = DiscordService()
 
     async def get_server_stats(self, guild_id: int, period: int, access_token: str) -> dict[str, Any]:
-        await self._access_service.ensure_panel_access(access_token, str(guild_id))
+        logger.info("Loading Activity server stats guild_id=%s period=%s", guild_id, period)
+        await self._access_service.ensure_module_access(access_token, str(guild_id), "server-stats")
         return {
             "summary": await self._query_server_stats(guild_id, period),
             "channels": await self._query_channel_stats(guild_id, period),
@@ -19,7 +24,8 @@ class ActivityStatsService:
         }
 
     async def search_user_stats(self, guild_id: int, query: str, access_token: str) -> list[dict[str, Any]]:
-        await self._access_service.ensure_panel_access(access_token, str(guild_id))
+        logger.info("Searching Activity user stats guild_id=%s query=%s", guild_id, query)
+        await self._access_service.ensure_module_access(access_token, str(guild_id), "server-stats")
         members = await self._discord.search_members(str(guild_id), query, 10)
         stats = []
         for member in members:
