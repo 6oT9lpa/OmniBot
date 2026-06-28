@@ -27,10 +27,28 @@ export const moduleOrder: ModuleKey[] = [
   "health",
 ];
 
+export const defaultVisibleModules: ModuleKey[] = [
+  "dashboard",
+  "integrations",
+  "health",
+  "server-stats",
+  "voice-rooms",
+];
+
+export const accessConfigurableModules: ModuleKey[] = [
+  "welcome",
+  "role-panels",
+  "creator-alerts",
+  "dev-blog",
+  "ai-moderator",
+  "logs",
+  "bot-settings",
+];
+
 export const moduleLabels: Record<ModuleKey, string> = {
   dashboard: "Dashboard",
-  access: "Access Control",
-  welcome: "Welcome",
+  access: "Access Roles",
+  welcome: "Welcome Alerts",
   "role-panels": "Role Panels",
   "creator-alerts": "Creator Alerts",
   "dev-blog": "Dev Blog",
@@ -45,7 +63,7 @@ export const moduleLabels: Record<ModuleKey, string> = {
 
 export const moduleDescriptions: Record<ModuleKey, string> = {
   dashboard: "Live overview of modules, activity and configuration health.",
-  access: "Map Discord roles to module permissions and workspace access.",
+  access: "Map Activity roles to tab permissions.",
   welcome: "Design welcome messages with variables, preview and publishing checks.",
   "role-panels": "Build role menus with buttons, select menus and validation states.",
   "creator-alerts": "Manage Twitch, YouTube and future creator source notifications.",
@@ -153,10 +171,10 @@ export function buildModules(session: PanelSession): PanelModule[] {
 }
 
 export const accessMatrix: AccessMatrixRow[] = [
-  row("ordinary", ["dashboard"], "view"),
-  row("creator", ["dashboard", "creator-alerts", "health"], "edit"),
-  row("developer", ["dashboard", "dev-blog", "health"], "publish"),
-  row("moderator", ["dashboard", "ai-moderator", "logs", "health"], "view"),
+  row("ordinary", defaultVisibleModules, "view"),
+  row("creator", [...defaultVisibleModules, "creator-alerts"], "edit"),
+  row("developer", [...defaultVisibleModules, "dev-blog"], "publish"),
+  row("moderator", [...defaultVisibleModules, "ai-moderator", "logs"], "view"),
   row("administrator", moduleOrder, "manage"),
 ];
 

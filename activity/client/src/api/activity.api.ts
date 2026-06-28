@@ -8,6 +8,7 @@ import type {
   ActivityRolePurpose,
   ActivitySession,
   ActivitySyncedRole,
+  BotSettingsPayload,
   ChannelPurpose,
   CreatorAlertSource,
   DevBlogDraft,
@@ -58,17 +59,39 @@ export function getActivityAccessRoles(guildId: string, token: string) {
   return apiRequest<ActivityAccessRole[]>(`/api/activity/rbac/access-roles?guild_id=${guildId}`, {}, token);
 }
 
+export function getAccessControlData(guildId: string, token: string) {
+  return apiRequest<{ access_roles: ActivityAccessRole[] }>(
+    `/api/activity/rbac/access-control?guild_id=${guildId}`,
+    {},
+    token,
+  );
+}
+
+export function getRolePanelsData(guildId: string, token: string) {
+  return apiRequest<{ access_roles: ActivityAccessRole[]; synced_roles: ActivitySyncedRole[] }>(
+    `/api/activity/rbac/role-panels?guild_id=${guildId}`,
+    {},
+    token,
+  );
+}
+
 export function createActivityAccessRole(guildId: string, token: string, name: string) {
   return apiRequest<ActivityAccessRole>("/api/activity/rbac/access-roles", {
     method: "POST",
-    body: JSON.stringify({ guild_id: Number(guildId), name }),
+    body: JSON.stringify({ guild_id: guildId, name }),
+  }, token);
+}
+
+export function deleteActivityAccessRole(guildId: string, token: string, roleId: number) {
+  return apiRequest<Record<string, unknown>>(`/api/activity/rbac/access-roles/${roleId}?guild_id=${guildId}`, {
+    method: "DELETE",
   }, token);
 }
 
 export function saveActivityAccessRoleModules(guildId: string, token: string, roleId: number, modules: ActivityAccessRole["modules"]) {
   return apiRequest<ActivityAccessRole>(`/api/activity/rbac/access-roles/${roleId}/modules`, {
     method: "PUT",
-    body: JSON.stringify({ guild_id: Number(guildId), modules }),
+    body: JSON.stringify({ guild_id: guildId, modules }),
   }, token);
 }
 
@@ -79,7 +102,7 @@ export function getActivitySyncedRoles(guildId: string, token: string) {
 export function saveActivitySyncedRoleAssignments(guildId: string, token: string, discordRoleId: string, accessRoleIds: number[]) {
   return apiRequest<ActivitySyncedRole>(`/api/activity/rbac/synced-roles/${discordRoleId}/assignments`, {
     method: "PUT",
-    body: JSON.stringify({ guild_id: Number(guildId), access_role_ids: accessRoleIds }),
+    body: JSON.stringify({ guild_id: guildId, access_role_ids: accessRoleIds }),
   }, token);
 }
 
@@ -100,6 +123,12 @@ export function resetWelcomeConfig(guildId: string, token: string) {
   }, token);
 }
 
+export function testWelcomeConfig(guildId: string, token: string) {
+  return apiRequest<Record<string, unknown>>(`/api/welcome/test?guild_id=${guildId}`, {
+    method: "POST",
+  }, token);
+}
+
 export function getDiscordChannels(guildId: string, token: string, kind?: "text" | "voice") {
   const suffix = kind ? `&kind=${kind}` : "";
   return apiRequest<DiscordChannel[]>(`/api/discord/channels?guild_id=${guildId}${suffix}`, {}, token);
@@ -114,24 +143,24 @@ export function searchDiscordMembers(guildId: string, token: string, query: stri
 }
 
 export function getChannelPurposes(guildId: string, token: string) {
-  return apiRequest<Record<ChannelPurpose, number | undefined>>(`/api/activity/channel-purposes?guild_id=${guildId}`, {}, token);
+  return apiRequest<Record<ChannelPurpose, string | undefined>>(`/api/activity/channel-purposes?guild_id=${guildId}`, {}, token);
 }
 
 export function saveChannelPurpose(guildId: string, token: string, purpose: ChannelPurpose, channelId: string) {
-  return apiRequest<Record<ChannelPurpose, number | undefined>>("/api/activity/channel-purposes", {
+  return apiRequest<Record<ChannelPurpose, string | undefined>>("/api/activity/channel-purposes", {
     method: "PUT",
-    body: JSON.stringify({ guild_id: Number(guildId), purpose, channel_id: Number(channelId) }),
+    body: JSON.stringify({ guild_id: guildId, purpose, channel_id: channelId }),
   }, token);
 }
 
 export function getActivityRoles(guildId: string, token: string) {
-  return apiRequest<Record<ActivityRolePurpose, number | undefined>>(`/api/activity/roles?guild_id=${guildId}`, {}, token);
+  return apiRequest<Record<ActivityRolePurpose, string | undefined>>(`/api/activity/roles?guild_id=${guildId}`, {}, token);
 }
 
 export function saveActivityRole(guildId: string, token: string, purpose: ActivityRolePurpose, roleId: string) {
-  return apiRequest<Record<ActivityRolePurpose, number | undefined>>("/api/activity/roles", {
+  return apiRequest<Record<ActivityRolePurpose, string | undefined>>("/api/activity/roles", {
     method: "PUT",
-    body: JSON.stringify({ guild_id: Number(guildId), purpose, role_id: Number(roleId) }),
+    body: JSON.stringify({ guild_id: guildId, purpose, role_id: roleId }),
   }, token);
 }
 
@@ -178,7 +207,7 @@ export function getVoiceRooms(guildId: string, token: string) {
 export function updateVoiceRoom(guildId: string, token: string, channelId: number, payload: Record<string, unknown>) {
   return apiRequest<Record<string, unknown>>(`/api/voice/rooms/${channelId}`, {
     method: "PATCH",
-    body: JSON.stringify({ guild_id: Number(guildId), ...payload }),
+    body: JSON.stringify({ guild_id: guildId, ...payload }),
   }, token);
 }
 
@@ -203,7 +232,7 @@ export function getLogs(guildId: string, token: string, source = "all", eventTyp
 }
 
 export function getBotSettings(guildId: string, token: string) {
-  return apiRequest<Record<string, unknown>>(`/api/bot/settings?guild_id=${guildId}`, {}, token);
+  return apiRequest<BotSettingsPayload>(`/api/bot/settings?guild_id=${guildId}`, {}, token);
 }
 
 export function getIntegrations(guildId: string, token: string) {

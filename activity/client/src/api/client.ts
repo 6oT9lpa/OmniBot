@@ -1,4 +1,23 @@
-const apiBase = import.meta.env.VITE_API_BASE_URL || "";
+const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim() || "";
+const apiBase = normalizeApiBase(configuredApiBase);
+
+function normalizeApiBase(value: string): string {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const url = new URL(value);
+    const isLoopback = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+    if (import.meta.env.PROD && isLoopback) {
+      return "";
+    }
+  } catch {
+    return value.replace(/\/+$/, "");
+  }
+
+  return value.replace(/\/+$/, "");
+}
 
 export class ApiError extends Error {
   constructor(
@@ -23,10 +42,17 @@ export async function apiRequest<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${apiBase}${path}`, {
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase}${path}`, {
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    const target = apiBase || "current Activity origin";
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Activity API is unreachable at ${target}: ${message}`);
+  }
 
   if (!response.ok) {
     const rawDetail = await response.text();

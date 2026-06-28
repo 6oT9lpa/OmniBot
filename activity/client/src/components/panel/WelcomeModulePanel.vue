@@ -28,6 +28,19 @@ async function resetWelcome() {
   saving.message = "Reset complete";
 }
 
+async function testWelcome() {
+  saving.value = true;
+  saving.message = "Sending test...";
+  try {
+    await activity.testWelcome();
+    saving.message = "Test message sent";
+  } catch (error) {
+    saving.message = error instanceof Error ? error.message : "Welcome channel is not configured";
+  } finally {
+    saving.value = false;
+  }
+}
+
 function colorToHex(value: number) {
   return `#${value.toString(16).padStart(6, "0").slice(-6)}`;
 }
@@ -41,7 +54,7 @@ function setColor(value: string) {
   <section class="editor-grid">
     <form class="control-surface" @submit.prevent="saveWelcome">
       <div class="section-heading">
-        <span>Welcome module</span>
+        <span>Welcome Alerts</span>
         <h2>Design the first server moment.</h2>
       </div>
 
@@ -67,18 +80,18 @@ function setColor(value: string) {
         </label>
         <label>
           Rules channel
-          <select v-model.number="welcomeDraft.rules_channel_id">
+          <select v-model="welcomeDraft.rules_channel_id">
             <option :value="null">Not selected</option>
-            <option v-for="channel in activity.textChannels" :key="channel.id" :value="Number(channel.id)">
+            <option v-for="channel in activity.textChannels" :key="channel.id" :value="channel.id">
               #{{ channel.name }}
             </option>
           </select>
         </label>
         <label>
           Roles channel
-          <select v-model.number="welcomeDraft.roles_channel_id">
+          <select v-model="welcomeDraft.roles_channel_id">
             <option :value="null">Not selected</option>
-            <option v-for="channel in activity.textChannels" :key="channel.id" :value="Number(channel.id)">
+            <option v-for="channel in activity.textChannels" :key="channel.id" :value="channel.id">
               #{{ channel.name }}
             </option>
           </select>
@@ -86,39 +99,6 @@ function setColor(value: string) {
         <label>
           Footer
           <input v-model="welcomeDraft.footer_text" placeholder="OmniBot Activity" />
-        </label>
-      </div>
-
-      <div class="form-grid">
-        <label>
-          Welcome target
-          <select
-            :value="activity.channelPurposes.welcome || ''"
-            @change="activity.saveChannelPurposeValue('welcome', ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="" disabled>Select channel</option>
-            <option v-for="channel in activity.textChannels" :key="channel.id" :value="channel.id">#{{ channel.name }}</option>
-          </select>
-        </label>
-        <label>
-          Dev Blog target
-          <select
-            :value="activity.channelPurposes.dev_blog || ''"
-            @change="activity.saveChannelPurposeValue('dev_blog', ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="" disabled>Select channel</option>
-            <option v-for="channel in activity.textChannels" :key="channel.id" :value="channel.id">#{{ channel.name }}</option>
-          </select>
-        </label>
-        <label>
-          Stream alerts target
-          <select
-            :value="activity.channelPurposes.stream_announce || ''"
-            @change="activity.saveChannelPurposeValue('stream_announce', ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="" disabled>Select channel</option>
-            <option v-for="channel in activity.textChannels" :key="channel.id" :value="channel.id">#{{ channel.name }}</option>
-          </select>
         </label>
       </div>
 
@@ -132,6 +112,7 @@ function setColor(value: string) {
       <div class="form-actions">
         <button class="primary-button" type="submit" :disabled="saving.value">Save</button>
         <button class="ghost-button" type="button" @click="resetWelcome">Reset</button>
+        <button class="ghost-button" type="button" :disabled="saving.value" @click="testWelcome">Test</button>
         <small>{{ saving.message }}</small>
       </div>
     </form>

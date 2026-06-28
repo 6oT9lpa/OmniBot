@@ -52,7 +52,7 @@ export type PanelSession = ActivitySession & {
 };
 
 export type WelcomeConfig = {
-  guild_id: number;
+  guild_id: string | number;
   title: string;
   description: string;
   thumbnail_url: string | null;
@@ -60,8 +60,8 @@ export type WelcomeConfig = {
   footer_icon_url: string | null;
   color: number;
   is_enabled: boolean;
-  rules_channel_id: number | null;
-  roles_channel_id: number | null;
+  rules_channel_id: string | number | null;
+  roles_channel_id: string | number | null;
 };
 
 export type PanelModule = {
@@ -151,6 +151,21 @@ export type ChannelPurpose =
   | "dev_blog"
   | "admin_log";
 
+export type BotSettingsPayload = {
+  guild_id: string | number;
+  command_prefix?: string | null;
+  activity_name?: string | null;
+  bot_status?: string | null;
+  activity_rotation_enabled?: boolean;
+  activity_rotation_interval_seconds?: number;
+  log_level?: string | null;
+  retention?: Record<string, unknown>;
+  channels: DiscordChannel[];
+  roles: DiscordRole[];
+  channel_purposes: Partial<Record<ChannelPurpose, string>>;
+  activity_roles: Partial<Record<ActivityRolePurpose, string>>;
+};
+
 export type DevBlogEmbed = {
   title?: string | null;
   description: string;
@@ -159,7 +174,7 @@ export type DevBlogEmbed = {
 };
 
 export type DevBlogDraft = {
-  guild_id: number;
+  guild_id: string | number;
   title: string;
   content?: string | null;
   embeds: DevBlogEmbed[];
@@ -169,18 +184,18 @@ export type DevBlogDraft = {
 export type CreatorAlertSource = {
   id?: number;
   user_id?: number;
-  guild_id: number;
+  guild_id: string | number;
   platform: "twitch" | "youtube" | "kick";
   channel_url: string;
   channel_name?: string | null;
   template?: string | null;
-  ping_role_id?: number | null;
+  ping_role_id?: string | number | null;
   active: boolean;
 };
 
 export type VoiceRoom = {
   channel_id: number;
-  guild_id: number;
+  guild_id: string | number;
   owner_id: number;
   name: string;
   is_persistent: number;

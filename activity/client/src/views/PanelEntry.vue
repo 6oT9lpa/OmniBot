@@ -15,6 +15,7 @@ import RolePanelsPanel from "../components/panel/RolePanelsPanel.vue";
 import ServerStatsPanel from "../components/panel/ServerStatsPanel.vue";
 import VoiceRoomsPanel from "../components/panel/VoiceRoomsPanel.vue";
 import WelcomeModulePanel from "../components/panel/WelcomeModulePanel.vue";
+import LoadingDots from "../components/common/LoadingDots.vue";
 import NoAccessState from "../components/common/NoAccessState.vue";
 import { useActivityStore } from "../stores/activity.store";
 import { buildModules, moduleLabels, moduleOrder } from "../stores/mock-data";
@@ -35,10 +36,39 @@ const activeModule = computed<ModuleKey>(() => {
 
 const activeTitle = computed(() => moduleLabels[activeModule.value]);
 const subtitle = computed(() =>
-  activity.mode === "local"
-    ? "Local preview. Discord OAuth starts automatically inside Activity."
-    : `${activity.displayName} connected through Discord Activity.`,
+  activity.session
+    ? `${activity.displayName} connected through Discord Activity.`
+    : "Discord Activity access is required.",
 );
+const sessionStateTitle = computed(() => {
+  if (activity.accessError) return "Access denied";
+  if (activity.error) return "Session failed";
+  return "Session is loading";
+});
+const sessionStateText = computed(() =>
+  activity.accessError?.message || activity.error || "Omni is preparing the role-based workspace.",
+);
+const sessionActionLabel = computed(() => {
+  if (activity.accessError?.can_sync_roles) return "Sync roles";
+  if (activity.error) return "Retry";
+  return undefined;
+});
+const activeModuleLoaded = computed(() => Boolean(activity.loadedModules[activeModule.value]));
+const activeModulePending = computed(() => activity.moduleLoading && !activeModuleLoaded.value);
+const activeModuleFailed = computed(() => Boolean(activity.moduleError && !activeModuleLoaded.value));
+
+async function handleSessionAction() {
+  if (activity.accessError?.can_sync_roles) {
+    await activity.syncRolesFromDiscord();
+    return;
+  }
+  activity.booted = false;
+  await activity.boot();
+}
+
+async function retryActiveModule() {
+  await activity.loadModuleData(activeModule.value);
+}
 
 watch(
   () => activeModule.value,
@@ -62,11 +92,27 @@ watch(
 
       <div v-if="!activity.session" class="panel-content">
         <NoAccessState
-          :title="activity.accessError ? 'Access denied' : 'Session is loading'"
-          :text="activity.accessError?.message || 'Omni is preparing the role-based workspace.'"
-          :action-label="activity.accessError?.can_sync_roles ? 'Sync roles' : undefined"
+          :title="sessionStateTitle"
+          :text="sessionStateText"
+          :action-label="sessionActionLabel"
+          :busy="activity.moduleLoading || activity.loading"
+          @action="handleSessionAction"
+        />
+      </div>
+
+      <div v-else-if="activeModulePending" class="panel-content module-loading-state">
+        <LoadingDots :label="`Loading ${activeTitle}`" />
+        <h2>{{ activeTitle }}</h2>
+        <p>Loading module data from the server.</p>
+      </div>
+
+      <div v-else-if="activeModuleFailed" class="panel-content">
+        <NoAccessState
+          title="Module failed"
+          :text="activity.moduleError || 'Module data could not be loaded.'"
+          action-label="Retry"
           :busy="activity.moduleLoading"
-          @action="activity.syncRolesFromDiscord"
+          @action="retryActiveModule"
         />
       </div>
 

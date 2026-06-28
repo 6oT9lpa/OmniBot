@@ -5,14 +5,14 @@ import {
   createActivityAccessRole,
   exchangeDiscordCode,
   createDevBlogPost,
+  deleteActivityAccessRole,
   deleteVoiceRoom,
-  getActivityAccessRoles,
   getActivityAudit,
   getActivityDashboard,
   getActivityHealth,
   getActivityRoles,
   getActivitySession,
-  getActivitySyncedRoles,
+  getAccessControlData,
   getBotSettings,
   getChannelPurposes,
   getCreatorAlertSources,
@@ -21,6 +21,7 @@ import {
   getDiscordRoles,
   getIntegrations,
   getLogs,
+  getRolePanelsData,
   getServerStats,
   getVoiceRooms,
   getWelcomeConfig,
@@ -34,13 +35,13 @@ import {
   saveWelcomeConfig,
   searchUserStats,
   syncActivityRoles,
+  testWelcomeConfig,
   updateVoiceRoom,
 } from "../api/activity.api";
 import { ApiError } from "../api/client";
 import {
   administratorPermissions,
   healthSignals as mockHealthSignals,
-  mockSession,
   mockWelcome,
 } from "./mock-data";
 import type {
@@ -53,6 +54,7 @@ import type {
   ActivitySyncedRole,
   AccessLevel,
   AccessDeniedDetail,
+  BotSettingsPayload,
   ChannelPurpose,
   CreatorAlertSource,
   DevBlogDraft,
@@ -88,11 +90,12 @@ type State = {
   lastHealthRefresh: number;
   moduleLoading: boolean;
   moduleError: string | null;
+  loadedModules: Partial<Record<ModuleKey, boolean>>;
   textChannels: DiscordChannel[];
   voiceChannels: DiscordChannel[];
   roles: DiscordRole[];
-  channelPurposes: Partial<Record<ChannelPurpose, number>>;
-  activityRoles: Partial<Record<ActivityRolePurpose, number>>;
+  channelPurposes: Partial<Record<ChannelPurpose, string>>;
+  activityRoles: Partial<Record<ActivityRolePurpose, string>>;
   devBlogPosts: Array<Record<string, unknown>>;
   creatorSources: CreatorAlertSource[];
   creatorPreview: Record<string, unknown> | null;
@@ -104,7 +107,7 @@ type State = {
   dashboard: ActivityDashboardResponse | null;
   accessRoles: ActivityAccessRole[];
   syncedRoles: ActivitySyncedRole[];
-  botSettings: Record<string, unknown> | null;
+  botSettings: BotSettingsPayload | null;
   integrations: Record<string, unknown> | null;
   discordSdk: DiscordSDK | null;
   auth: Auth | null;
@@ -128,6 +131,7 @@ export const useActivityStore = defineStore("activity", {
     lastHealthRefresh: 0,
     moduleLoading: false,
     moduleError: null,
+    loadedModules: {},
     textChannels: [],
     voiceChannels: [],
     roles: [],
@@ -167,7 +171,7 @@ export const useActivityStore = defineStore("activity", {
 
       try {
         if (!isDiscordActivityLaunch()) {
-          this.useLocalPreview();
+          this.rejectBrowserLaunch();
           return;
         }
 
@@ -177,8 +181,6 @@ export const useActivityStore = defineStore("activity", {
         if (error instanceof ApiError && error.status === 403) {
           this.accessError = normalizeAccessError(error.detail);
           this.session = null;
-        } else if (!this.session) {
-          this.useLocalPreview();
         }
       } finally {
         this.loading = false;
@@ -186,30 +188,18 @@ export const useActivityStore = defineStore("activity", {
       }
     },
 
-    useLocalPreview() {
+    rejectBrowserLaunch() {
       this.mode = "local";
       this.token = null;
       this.auth = null;
       this.discordSdk = null;
-      this.session = mockSession;
-      this.accessError = null;
-      this.welcome = mockWelcome;
-      this.healthSignals = mockHealthSignals;
-      this.botLatencyMs = 42;
-      this.healthError = null;
-      this.textChannels = [
-        { id: "1515345327903867114", name: "welcome", type: 0, position: 1 },
-        { id: "1515345327903867115", name: "dev-blog", type: 0, position: 2 },
-        { id: "1515345327903867116", name: "stream-alerts", type: 0, position: 3 },
-      ];
-      this.voiceChannels = [{ id: "1516082233121702031", name: "Create room", type: 2, position: 1 }];
-      this.roles = [
-        { id: "1", name: "Admin", color: 0x5865f2, position: 10, managed: false, mentionable: true },
-        { id: "2", name: "Streamer", color: 0x8b5cf6, position: 9, managed: false, mentionable: true },
-        { id: "3", name: "Developer", color: 0x22c55e, position: 8, managed: false, mentionable: true },
-      ];
-      this.channelPurposes = { welcome: 1515345327903867114, dev_blog: 1515345327903867115, stream_announce: 1515345327903867116 };
-      this.activityRoles = { activity_admin: 1, activity_streamer: 2, activity_developer: 3 };
+      this.session = null;
+      this.accessError = {
+        code: "discord_activity_required",
+        message: "Omni Activity is available only inside Discord.",
+        can_sync_roles: false,
+      };
+      this.error = this.accessError.message;
     },
 
     async bootDiscordActivity() {
@@ -242,15 +232,11 @@ export const useActivityStore = defineStore("activity", {
       }
 
       if (!discordSdk.guildId) {
-        this.session = {
-          ...mockSession,
-          user: this.auth.user,
-          guild_id: "0",
-          access_level: "ordinary",
-          activity_roles: [],
-          available_modules: [],
-          permissions: emptyPermissions(),
-          is_admin: false,
+        this.session = null;
+        this.accessError = {
+          code: "guild_required",
+          message: "Omni Activity must be opened from a Discord server.",
+          can_sync_roles: false,
         };
         return;
       }
@@ -289,11 +275,16 @@ export const useActivityStore = defineStore("activity", {
       if (!this.session) return;
 
       if (!this.token || this.mode === "local") {
-        this.welcome = { ...mockWelcome, guild_id: Number(this.session.guild_id) || mockWelcome.guild_id };
+        this.welcome = { ...mockWelcome, guild_id: this.session.guild_id || mockWelcome.guild_id };
         return;
       }
 
       this.welcome = await resetWelcomeConfig(this.session.guild_id, this.token);
+    },
+
+    async testWelcome() {
+      if (!this.session || !this.token || this.mode === "local") return null;
+      return await testWelcomeConfig(this.session.guild_id, this.token);
     },
 
     async refreshHealth(force = false) {
@@ -367,6 +358,8 @@ export const useActivityStore = defineStore("activity", {
               this.serverStats = stats;
             }),
           ]);
+        } else if (module === "welcome") {
+          this.welcome = await getWelcomeConfig(guildId, this.token);
         } else if (module === "access") {
           await this.loadAccessControl();
         } else if (module === "role-panels") {
@@ -382,14 +375,21 @@ export const useActivityStore = defineStore("activity", {
         } else if (module === "logs") {
           this.logs = await getLogs(guildId, this.token);
         } else if (module === "bot-settings") {
-          this.botSettings = await getBotSettings(guildId, this.token);
+          const settings = await getBotSettings(guildId, this.token);
+          this.botSettings = settings;
+          this.textChannels = settings.channels;
+          this.roles = settings.roles;
+          this.activityRoles = settings.activity_roles;
+          this.channelPurposes = settings.channel_purposes;
         } else if (module === "integrations") {
           this.integrations = await getIntegrations(guildId, this.token);
         } else if (module === "health") {
           await this.refreshHealth(true);
         }
+        this.loadedModules[module] = true;
       } catch (error) {
         this.moduleError = error instanceof Error ? error.message : String(error);
+        this.loadedModules[module] = false;
       } finally {
         this.moduleLoading = false;
       }
@@ -397,7 +397,7 @@ export const useActivityStore = defineStore("activity", {
 
     async saveActivityRolePurpose(purpose: ActivityRolePurpose, roleId: string) {
       if (!this.session || !this.token || this.mode === "local") {
-        this.activityRoles[purpose] = Number(roleId);
+        this.activityRoles[purpose] = roleId;
         return;
       }
       this.activityRoles = await saveActivityRole(this.session.guild_id, this.token, purpose, roleId);
@@ -405,7 +405,7 @@ export const useActivityStore = defineStore("activity", {
 
     async saveChannelPurposeValue(purpose: ChannelPurpose, channelId: string) {
       if (!this.session || !this.token || this.mode === "local") {
-        this.channelPurposes[purpose] = Number(channelId);
+        this.channelPurposes[purpose] = channelId;
         return;
       }
       this.channelPurposes = await saveChannelPurpose(this.session.guild_id, this.token, purpose, channelId);
@@ -413,19 +413,19 @@ export const useActivityStore = defineStore("activity", {
 
     async createDevBlog(draft: Omit<DevBlogDraft, "guild_id">) {
       if (!this.session || !this.token) return;
-      await createDevBlogPost({ guild_id: Number(this.session.guild_id), ...draft }, this.token);
+      await createDevBlogPost({ ...draft, guild_id: this.session.guild_id }, this.token);
       await this.loadModuleData("dev-blog");
     },
 
     async saveCreatorSource(source: Omit<CreatorAlertSource, "guild_id">) {
       if (!this.session || !this.token) return;
-      await saveCreatorAlertSource({ guild_id: Number(this.session.guild_id), ...source }, this.token);
+      await saveCreatorAlertSource({ ...source, guild_id: this.session.guild_id }, this.token);
       await this.loadModuleData("creator-alerts");
     },
 
     async previewCreatorSource(source: Omit<CreatorAlertSource, "guild_id">) {
       if (!this.session || !this.token) return;
-      this.creatorPreview = await previewCreatorAlert({ guild_id: Number(this.session.guild_id), ...source }, this.token);
+      this.creatorPreview = await previewCreatorAlert({ ...source, guild_id: this.session.guild_id }, this.token);
     },
 
     async updateVoice(channelId: number, payload: Record<string, unknown>) {
@@ -474,22 +474,15 @@ export const useActivityStore = defineStore("activity", {
 
     async loadAccessControl() {
       if (!this.session || !this.token || this.mode === "local") return;
-      const [roles, accessRoles] = await Promise.all([
-        getDiscordRoles(this.session.guild_id, this.token),
-        getActivityAccessRoles(this.session.guild_id, this.token),
-      ]);
-      this.roles = roles;
-      this.accessRoles = accessRoles;
+      const data = await getAccessControlData(this.session.guild_id, this.token);
+      this.accessRoles = data.access_roles;
     },
 
     async loadRolePanels() {
       if (!this.session || !this.token || this.mode === "local") return;
-      const [accessRoles, syncedRoles] = await Promise.all([
-        getActivityAccessRoles(this.session.guild_id, this.token),
-        getActivitySyncedRoles(this.session.guild_id, this.token),
-      ]);
-      this.accessRoles = accessRoles;
-      this.syncedRoles = syncedRoles;
+      const data = await getRolePanelsData(this.session.guild_id, this.token);
+      this.accessRoles = data.access_roles;
+      this.syncedRoles = data.synced_roles;
     },
 
     async syncRolesFromDiscord() {
@@ -515,13 +508,19 @@ export const useActivityStore = defineStore("activity", {
     async createAccessRole(name: string) {
       if (!this.session || !this.token || this.mode === "local") return;
       await createActivityAccessRole(this.session.guild_id, this.token, name);
-      await this.loadAccessControl();
+      await Promise.all([this.loadAccessControl(), this.loadRolePanels()]);
+    },
+
+    async deleteAccessRole(roleId: number) {
+      if (!this.session || !this.token || this.mode === "local") return;
+      await deleteActivityAccessRole(this.session.guild_id, this.token, roleId);
+      await Promise.all([this.loadAccessControl(), this.loadRolePanels()]);
     },
 
     async saveAccessRoleModules(roleId: number, modules: Record<ModuleKey, PermissionLevel>) {
       if (!this.session || !this.token || this.mode === "local") return;
-      await saveActivityAccessRoleModules(this.session.guild_id, this.token, roleId, modules);
-      await this.loadAccessControl();
+      const updated = await saveActivityAccessRoleModules(this.session.guild_id, this.token, roleId, modules);
+      this.accessRoles = this.accessRoles.map((role) => (role.id === roleId ? updated : role));
       const session = await getActivitySession(this.session.guild_id, this.token);
       this.session = toPanelSession(session);
     },

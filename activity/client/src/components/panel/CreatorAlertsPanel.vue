@@ -9,7 +9,7 @@ const creatorDraft = reactive({
   channel_url: "",
   channel_name: "",
   template: "{creator} is active on {platform}: {url}",
-  ping_role_id: null as number | null,
+  ping_role_id: null as string | null,
   active: true,
 });
 const saving = reactive({ value: false, message: "" });
@@ -59,7 +59,7 @@ function formatRecordValue(value: unknown) {
           Ping role
           <select
             :value="creatorDraft.ping_role_id || ''"
-            @change="creatorDraft.ping_role_id = ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null"
+            @change="creatorDraft.ping_role_id = ($event.target as HTMLSelectElement).value || null"
           >
             <option value="">No ping</option>
             <option v-for="role in activity.roles" :key="role.id" :value="role.id">@{{ role.name }}</option>
