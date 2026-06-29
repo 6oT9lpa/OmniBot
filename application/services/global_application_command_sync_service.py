@@ -19,7 +19,12 @@ class GlobalApplicationCommandSyncService:
             return []
 
         global_commands = self._collect_global_commands(bot)
-        logger.info("Starting manual global application command sync count=%s", len(global_commands))
+        command_names = sorted(command.name for command in global_commands)
+        logger.info(
+            "Starting manual global application command sync count=%s names=%s",
+            len(global_commands),
+            ",".join(command_names),
+        )
 
         for command in global_commands:
             await self._upsert_global_command(bot, command)

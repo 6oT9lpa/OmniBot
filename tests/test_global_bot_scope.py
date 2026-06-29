@@ -3,6 +3,7 @@ import pytest
 from infrastructure.config import BotConfig
 from infrastructure.database import DatabaseManager
 from infrastructure.database.repositories.role_repository import RoleRepository
+from infrastructure.database.repositories.voice_repository import VoiceRepository
 from presentation.bot import DiscordBot
 
 
@@ -75,5 +76,28 @@ async def test_role_repository_requires_guild_without_legacy_default(tmp_path):
     try:
         with pytest.raises(ValueError, match="guild_id is required"):
             await repository.get_all_roles()
+    finally:
+        await manager.close()
+
+
+@pytest.mark.asyncio
+async def test_voice_repository_tracks_members_per_channel(tmp_path):
+    manager = DatabaseManager(f"sqlite:///{tmp_path / 'voice_members.db'}")
+    await manager.initialize()
+    repository = VoiceRepository(manager)
+
+    try:
+        await repository.add_member(10, 100, 42)
+        await repository.add_member(10, 100, 99)
+        await repository.add_member(20, 200, 77)
+
+        assert await repository.get_member_ids(10) == [42, 99]
+
+        await repository.remove_member(10, 42)
+        assert await repository.get_member_ids(10) == [99]
+        assert await repository.get_member_ids(20) == [77]
+
+        await repository.clear_members(10)
+        assert await repository.get_member_ids(10) == []
     finally:
         await manager.close()

@@ -50,6 +50,7 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
     async def delete(self, channel_id: int) -> None:
         """Удалить запись о голосовой комнате."""
         try:
+            await self.clear_members(channel_id)
             await self.execute(
                 "DELETE FROM voice_rooms WHERE channel_id = ?",
                 (channel_id,),
@@ -102,6 +103,56 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
                 "Failed to update admin channel_id=%s: %s", channel_id, exc,
             )
             raise
+
+    async def add_member(self, channel_id: int, guild_id: int, user_id: int) -> None:
+        try:
+            await self.execute(
+                """
+                INSERT INTO voice_room_members (channel_id, guild_id, user_id)
+                VALUES (?, ?, ?)
+                ON CONFLICT(channel_id, user_id)
+                DO UPDATE SET joined_at = datetime('now', 'localtime')
+                """,
+                (channel_id, guild_id, user_id),
+            )
+            await self.commit()
+            logger.debug("Voice room member tracked: channel_id=%s user_id=%s", channel_id, user_id)
+        except Exception as exc:
+            logger.error("Failed to track voice room member channel_id=%s user_id=%s: %s", channel_id, user_id, exc)
+            raise
+
+    async def remove_member(self, channel_id: int, user_id: int) -> None:
+        try:
+            await self.execute(
+                "DELETE FROM voice_room_members WHERE channel_id = ? AND user_id = ?",
+                (channel_id, user_id),
+            )
+            await self.commit()
+            logger.debug("Voice room member untracked: channel_id=%s user_id=%s", channel_id, user_id)
+        except Exception as exc:
+            logger.error("Failed to untrack voice room member channel_id=%s user_id=%s: %s", channel_id, user_id, exc)
+            raise
+
+    async def clear_members(self, channel_id: int) -> None:
+        try:
+            await self.execute(
+                "DELETE FROM voice_room_members WHERE channel_id = ?",
+                (channel_id,),
+            )
+            await self.commit()
+            logger.debug("Voice room members cleared: channel_id=%s", channel_id)
+        except Exception as exc:
+            logger.error("Failed to clear voice room members channel_id=%s: %s", channel_id, exc)
+            raise
+
+    async def get_member_ids(self, channel_id: int) -> List[int]:
+        rows = await self.fetch_all(
+            "SELECT user_id FROM voice_room_members WHERE channel_id = ? ORDER BY joined_at ASC, user_id ASC",
+            (channel_id,),
+        )
+        member_ids = [int(row["user_id"]) for row in rows]
+        logger.debug("Voice room members loaded: channel_id=%s count=%s", channel_id, len(member_ids))
+        return member_ids
 
     async def set_persistent(self, channel_id: int, persistent: bool) -> None:
         """Установить флаг постоянства комнаты."""

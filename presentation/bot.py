@@ -91,6 +91,7 @@ class DiscordBot(commands.Bot):
             await self._start_presence_rotation()
 
     async def on_connect(self):
+        await asyncio.sleep(1)
         await self._ensure_global_commands_synced()
 
     async def _ensure_global_commands_synced(self) -> None:

@@ -213,6 +213,7 @@ class DatabaseManager:
         await self._create_welcome_config_table()
         await self._create_voice_rooms_table()
         await self._ensure_voice_room_columns()
+        await self._create_voice_room_members_table()
         await self._create_voice_config_table()
         await self._ensure_messages_columns()
         await self._create_voice_sessions_table()
@@ -664,6 +665,25 @@ class DatabaseManager:
         await self._connection.execute("CREATE INDEX IF NOT EXISTS idx_voice_rooms_admin ON voice_rooms(admin_id)")
         await self.commit()
         logger.info("Ensured voice_rooms admin columns")
+
+    async def _create_voice_room_members_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS voice_room_members (
+                channel_id INTEGER NOT NULL,
+                guild_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                joined_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                PRIMARY KEY (channel_id, user_id)
+            )
+        """)
+        await self._connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_voice_room_members_guild ON voice_room_members(guild_id)"
+        )
+        await self._connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_voice_room_members_user ON voice_room_members(user_id)"
+        )
+        await self.commit()
+        logger.info("Created voice_room_members table")
 
     async def _create_voice_config_table(self) -> None:
         await self._connection.execute("""

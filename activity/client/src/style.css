@@ -709,6 +709,7 @@ a {
 
 .loading-dots {
   position: relative;
+  --dot-cycle: 900ms;
   width: 86px;
   height: 42px;
   margin: 0 auto;
@@ -727,23 +728,23 @@ a {
 
 .dot-1 {
   transform: translateX(0);
-  animation: dotWaveOne 1150ms cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation: dotWaveOne var(--dot-cycle) cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
 .dot-2 {
   transform: translateX(24px);
-  animation: dotWaveTwo 1150ms cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation: dotWaveTwo var(--dot-cycle) cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
 .dot-3 {
   transform: translateX(48px);
-  animation: dotWaveThree 1150ms cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation: dotWaveThree var(--dot-cycle) cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
 .dot-4 {
   offset-path: path("M 72 0 C 72 -24 0 -24 0 0");
   offset-rotate: 0deg;
-  animation: dotLeap 500ms linear infinite;
+  animation: dotLeap var(--dot-cycle) linear infinite;
 }
 
 .no-access-state {
@@ -1803,6 +1804,9 @@ input[type="color"] {
   0% {
     offset-distance: 0%;
   }
+  56% {
+    offset-distance: 100%;
+  }
   100% {
     offset-distance: 100%;
   }
@@ -1810,13 +1814,13 @@ input[type="color"] {
 
 @keyframes dotWaveOne {
   0%,
-  48% {
+  56% {
     transform: translate(0, 0);
   }
-  62% {
+  70% {
     transform: translate(24px, -5px);
   }
-  78%,
+  86%,
   100% {
     transform: translate(24px, 0);
   }
@@ -1824,13 +1828,13 @@ input[type="color"] {
 
 @keyframes dotWaveTwo {
   0%,
-  54% {
+  62% {
     transform: translate(24px, 0);
   }
-  70% {
+  78% {
     transform: translate(48px, -4px);
   }
-  84%,
+  94%,
   100% {
     transform: translate(48px, 0);
   }
@@ -1838,13 +1842,13 @@ input[type="color"] {
 
 @keyframes dotWaveThree {
   0%,
-  60% {
+  68% {
     transform: translate(48px, 0);
   }
-  76% {
+  84% {
     transform: translate(72px, -3px);
   }
-  90%,
+  98%,
   100% {
     transform: translate(72px, 0);
   }

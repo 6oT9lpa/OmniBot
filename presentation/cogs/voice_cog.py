@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import disnake
 from disnake.ext import commands
 
@@ -16,7 +14,7 @@ class VoiceCog(commands.Cog):
     def __init__(self, bot: commands.Bot, service: VoiceServiceInterface) -> None:
         self._bot = bot
         self._service = service
-        self._trigger_cache: Optional[int] = None
+        self._trigger_cache: dict[int, int] = {}
         self._bot.loop.create_task(self._on_start())
 
     async def _on_start(self) -> None:
@@ -25,9 +23,8 @@ class VoiceCog(commands.Cog):
         for guild in self._bot.guilds:
             trigger = await self._service.get_trigger(guild.id)
             if trigger is not None:
-                self._trigger_cache = trigger
-                break
-        logger.info("VoiceCog loaded, trigger_id=%s", self._trigger_cache)
+                self._trigger_cache[guild.id] = trigger
+        logger.info("VoiceCog loaded, trigger_count=%s", len(self._trigger_cache))
 
     @commands.Cog.listener()
     async def on_voice_state_update(
@@ -45,7 +42,7 @@ class VoiceCog(commands.Cog):
             return
 
         guild = member.guild
-        trigger_id = await self._service.get_trigger(guild.id) or self._trigger_cache
+        trigger_id = await self._service.get_trigger(guild.id) or self._trigger_cache.get(guild.id)
 
         if after.channel and trigger_id and after.channel.id == trigger_id:
             logger.info("Voice trigger entered: guild_id=%s user_id=%s trigger_id=%s", guild.id, member.id, trigger_id)
@@ -69,7 +66,9 @@ class VoiceCog(commands.Cog):
         if before.channel:
             room = await self._service._repo.get(before.channel.id)
             if room:
-                if room.get("admin_id") == member.id:
+                await self._service.track_member_leave(before.channel, member)
+                admin_id = int(room["admin_id"]) if room.get("admin_id") else None
+                if admin_id == member.id:
                     await self._service.handle_admin_leave(before.channel, member)
                 if len(before.channel.members) == 0:
                     await self._service.schedule_delete(before.channel)
@@ -78,6 +77,7 @@ class VoiceCog(commands.Cog):
         if after.channel:
             room = await self._service._repo.get(after.channel.id)
             if room:
+                await self._service.track_member_join(after.channel, member)
                 await self._service.cancel_delete(after.channel.id)
                 logger.debug("Voice room delete cancelled after join: channel_id=%s user_id=%s", after.channel.id, member.id)
 
@@ -122,7 +122,7 @@ class VoiceCog(commands.Cog):
             return
 
         await self._service.set_trigger(inter.guild.id, канал.id)
-        self._trigger_cache = канал.id
+        self._trigger_cache[inter.guild.id] = канал.id
         await inter.response.send_message(f"{канал.mention} установлен как trigger.", ephemeral=True)
         logger.info("Voice trigger set: guild_id=%s channel_id=%s user_id=%s", inter.guild.id, канал.id, inter.author.id)
 
@@ -134,6 +134,6 @@ class VoiceCog(commands.Cog):
             return
 
         await self._service.remove_trigger(inter.guild.id)
-        self._trigger_cache = None
+        self._trigger_cache.pop(inter.guild.id, None)
         await inter.response.send_message("Trigger удален.", ephemeral=True)
         logger.info("Voice trigger removed: guild_id=%s user_id=%s", inter.guild.id, inter.author.id)

@@ -199,6 +199,7 @@ export type VoiceRoom = {
   guild_id: string | number;
   owner_id: string;
   admin_id?: string | null;
+  voice_member_ids?: string[];
   name: string;
   is_persistent: boolean;
   created_at: string;

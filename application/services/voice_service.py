@@ -89,7 +89,8 @@ class VoiceService(VoiceServiceInterface):
     ) -> None:
         # Admin is intentionally temporary; owner_id remains the creator forever.
         room = await self._repo.get(channel.id)
-        if not room or room.get("admin_id") != old_admin.id:
+        admin_id = int(room["admin_id"]) if room and room.get("admin_id") else None
+        if not room or admin_id != old_admin.id:
             logger.debug("Skip admin leave handling channel_id=%s user_id=%s", channel.id, old_admin.id)
             return
 
@@ -157,10 +158,11 @@ class VoiceService(VoiceServiceInterface):
     async def claim_admin(self, channel: disnake.VoiceChannel, user: disnake.Member) -> None:
         logger.info("Voice admin claim requested: channel_id=%s user_id=%s", channel.id, user.id)
         room = await self._require_room(channel)
-        if room["owner_id"] == user.id:
+        if int(room["owner_id"]) == user.id:
             logger.warning("Owner %s attempted to claim admin in channel_id=%s", user.id, channel.id)
             raise PermissionError("Owner cannot become admin")
-        if room.get("admin_id") and room.get("admin_id") != user.id:
+        admin_id = int(room["admin_id"]) if room.get("admin_id") else None
+        if admin_id and admin_id != user.id:
             logger.warning("User %s attempted to claim occupied admin channel_id=%s", user.id, channel.id)
             raise PermissionError("Admin rights are already taken")
 
@@ -170,7 +172,8 @@ class VoiceService(VoiceServiceInterface):
     async def release_admin(self, channel: disnake.VoiceChannel, user: disnake.Member) -> None:
         logger.info("Voice admin release requested: channel_id=%s user_id=%s", channel.id, user.id)
         room = await self._require_room(channel)
-        if room.get("admin_id") != user.id:
+        admin_id = int(room["admin_id"]) if room.get("admin_id") else None
+        if admin_id != user.id:
             logger.warning("User %s attempted to release admin in channel_id=%s", user.id, channel.id)
             raise PermissionError("Only current admin can release admin rights")
 
@@ -190,10 +193,10 @@ class VoiceService(VoiceServiceInterface):
             getattr(new_admin, "id", None),
         )
         room = await self._require_room(channel)
-        if room["owner_id"] != user.id and not self._has_manage_permissions(user, channel):
+        if int(room["owner_id"]) != user.id:
             logger.warning("User %s attempted owner-only admin assignment channel_id=%s", user.id, channel.id)
             raise PermissionError("Only owner can assign admin rights")
-        if new_admin and new_admin.id == room["owner_id"]:
+        if new_admin and new_admin.id == int(room["owner_id"]):
             logger.warning("Owner %s cannot be assigned as admin channel_id=%s", new_admin.id, channel.id)
             raise PermissionError("Owner cannot become admin")
         if new_admin and new_admin.bot:
@@ -211,6 +214,22 @@ class VoiceService(VoiceServiceInterface):
             logger.info("Temporary voice admin assigned: channel_id=%s owner_id=%s admin_id=%s", channel.id, user.id, new_admin.id)
         else:
             logger.info("Temporary voice admin cleared by owner: channel_id=%s owner_id=%s", channel.id, user.id)
+
+    async def track_member_join(self, channel: disnake.VoiceChannel, member: disnake.Member) -> None:
+        room = await self._repo.get(channel.id)
+        if not room:
+            logger.debug("Skip voice member join tracking because room is missing channel_id=%s user_id=%s", channel.id, member.id)
+            return
+        await self._repo.add_member(channel.id, member.guild.id, member.id)
+        logger.debug("Voice member join tracked: guild_id=%s channel_id=%s user_id=%s", member.guild.id, channel.id, member.id)
+
+    async def track_member_leave(self, channel: disnake.VoiceChannel, member: disnake.Member) -> None:
+        room = await self._repo.get(channel.id)
+        if not room:
+            logger.debug("Skip voice member leave tracking because room is missing channel_id=%s user_id=%s", channel.id, member.id)
+            return
+        await self._repo.remove_member(channel.id, member.id)
+        logger.debug("Voice member leave tracked: guild_id=%s channel_id=%s user_id=%s", member.guild.id, channel.id, member.id)
 
     async def invite(
         self,
@@ -295,6 +314,7 @@ class VoiceService(VoiceServiceInterface):
                     created_at=datetime.now(_MSK),
                 )
             )
+            await self._repo.add_member(channel.id, guild.id, member.id)
             logger.info("Voice room created: channel_id=%s name=%s owner=%s", channel.id, room_name, member.id)
             return channel
         except Exception as exc:
@@ -314,7 +334,7 @@ class VoiceService(VoiceServiceInterface):
 
     async def _clear_admin(self, channel: disnake.VoiceChannel, admin: disnake.Member) -> None:
         room = await self._require_room(channel)
-        if room["owner_id"] != admin.id:
+        if int(room["owner_id"]) != admin.id:
             await channel.set_permissions(admin, overwrite=None)
         await self._repo.update_admin(channel.id, None)
         logger.debug("Admin permissions cleared: channel_id=%s admin_id=%s", channel.id, admin.id)
@@ -391,7 +411,8 @@ class VoiceService(VoiceServiceInterface):
         if not room:
             logger.debug("Control denied because room metadata is missing channel_id=%s user_id=%s", channel.id, user.id)
             return False
-        if room["owner_id"] == user.id or room.get("admin_id") == user.id:
+        admin_id = int(room["admin_id"]) if room.get("admin_id") else None
+        if int(room["owner_id"]) == user.id or admin_id == user.id:
             return True
         return self._has_manage_permissions(user, channel)
 

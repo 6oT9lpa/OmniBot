@@ -53,6 +53,18 @@ class FakeVoiceRepository:
         assert channel_id == self.room["channel_id"]
         self.room["admin_id"] = admin_id
 
+    async def add_member(self, channel_id, guild_id, user_id):
+        pass
+
+    async def remove_member(self, channel_id, user_id):
+        pass
+
+    async def clear_members(self, channel_id):
+        pass
+
+    async def get_member_ids(self, channel_id):
+        return []
+
 
 @pytest.mark.asyncio
 async def test_owner_is_immutable_when_admin_is_assigned():
@@ -100,3 +112,18 @@ async def test_admin_leave_clears_only_admin():
     assert repo.room["owner_id"] == 42
     assert repo.room["admin_id"] is None
     assert channel.permission_calls[-1] == (99, {"overwrite": None})
+
+
+@pytest.mark.asyncio
+async def test_manage_permissions_cannot_assign_admin_without_owner():
+    repo = FakeVoiceRepository()
+    service = VoiceService(repo)
+    guild = FakeGuild()
+    moderator = FakeMember(77, guild, manage_permissions=True)
+    target = FakeMember(99, guild)
+    channel = FakeChannel(10, guild)
+
+    with pytest.raises(PermissionError):
+        await service.assign_admin(channel, target, moderator)
+
+    assert repo.room["admin_id"] is None

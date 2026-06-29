@@ -13,5 +13,6 @@ async def test_database_manager_creates_logging_tables(tmp_path):
         assert "message_logs" in names
         assert "guild_event_logs" in names
         assert "punishments" in names
+        assert "voice_room_members" in names
     finally:
         await manager.close()

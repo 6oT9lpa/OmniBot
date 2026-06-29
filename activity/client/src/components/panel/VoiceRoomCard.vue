@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive } from "vue";
+import { computed, reactive } from "vue";
 import { useActivityStore } from "../../stores/activity.store";
 import type { VoiceRoom } from "../../types/activity.types";
 
@@ -15,6 +15,15 @@ const draft = reactive({
   targetUserId: "",
   region: props.room.discord?.rtc_region || "",
 });
+
+const voiceMembers = computed(() => {
+  const ids = new Set((props.room.voice_member_ids || []).map(String));
+  return activity.members.filter((member) => ids.has(member.id) && member.id !== props.room.owner_id);
+});
+const currentUserId = computed(() => activity.session?.user.id || "");
+const isOwner = computed(() => currentUserId.value === String(props.room.owner_id));
+const isAdmin = computed(() => currentUserId.value === String(props.room.admin_id || ""));
+const hasAdmin = computed(() => Boolean(props.room.admin_id));
 
 function memberName(id?: string | null) {
   if (!id) return "Free";
@@ -45,6 +54,11 @@ async function updateRoomRegion() {
 
 async function assignAdmin() {
   await activity.updateVoice(props.room.channel_id, { admin_id: draft.adminId || null });
+}
+
+async function clearAdmin() {
+  draft.adminId = "";
+  await activity.updateVoice(props.room.channel_id, { admin_id: null });
 }
 
 async function memberAction(key: "invite_user_id" | "kick_user_id" | "ban_user_id") {
@@ -80,17 +94,18 @@ async function memberAction(key: "invite_user_id" | "kick_user_id" | "ban_user_i
           <option :value="room.owner_id">{{ memberName(room.owner_id) }}</option>
         </select>
       </label>
-      <label>
+      <label v-if="isOwner && !hasAdmin">
         Admin
         <select v-model="draft.adminId" @change="assignAdmin">
           <option value="">Free</option>
           <option
-            v-for="member in activity.members.filter((item) => item.id !== room.owner_id)"
+            v-for="member in voiceMembers"
             :key="member.id"
             :value="member.id"
           >
             {{ member.display_name }}
           </option>
+          <option v-if="voiceMembers.length === 0" value="" disabled>No users in room</option>
         </select>
       </label>
       <label>
@@ -113,8 +128,9 @@ async function memberAction(key: "invite_user_id" | "kick_user_id" | "ban_user_i
     <div class="inline-actions">
       <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { locked: true })">Lock</button>
       <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { locked: false })">Unlock</button>
-      <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { claim_admin: true })">Take admin</button>
-      <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { release_admin: true })">Release admin</button>
+      <button v-if="isOwner" class="ghost-button compact" type="button" @click="clearAdmin">Take admin</button>
+      <button v-if="isOwner && hasAdmin" class="ghost-button compact" type="button" @click="clearAdmin">Clear admin</button>
+      <button v-if="isAdmin" class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { release_admin: true })">Release admin</button>
       <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { persistent: !room.is_persistent })">
         {{ room.is_persistent ? "Temporary" : "Persist" }}
       </button>

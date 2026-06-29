@@ -46,7 +46,8 @@ class VoiceRoomService:
         results = []
         for room in rooms:
             channel = await self._discord.safe_bot_request("GET", f"/channels/{room['channel_id']}")
-            results.append(self._serialize_room(room, channel))
+            voice_member_ids = await self._list_voice_member_ids(guild_id, int(room["channel_id"]))
+            results.append(self._serialize_room(room, channel, voice_member_ids))
         logger.info("Activity voice rooms listed guild_id=%s count=%s", guild_id, len(results))
         return results
 
@@ -111,6 +112,7 @@ class VoiceRoomService:
         user, access = await self._access_service.ensure_module_access(access_token, str(guild_id), "voice-rooms")
         room = await self._get_authorized_room(guild_id, channel_id, user, access)
         await self._discord.safe_bot_request("DELETE", f"/channels/{channel_id}")
+        await get_db().execute("DELETE FROM voice_room_members WHERE channel_id = ?", (channel_id,))
         await get_db().execute("DELETE FROM voice_rooms WHERE channel_id = ?", (channel_id,))
         await get_db().commit()
         await self._audit_service.log_action(
@@ -145,6 +147,13 @@ class VoiceRoomService:
 
         if requested_admin_id is not None and requested_admin_id == int(room["owner_id"]):
             raise HTTPException(status_code=400, detail="Owner cannot become admin")
+        if requested_admin_id is not None and requested_admin_id not in await self._load_voice_member_ids(channel_id):
+            logger.warning(
+                "Voice admin update rejected because target is not in room channel_id=%s target_id=%s",
+                channel_id,
+                requested_admin_id,
+            )
+            raise HTTPException(status_code=400, detail="Admin must be a current voice room member")
 
         channel = channel or await self._discord.bot_request("GET", f"/channels/{channel_id}")
         current_admin_id = int(room["admin_id"]) if room.get("admin_id") else None
@@ -167,14 +176,13 @@ class VoiceRoomService:
         user: dict[str, Any],
     ) -> int | None | str:
         if payload.claim_admin:
-            if room.get("admin_id"):
-                raise HTTPException(status_code=409, detail="Admin rights are already taken")
-            return int(user["id"])
+            raise HTTPException(status_code=400, detail="Use owner admin assignment controls")
         if payload.release_admin:
-            if room.get("admin_id") != int(user["id"]):
+            admin_id = int(room["admin_id"]) if room.get("admin_id") else None
+            if admin_id != int(user["id"]):
                 raise HTTPException(status_code=403, detail="Only current admin can release admin rights")
             return None
-        if payload.admin_id is not None:
+        if "admin_id" in payload.model_fields_set:
             return payload.admin_id
         return "unchanged"
 
@@ -191,7 +199,8 @@ class VoiceRoomService:
         )
         if room is None:
             raise HTTPException(status_code=404, detail="Voice room not found")
-        if self._can_manage_all(access) or int(room["owner_id"]) == int(user["id"]) or room.get("admin_id") == int(user["id"]):
+        admin_id = int(room["admin_id"]) if room.get("admin_id") else None
+        if self._can_manage_all(access) or int(room["owner_id"]) == int(user["id"]) or admin_id == int(user["id"]):
             return room
         logger.warning("Voice room access denied guild_id=%s channel_id=%s user_id=%s", guild_id, channel_id, user.get("id"))
         raise HTTPException(status_code=403, detail="Voice room owner or admin permission is required")
@@ -203,9 +212,9 @@ class VoiceRoomService:
         access: dict[str, Any],
         payload: VoiceRoomUpdatePayload,
     ) -> bool:
-        if payload.claim_admin or payload.release_admin:
+        if payload.release_admin:
             return True
-        return self._can_manage_all(access) or int(room["owner_id"]) == int(user["id"])
+        return int(room["owner_id"]) == int(user["id"])
 
     def _can_manage_all(self, access: dict[str, Any]) -> bool:
         return bool(access.get("is_admin")) or access.get("access_level") == "moderator"
@@ -213,7 +222,24 @@ class VoiceRoomService:
     def _display_name(self, user: dict[str, Any]) -> str:
         return user.get("global_name") or user.get("username") or str(user.get("id"))
 
-    def _serialize_room(self, room: dict[str, Any], channel: dict[str, Any] | None) -> dict[str, Any]:
+    async def _list_voice_member_ids(self, guild_id: int, channel_id: int) -> list[str]:
+        member_ids = [str(member_id) for member_id in sorted(await self._load_voice_member_ids(channel_id))]
+        logger.info("Voice room members resolved guild_id=%s channel_id=%s count=%s", guild_id, channel_id, len(member_ids))
+        return member_ids
+
+    async def _load_voice_member_ids(self, channel_id: int) -> set[int]:
+        rows = await get_db().fetch_all(
+            "SELECT user_id FROM voice_room_members WHERE channel_id = ?",
+            (channel_id,),
+        )
+        return {int(row["user_id"]) for row in rows}
+
+    def _serialize_room(
+        self,
+        room: dict[str, Any],
+        channel: dict[str, Any] | None,
+        voice_member_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
         logger.info("Serializing Activity voice room channel_id=%s", room.get("channel_id"))
         return {
             **room,
@@ -222,5 +248,6 @@ class VoiceRoomService:
             "owner_id": str(room["owner_id"]),
             "admin_id": str(room["admin_id"]) if room.get("admin_id") else None,
             "is_persistent": bool(room.get("is_persistent")),
+            "voice_member_ids": voice_member_ids or [],
             "discord": channel,
         }

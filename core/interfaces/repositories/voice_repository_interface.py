@@ -38,6 +38,26 @@ class VoiceRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def add_member(self, channel_id: int, guild_id: int, user_id: int) -> None:
+        """Track a member currently connected to a dynamic voice room."""
+        pass
+
+    @abstractmethod
+    async def remove_member(self, channel_id: int, user_id: int) -> None:
+        """Stop tracking a member for a dynamic voice room."""
+        pass
+
+    @abstractmethod
+    async def clear_members(self, channel_id: int) -> None:
+        """Remove all tracked members for a dynamic voice room."""
+        pass
+
+    @abstractmethod
+    async def get_member_ids(self, channel_id: int) -> List[int]:
+        """Return tracked member ids for a dynamic voice room."""
+        pass
+
+    @abstractmethod
     async def set_persistent(self, channel_id: int, persistent: bool) -> None:
         """Установить флаг постоянства комнаты"""
         pass

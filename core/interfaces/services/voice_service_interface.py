@@ -78,6 +78,16 @@ class VoiceServiceInterface(ABC):
         pass
 
     @abstractmethod
+    async def track_member_join(self, channel: disnake.VoiceChannel, member: disnake.Member) -> None:
+        """Track a member currently connected to a dynamic voice room."""
+        pass
+
+    @abstractmethod
+    async def track_member_leave(self, channel: disnake.VoiceChannel, member: disnake.Member) -> None:
+        """Stop tracking a member for a dynamic voice room."""
+        pass
+
+    @abstractmethod
     async def invite(self, channel: disnake.VoiceChannel, target: disnake.Member, user: disnake.Member) -> None:
         """Пригласить участника в комнату"""
         pass
