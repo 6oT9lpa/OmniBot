@@ -40,3 +40,13 @@ async def search_discord_members(
 ) -> list[DiscordMember]:
     await access_service.ensure_panel_access(access_token, guild_id)
     return await service.search_members(guild_id, q, limit)
+
+
+@router.get("/api/discord/members", response_model=list[DiscordMember])
+async def list_discord_members(
+    guild_id: str = Query(min_length=1),
+    limit: int = Query(default=1000, ge=1, le=1000),
+    access_token: str = Depends(require_bearer_token),
+) -> list[DiscordMember]:
+    await access_service.ensure_panel_access(access_token, guild_id)
+    return await service.list_members(guild_id, limit)

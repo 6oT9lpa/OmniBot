@@ -338,12 +338,17 @@ class LoggingService(LoggingServiceInterface):
     ) -> None:
         
         timestamp = datetime.now(timezone.utc)
+        before_channel = before.channel if before else None
+        after_channel = after.channel if after else None
 
-        if before and before.channel and after and after.channel:
+        if before_channel == after_channel:
+            return
+
+        if before_channel and after_channel:
             embed = VoiceLogEmbedBuilder.build_move(
                 member,
-                before.channel.name,
-                after.channel.name,
+                before_channel.name,
+                after_channel.name,
                 timestamp,
             )
             await self._persist_and_send(
@@ -353,15 +358,15 @@ class LoggingService(LoggingServiceInterface):
                 actor_name=str(member),
                 target_id=member.id,
                 target_name=str(member),
-                details={"before_channel": before.channel.name, "after_channel": after.channel.name},
+                details={"before_channel": before_channel.name, "after_channel": after_channel.name},
                 embed=embed,
             )
-            logger.debug("Logged voice move for user %s from %s to %s", member.id, before.channel.name, after.channel.name)
+            logger.debug("Logged voice move for user %s from %s to %s", member.id, before_channel.name, after_channel.name)
 
-        elif before and before.channel:
+        elif before_channel:
             embed = VoiceLogEmbedBuilder.build_leave(
                 member,
-                before.channel.name,
+                before_channel.name,
                 timestamp,
             )
 
@@ -372,16 +377,16 @@ class LoggingService(LoggingServiceInterface):
                 actor_name=str(member),
                 target_id=member.id,
                 target_name=str(member),
-                details={"channel": before.channel.name},
+                details={"channel": before_channel.name},
                 embed=embed,
             )
 
-            logger.debug("Logged voice leave for user %s from %s", member.id, before.channel.name)
+            logger.debug("Logged voice leave for user %s from %s", member.id, before_channel.name)
 
-        elif after and after.channel:
+        elif after_channel:
             embed = VoiceLogEmbedBuilder.build_join(
                 member,
-                after.channel.name,
+                after_channel.name,
                 timestamp,
             )
 
@@ -392,11 +397,11 @@ class LoggingService(LoggingServiceInterface):
                 actor_name=str(member),
                 target_id=member.id,
                 target_name=str(member),
-                details={"channel": after.channel.name},
+                details={"channel": after_channel.name},
                 embed=embed,
             )
 
-            logger.debug("Logged voice join for user %s to %s", member.id, after.channel.name)
+            logger.debug("Logged voice join for user %s to %s", member.id, after_channel.name)
 
     async def log_channel_create(
         self,
@@ -442,6 +447,10 @@ class LoggingService(LoggingServiceInterface):
         timestamp: Optional[datetime] = None,
     ) -> None:
         changes = self._detect_channel_changes(before, after)
+        if not changes:
+            logger.debug("Skipping channel update for channel %s without visible changes", after.id)
+            return
+
         embed = ChannelLogEmbedBuilder.build_update(after, changes, moderator, timestamp or datetime.now(timezone.utc))
         
         await self._persist_and_send(
@@ -707,6 +716,9 @@ class LoggingService(LoggingServiceInterface):
         if hasattr(before, "slowmode_delay") and hasattr(after, "slowmode_delay") and before.slowmode_delay != after.slowmode_delay:
             changes.append(f"Slowmode: {before.slowmode_delay}с → {after.slowmode_delay}с")
 
+        if hasattr(before, "rate_limit_per_user") and hasattr(after, "rate_limit_per_user") and before.rate_limit_per_user != after.rate_limit_per_user:
+            changes.append(f"Slowmode: {before.rate_limit_per_user}с → {after.rate_limit_per_user}с")
+
         if hasattr(before, "nsfw") and hasattr(after, "nsfw") and before.nsfw != after.nsfw:
             changes.append(f"NSFW: {'вкл' if after.nsfw else 'выкл'}")
 
@@ -719,9 +731,21 @@ class LoggingService(LoggingServiceInterface):
         if hasattr(before, "rtc_region") and hasattr(after, "rtc_region") and before.rtc_region != after.rtc_region:
             changes.append(f"Регион: {before.rtc_region} → {after.rtc_region}")
 
+        if hasattr(before, "video_quality_mode") and hasattr(after, "video_quality_mode") and before.video_quality_mode != after.video_quality_mode:
+            changes.append(f"Качество видео: {before.video_quality_mode} → {after.video_quality_mode}")
+
+        if hasattr(before, "status") and hasattr(after, "status") and before.status != after.status:
+            before_status = before.status or "нет"
+            after_status = after.status or "нет"
+            changes.append(f"Статус голосового канала: `{before_status}` → `{after_status}`")
+
         if hasattr(before, "overwrites") and hasattr(after, "overwrites"):
             if before.overwrites != after.overwrites:
-                changes.append("Изменены права доступа (overwrites)")
+                voice_admin_change = self._detect_voice_admin_overwrite_change(before, after)
+                if voice_admin_change:
+                    changes.append(voice_admin_change)
+                else:
+                    changes.append("Изменены права доступа (overwrites)")
 
         if hasattr(before, "category") and hasattr(after, "category") and before.category != after.category:
             before_cat = before.category.name if before.category else "нет"
@@ -765,10 +789,48 @@ class LoggingService(LoggingServiceInterface):
             if before.flags != after.flags:
                 changes.append("Изменены флаги канала (например, инвайты)")
 
-        if not changes:
-            changes.append("Незначительные изменения")
-
         return changes
+
+    def _detect_voice_admin_overwrite_change(self, before, after) -> Optional[str]:
+        if not isinstance(after, disnake.VoiceChannel):
+            return None
+
+        before_admins = self._voice_admin_overwrite_ids(before)
+        after_admins = self._voice_admin_overwrite_ids(after)
+        if before_admins == after_admins:
+            return None
+
+        old_value = self._format_member_id_set(before_admins - after_admins)
+        new_value = self._format_member_id_set(after_admins - before_admins)
+        logger.info(
+            "Detected voice admin permission change channel_id=%s removed=%s added=%s",
+            after.id,
+            old_value,
+            new_value,
+        )
+        return f"Админ динамического войса: {old_value} → {new_value}"
+
+    def _voice_admin_overwrite_ids(self, channel) -> set[int]:
+        admin_ids: set[int] = set()
+        for target, overwrite in getattr(channel, "overwrites", {}).items():
+            if isinstance(target, disnake.Role):
+                continue
+            if self._overwrite_grants_voice_admin(overwrite):
+                admin_ids.add(int(target.id))
+        return admin_ids
+
+    @staticmethod
+    def _overwrite_grants_voice_admin(overwrite) -> bool:
+        return any(
+            getattr(overwrite, permission, None) is True
+            for permission in ("manage_channels", "manage_permissions", "move_members")
+        )
+
+    @staticmethod
+    def _format_member_id_set(values: set[int]) -> str:
+        if not values:
+            return "нет"
+        return ", ".join(f"<@{value}>" for value in sorted(values))
     
     def _detect_role_changes(self, before: disnake.Role, after: disnake.Role) -> List[str]:
         changes = []

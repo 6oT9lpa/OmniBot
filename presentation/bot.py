@@ -49,7 +49,6 @@ class DiscordBot(commands.Bot):
             intents=intents,
             activity=self._build_activity(initial_presence),
             status=initial_presence.status,
-            # Slash commands must stay global; passing test_guilds makes them visible only in one guild.
             command_sync_flags=self._build_command_sync_flags(),
             proxy=self._config.discord_proxy_url,
         )

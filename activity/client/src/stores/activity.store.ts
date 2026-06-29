@@ -18,6 +18,7 @@ import {
   getCreatorAlertSources,
   getDevBlogPosts,
   getDiscordChannels,
+  getDiscordMembers,
   getDiscordRoles,
   getIntegrations,
   getLogActors,
@@ -60,6 +61,7 @@ import type {
   CreatorAlertSource,
   DevBlogDraft,
   DiscordChannel,
+  DiscordMember,
   DiscordRole,
   HealthSignal,
   LogActor,
@@ -95,6 +97,7 @@ type State = {
   loadedModules: Partial<Record<ModuleKey, boolean>>;
   textChannels: DiscordChannel[];
   voiceChannels: DiscordChannel[];
+  members: DiscordMember[];
   roles: DiscordRole[];
   channelPurposes: Partial<Record<ChannelPurpose, string>>;
   activityRoles: Partial<Record<ActivityRolePurpose, string>>;
@@ -137,6 +140,7 @@ export const useActivityStore = defineStore("activity", {
     loadedModules: {},
     textChannels: [],
     voiceChannels: [],
+    members: [],
     roles: [],
     channelPurposes: {},
     activityRoles: {},
@@ -329,13 +333,15 @@ export const useActivityStore = defineStore("activity", {
     async loadReferenceData() {
       if (!this.session || !this.token || this.mode === "local") return;
       const guildId = this.session.guild_id;
-      const [textChannels, voiceChannels, channelPurposes] = await Promise.all([
+      const [textChannels, voiceChannels, members, channelPurposes] = await Promise.all([
         getDiscordChannels(guildId, this.token, "text"),
         getDiscordChannels(guildId, this.token, "voice"),
+        getDiscordMembers(guildId, this.token),
         getChannelPurposes(guildId, this.token),
       ]);
       this.textChannels = textChannels;
       this.voiceChannels = voiceChannels;
+      this.members = members;
       this.channelPurposes = channelPurposes;
 
       if (this.isAdmin) {

@@ -33,7 +33,7 @@ class VoiceRepositoryInterface(ABC):
         pass
 
     @abstractmethod
-    async def update_owner(self, channel_id: int, new_owner_id: int) -> None:
+    async def update_admin(self, channel_id: int, admin_id: Optional[int]) -> None:
         """Обновить владельца комнаты"""
         pass
 

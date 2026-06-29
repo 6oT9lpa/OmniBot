@@ -139,6 +139,10 @@ export function getDiscordRoles(guildId: string, token: string) {
   return apiRequest<DiscordRole[]>(`/api/discord/roles?guild_id=${guildId}`, {}, token);
 }
 
+export function getDiscordMembers(guildId: string, token: string) {
+  return apiRequest<DiscordMember[]>(`/api/discord/members?guild_id=${guildId}`, {}, token);
+}
+
 export function searchDiscordMembers(guildId: string, token: string, query: string) {
   return apiRequest<DiscordMember[]>(`/api/discord/members/search?guild_id=${guildId}&q=${encodeURIComponent(query)}`, {}, token);
 }

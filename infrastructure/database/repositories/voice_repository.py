@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
     _TABLE_NAME = "voice_rooms"
     _ALLOWED_COLUMNS = {
-        "channel_id", "guild_id", "owner_id", "name",
+        "channel_id", "guild_id", "owner_id", "admin_id", "name",
         "created_at", "is_persistent",
     }
 
@@ -26,13 +26,14 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
         try:
             await self.execute(
                 """
-                INSERT INTO voice_rooms (channel_id, guild_id, owner_id, name, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO voice_rooms (channel_id, guild_id, owner_id, admin_id, name, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     dto.channel_id,
                     dto.guild_id,
                     dto.owner_id,
+                    dto.admin_id,
                     dto.name,
                     dto.created_at.isoformat(timespec="seconds"),
                 ),
@@ -84,21 +85,21 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
             (guild_id,),
         )
 
-    async def update_owner(self, channel_id: int, new_owner_id: int) -> None:
+    async def update_admin(self, channel_id: int, admin_id: Optional[int]) -> None:
         """Обновить владельца комнаты."""
         try:
             await self.execute(
-                "UPDATE voice_rooms SET owner_id = ? WHERE channel_id = ?",
-                (new_owner_id, channel_id),
+                "UPDATE voice_rooms SET admin_id = ? WHERE channel_id = ?",
+                (admin_id, channel_id),
             )
             await self.commit()
             logger.debug(
-                "Voice room owner updated: channel_id=%s new_owner=%s",
-                channel_id, new_owner_id,
+                "Voice room admin updated: channel_id=%s admin_id=%s",
+                channel_id, admin_id,
             )
         except Exception as exc:
             logger.error(
-                "Failed to update owner channel_id=%s: %s", channel_id, exc,
+                "Failed to update admin channel_id=%s: %s", channel_id, exc,
             )
             raise
 

@@ -124,6 +124,26 @@ class DiscordService:
             for member in members
         ]
 
+    async def list_members(self, guild_id: str, limit: int = 1000) -> list[DiscordMember]:
+        logger.info("Listing Discord members guild_id=%s limit=%s", guild_id, limit)
+        members = await self.bot_request(
+            "GET",
+            f"/guilds/{guild_id}/members",
+            params={"limit": min(max(limit, 1), 1000)},
+        )
+        return [
+            DiscordMember(
+                id=member["user"]["id"],
+                username=member["user"].get("username", "unknown"),
+                display_name=member.get("nick")
+                or member["user"].get("global_name")
+                or member["user"].get("username", "unknown"),
+                avatar=member["user"].get("avatar"),
+            )
+            for member in sorted(members, key=lambda item: (item.get("nick") or item["user"].get("global_name") or item["user"].get("username", "")).lower())
+            if not member["user"].get("bot", False)
+        ]
+
     async def fetch_member_role_ids(self, guild_id: str, user_id: str) -> set[int]:
         logger.info("Fetching Discord member roles guild_id=%s user_id=%s", guild_id, user_id)
         response = await self.safe_bot_request("GET", f"/guilds/{guild_id}/members/{user_id}")

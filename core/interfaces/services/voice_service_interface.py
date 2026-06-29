@@ -28,7 +28,7 @@ class VoiceServiceInterface(ABC):
         pass
 
     @abstractmethod
-    async def handle_owner_leave(self, channel: disnake.VoiceChannel, old_owner: disnake.Member) -> None:
+    async def handle_admin_leave(self, channel: disnake.VoiceChannel, old_admin: disnake.Member) -> None:
         """Обработка ухода владельца комнаты"""
         pass
 
@@ -55,6 +55,26 @@ class VoiceServiceInterface(ABC):
     @abstractmethod
     async def transfer(self, channel: disnake.VoiceChannel, new_owner: disnake.Member, user: disnake.Member) -> None:
         """Передать владение комнатой"""
+        pass
+
+    @abstractmethod
+    async def claim_admin(self, channel: disnake.VoiceChannel, user: disnake.Member) -> None:
+        """Claim free temporary admin rights."""
+        pass
+
+    @abstractmethod
+    async def release_admin(self, channel: disnake.VoiceChannel, user: disnake.Member) -> None:
+        """Release temporary admin rights."""
+        pass
+
+    @abstractmethod
+    async def assign_admin(
+        self,
+        channel: disnake.VoiceChannel,
+        new_admin: Optional[disnake.Member],
+        user: disnake.Member,
+    ) -> None:
+        """Owner-only temporary admin assignment."""
         pass
 
     @abstractmethod

@@ -183,6 +183,9 @@ class LoggingCog(commands.Cog):
         before: disnake.VoiceState,
         after: disnake.VoiceState,
     ):
+        if before.channel == after.channel:
+            return
+
         await self._logging_service.log_voice_event(member, before, after)
 
     @commands.Cog.listener()
@@ -270,6 +273,9 @@ class LoggingCog(commands.Cog):
         try:
             async for entry in guild.audit_logs(limit=limit, action=action):
                 if entry.target and entry.target.id == target_id:
+                    if (datetime.now(timezone.utc) - entry.created_at).total_seconds() > 10:
+                        continue
+
                     logger.debug("Found audit log actor %s for action %s target %s", entry.user.id, action, target_id)
                     return entry.user
                 
