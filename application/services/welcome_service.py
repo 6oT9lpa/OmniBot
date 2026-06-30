@@ -120,9 +120,6 @@ class WelcomeService(WelcomeServiceInterface):
         return result
 
     def _format_channel_placeholder(self, guild: disnake.Guild, channel_id: int, mention_style: str) -> str:
-        if mention_style == "plain":
-            channel = guild.get_channel(channel_id)
-            return f"#{channel.name}" if channel else f"#{channel_id}"
         return f"<#{channel_id}>"
 
     def _format_role_placeholder(self, guild: disnake.Guild, role_id: int, mention_style: str) -> str:
@@ -132,10 +129,6 @@ class WelcomeService(WelcomeServiceInterface):
         return f"<@&{role_id}>"
 
     def _format_user_placeholder(self, guild: disnake.Guild, user_id: int, mention_style: str) -> str:
-        if mention_style == "plain":
-            user = guild.get_member(user_id)
-            display_name = getattr(user, "display_name", None) if user else None
-            return f"@{display_name or user_id}"
         return f"<@{user_id}>"
 
     def build_embed(

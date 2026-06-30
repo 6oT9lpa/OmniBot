@@ -48,12 +48,12 @@ def test_welcome_text_normalizes_supported_placeholders():
     assert "<@123456789012345680>" in result
 
 
-def test_welcome_text_normalizes_dm_placeholders_as_plain_names():
+def test_welcome_text_normalizes_dm_role_placeholder_as_plain_name():
     service = WelcomeService(FakeWelcomeRepo())
     text = "{channel.123456789012345678} {role.123456789012345679} {user.123456789012345680}"
 
     result = service.normalize_text(text, FakeMember(), FakeGuild(), mention_style="plain")
 
-    assert "#rules" in result
+    assert "<#123456789012345678>" in result
     assert "@support" in result
-    assert "@Target" in result
+    assert "<@123456789012345680>" in result
