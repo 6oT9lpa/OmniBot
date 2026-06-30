@@ -118,3 +118,18 @@ async def test_mute_admin_removes_admin_role_before_timeout():
     assert target.removed_roles == [target_role]
     assert target.timeout_duration == timedelta(seconds=120)
     assert target.timeout_reason == "test mute"
+
+
+@pytest.mark.asyncio
+async def test_duplicate_dm_notification_is_suppressed():
+    guild = FakeGuild()
+    target_role = FakeRole(3, 50)
+    target = FakeMember(30, guild, target_role, name="target")
+    service = ModeratorService(FakePunishmentRepository(), FakeLoggingService(), FakeHistoryService())
+
+    first_sent = await service._send_dm(target, "User banned", "same reason")
+    second_sent = await service._send_dm(target, "User banned", "same reason")
+
+    assert first_sent is True
+    assert second_sent is False
+    assert len(target.sent_messages) == 1

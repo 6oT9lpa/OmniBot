@@ -1,5 +1,7 @@
+import asyncio
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, Any, Union
+from time import monotonic
+from typing import Optional, Dict, Any
 
 import disnake
 
@@ -13,6 +15,8 @@ logger = get_logger(__name__)
 
 
 class ModeratorService(ModeratorServiceInterface):
+    _DM_DEDUPE_TTL_SECONDS = 120.0
+
     def __init__(
         self,
         punishment_repo: PunishmentRepositoryInterface,
@@ -23,6 +27,8 @@ class ModeratorService(ModeratorServiceInterface):
         self._logging_service = logging_service
         self._history_service = history_service
         self._bot: Optional[disnake.Client] = None
+        self._dm_dedupe_lock = asyncio.Lock()
+        self._recent_dm_notifications: dict[tuple[int, int, str, str], float] = {}
 
     def set_bot(self, bot: disnake.Client) -> None:
         self._bot = bot
@@ -545,6 +551,9 @@ class ModeratorService(ModeratorServiceInterface):
         title: str,
         reason: str,
     ) -> bool:
+        if not await self._reserve_dm_notification(target, title, reason):
+            return False
+
         try:
             embed = disnake.Embed(
                 title=title,
@@ -571,6 +580,28 @@ class ModeratorService(ModeratorServiceInterface):
                 f"[DM] Failed user={target.id} error={exc}"
             )
             return False
+
+    async def _reserve_dm_notification(
+        self,
+        target: disnake.Member,
+        title: str,
+        reason: str,
+    ) -> bool:
+        guild_id = getattr(getattr(target, "guild", None), "id", 0)
+        key = (int(guild_id or 0), int(target.id), title.strip(), reason.strip())
+        now = monotonic()
+
+        async with self._dm_dedupe_lock:
+            self._recent_dm_notifications = {
+                item_key: expires_at
+                for item_key, expires_at in self._recent_dm_notifications.items()
+                if expires_at > now
+            }
+            if key in self._recent_dm_notifications:
+                logger.info("[DM] Duplicate moderation notification suppressed user=%s title=%s", target.id, title)
+                return False
+            self._recent_dm_notifications[key] = now + self._DM_DEDUPE_TTL_SECONDS
+            return True
 
     def _format_duration(self, seconds: int) -> str:
         return str(timedelta(seconds=seconds))
