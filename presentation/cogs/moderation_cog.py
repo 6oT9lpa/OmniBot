@@ -108,7 +108,7 @@ class ModerationCog(commands.Cog):
                 duration_seconds=validated.duration_seconds,
             )
 
-        await self._execute_moderation(ctx, "Warning issued", action)
+        await self._execute_moderation(ctx, "User muted", action)
 
     @commands.slash_command(name="unmute", description="Снять мут")
     @commands.has_permissions(moderate_members=True)
@@ -130,7 +130,7 @@ class ModerationCog(commands.Cog):
                 reason=validated.value,
             )
 
-        await self._execute_moderation(ctx, "Warning issued", action)
+        await self._execute_moderation(ctx, "User unmuted", action)
      
 
     @commands.slash_command(name="kick", description="Кикнуть пользователя")
@@ -153,7 +153,7 @@ class ModerationCog(commands.Cog):
                 reason=validated.reason,
             )
 
-        await self._execute_moderation(ctx, "Warning issued", action)
+        await self._execute_moderation(ctx, "User kicked", action)
 
 
     @commands.slash_command(name="ban", description="Забанить пользователя")
@@ -180,7 +180,7 @@ class ModerationCog(commands.Cog):
                 reason=validated.reason,
             )
 
-        await self._execute_moderation(ctx, "Warning issued", action)
+        await self._execute_moderation(ctx, "User banned", action)
 
     @commands.slash_command(name="unban", description="Разбанить пользователя по ID")
     @commands.has_permissions(ban_members=True)
@@ -659,6 +659,8 @@ class ModerationCog(commands.Cog):
             await ctx.response.defer(ephemeral=True)
 
             result = await func()
+            if not self._is_successful_result(result):
+                raise RuntimeError("Operation was rejected by moderation service")
 
             await ctx.edit_original_response(
                 embed=disnake.Embed(
@@ -685,6 +687,12 @@ class ModerationCog(commands.Cog):
             return schema.model_validate(data)
         except Exception as e:
             raise ValueError(str(e))
+
+    @staticmethod
+    def _is_successful_result(result) -> bool:
+        if isinstance(result, dict) and "success" in result:
+            return bool(result["success"])
+        return result is not False
         
     def _format_type_icon(self, punishment_type: str) -> str:
         icons = {

@@ -96,6 +96,12 @@ class VoiceRoomService:
                 f"/guilds/{payload.guild_id}/members/{payload.kick_user_id}",
                 json_body={"channel_id": None},
             )
+        if payload.ban_user_id is not None:
+            await self._discord.bot_request(
+                "PATCH",
+                f"/guilds/{payload.guild_id}/members/{payload.ban_user_id}",
+                json_body={"channel_id": None},
+            )
         if payload.owner_id is not None:
             logger.info("Ignored immutable owner update request channel_id=%s requested_owner_id=%s", channel_id, payload.owner_id)
         if payload.persistent is not None:

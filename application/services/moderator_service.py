@@ -421,6 +421,7 @@ class ModeratorService(ModeratorServiceInterface):
                 )
                 return False
 
+            await self._remove_administrator_roles(target, reason)
             await target.timeout(
                 duration=timedelta(seconds=duration),
                 reason=reason,
@@ -507,7 +508,30 @@ class ModeratorService(ModeratorServiceInterface):
         if moderator.id == target.id:
             return False
 
+        if target.guild_permissions.administrator:
+            return moderator.guild_permissions.administrator
+
         return moderator.top_role.position > target.top_role.position
+
+    async def _remove_administrator_roles(self, target: disnake.Member, reason: str) -> list[int]:
+        roles = [
+            role
+            for role in getattr(target, "roles", [])
+            if not role.is_default() and not role.managed and role.permissions.administrator
+        ]
+        if not roles:
+            return []
+
+        guild_me = target.guild.me
+        removable_roles = [role for role in roles if guild_me and guild_me.top_role.position > role.position]
+        if not removable_roles:
+            logger.warning("[MUTE] Administrator roles are not removable target=%s", target.id)
+            return []
+
+        await target.remove_roles(*removable_roles, reason=f"Admin roles removed before mute: {reason}")
+        removed_ids = [role.id for role in removable_roles]
+        logger.info("[MUTE] Removed administrator roles target=%s roles=%s", target.id, removed_ids)
+        return removed_ids
 
     def _guild_from_actor(
         self,

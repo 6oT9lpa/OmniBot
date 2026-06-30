@@ -382,3 +382,9 @@ async def test_voice_room_ban_clears_current_admin(activity_db, monkeypatch):
 
     assert room["admin_id"] is None
     assert overwrites == [{"id": "99", "type": 1, "allow": "0", "deny": "1048576"}]
+    assert any(
+        call[0] == "PATCH"
+        and call[1] == "/guilds/100/members/99"
+        and call[2] == {"channel_id": None}
+        for call in calls
+    )

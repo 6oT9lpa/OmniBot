@@ -220,6 +220,10 @@ class VoiceService(VoiceServiceInterface):
         if not room:
             logger.debug("Skip voice member join tracking because room is missing channel_id=%s user_id=%s", channel.id, member.id)
             return
+        if self._is_banned_from_room(channel, member):
+            await member.move_to(None)
+            logger.info("Banned voice member removed on join: channel_id=%s user_id=%s", channel.id, member.id)
+            return
         await self._repo.add_member(channel.id, member.guild.id, member.id)
         logger.debug("Voice member join tracked: guild_id=%s channel_id=%s user_id=%s", member.guild.id, channel.id, member.id)
 
@@ -434,3 +438,12 @@ class VoiceService(VoiceServiceInterface):
     @staticmethod
     def _has_manage_permissions(user: disnake.Member, channel: disnake.VoiceChannel) -> bool:
         return channel.permissions_for(user).manage_permissions
+
+    @staticmethod
+    def _is_banned_from_room(channel: disnake.VoiceChannel, member: disnake.Member) -> bool:
+        try:
+            overwrite = channel.overwrites_for(member)
+        except Exception as exc:
+            logger.debug("Failed to inspect voice overwrite channel_id=%s user_id=%s: %s", channel.id, member.id, exc)
+            return False
+        return overwrite.connect is False
