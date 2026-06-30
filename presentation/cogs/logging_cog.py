@@ -92,10 +92,6 @@ class LoggingCog(commands.Cog):
         await self._logging_service.log_bulk_delete([], channel, deleted_by=deleted_by)
 
     @commands.Cog.listener()
-    async def on_member_remove(self, member: disnake.Member):
-        await self._logging_service.log_member_event(EventType.MEMBER_LEAVE, member)
-
-    @commands.Cog.listener()
     async def on_member_update(self, before: disnake.Member, after: disnake.Member):
         if before.roles != after.roles:
             added = [r for r in after.roles if r not in before.roles]
