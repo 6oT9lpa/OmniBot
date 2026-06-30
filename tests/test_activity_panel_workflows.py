@@ -343,3 +343,42 @@ async def test_voice_room_rejects_self_and_owner_removal(activity_db, monkeypatc
 
     assert self_exc.value.status_code == 400
     assert owner_exc.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_voice_room_ban_clears_current_admin(activity_db, monkeypatch):
+    service = VoiceRoomService()
+    calls = []
+
+    async def ensure_voice(*_):
+        return {"id": "42", "username": "owner"}, {"access_level": "ordinary", "is_admin": False}
+
+    async def bot_request(method, path, *, json_body=None, **_):
+        calls.append((method, path, json_body))
+        if method == "GET":
+            return {
+                "id": "704",
+                "name": "Room",
+                "permission_overwrites": [{"id": "99", "type": 1, "allow": "285212688", "deny": "0"}],
+            }
+        return {"id": "704", "name": "Room"}
+
+    monkeypatch.setattr(service._access_service, "ensure_module_access", ensure_voice)
+    monkeypatch.setattr(service._discord, "bot_request", bot_request)
+    await activity_db.execute(
+        "INSERT INTO voice_rooms (channel_id, guild_id, owner_id, admin_id, name) VALUES (?, ?, ?, ?, ?)",
+        (704, 100, 42, 99, "Room"),
+    )
+    await activity_db.execute(
+        "INSERT INTO voice_room_members (channel_id, guild_id, user_id) VALUES (?, ?, ?)",
+        (704, 100, 99),
+    )
+    await activity_db.commit()
+
+    await service.update_room(704, VoiceRoomUpdatePayload(guild_id=100, ban_user_id=99), "token")
+    room = await activity_db.fetch_one("SELECT admin_id FROM voice_rooms WHERE channel_id = ?", (704,))
+    patch_call = next(call for call in calls if call[0] == "PATCH" and call[1] == "/channels/704")
+    overwrites = patch_call[2]["permission_overwrites"]
+
+    assert room["admin_id"] is None
+    assert overwrites == [{"id": "99", "type": 1, "allow": "0", "deny": "1048576"}]

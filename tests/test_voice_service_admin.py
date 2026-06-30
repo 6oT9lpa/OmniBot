@@ -148,3 +148,22 @@ async def test_admin_cannot_kick_owner_or_self():
         await service.ban(channel, owner, admin)
 
     assert channel.permission_calls == []
+
+
+@pytest.mark.asyncio
+async def test_ban_current_admin_clears_admin_before_denying_connect():
+    repo = FakeVoiceRepository()
+    repo.room["admin_id"] = 99
+    service = VoiceService(repo)
+    guild = FakeGuild()
+    owner = FakeMember(42, guild)
+    admin = FakeMember(99, guild)
+    channel = FakeChannel(10, guild)
+
+    await service.ban(channel, admin, owner)
+
+    assert repo.room["admin_id"] is None
+    assert channel.permission_calls == [
+        (99, {"overwrite": None}),
+        (99, {"connect": False}),
+    ]

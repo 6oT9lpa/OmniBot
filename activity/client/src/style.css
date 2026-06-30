@@ -1908,15 +1908,57 @@ input[type="color"] {
 }
 
 .voice-member-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(3, auto);
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+}
+
+.voice-action-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.voice-member-actions.is-selecting {
+  flex-wrap: nowrap;
+}
+
+.voice-member-actions .ghost-button.active {
+  color: #fff;
+  background: rgba(88, 101, 242, 0.26);
+  border-color: rgba(88, 101, 242, 0.58);
+}
+
+.voice-target-slide-enter-active,
+.voice-target-slide-leave-active,
+.voice-action-button-enter-active,
+.voice-action-button-leave-active {
+  transition:
+    opacity 180ms ease,
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.voice-target-slide-enter-from,
+.voice-target-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-14px) scaleX(0.94);
+}
+
+.voice-action-button-enter-from,
+.voice-action-button-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.94);
 }
 
 .voice-control-grid select,
 .voice-member-actions select {
   max-width: none;
+}
+
+.voice-member-actions select {
+  flex: 1 1 220px;
+  min-width: 0;
 }
 
 @keyframes caretBlink {
@@ -1957,8 +1999,8 @@ input[type="color"] {
   0% {
     offset-distance: 0%;
   }
-  55% {
-    offset-distance: 72%;
+  58% {
+    offset-distance: 100%;
   }
   100% {
     offset-distance: 100%;
@@ -1967,10 +2009,10 @@ input[type="color"] {
 
 @keyframes dotWaveOne {
   0%,
-  68% {
+  58% {
     transform: translate(0, 0);
   }
-  84% {
+  72% {
     transform: translate(24px, -5px);
   }
   100% {
@@ -1980,10 +2022,10 @@ input[type="color"] {
 
 @keyframes dotWaveTwo {
   0%,
-  72% {
+  68% {
     transform: translate(24px, 0);
   }
-  88% {
+  82% {
     transform: translate(48px, -4px);
   }
   100% {
@@ -1993,7 +2035,7 @@ input[type="color"] {
 
 @keyframes dotWaveThree {
   0%,
-  76% {
+  78% {
     transform: translate(48px, 0);
   }
   92% {

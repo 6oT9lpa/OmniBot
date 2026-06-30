@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive } from "vue";
+import { computed, reactive, ref } from "vue";
 import { useActivityStore } from "../../stores/activity.store";
 import type { VoiceRoom } from "../../types/activity.types";
 
@@ -8,6 +8,8 @@ const props = defineProps<{
 }>();
 
 const activity = useActivityStore();
+type MemberAction = "invite" | "kick" | "ban";
+
 const draft = reactive({
   name: props.room.discord?.name || props.room.name,
   userLimit: props.room.discord?.user_limit ?? 0,
@@ -15,6 +17,7 @@ const draft = reactive({
   targetUserId: "",
   region: props.room.discord?.rtc_region || "",
 });
+const activeMemberAction = ref<MemberAction | null>(null);
 
 const voiceMembers = computed(() => {
   const ids = new Set((props.room.voice_member_ids || []).map(String));
@@ -33,6 +36,8 @@ const actionMembers = computed(() => {
     return true;
   });
 });
+const inviteMembers = computed(() => activity.members.filter((member) => member.id !== currentUserId.value));
+const activeTargetMembers = computed(() => (activeMemberAction.value === "invite" ? inviteMembers.value : actionMembers.value));
 
 function memberName(id?: string | null) {
   if (!id) return "Free";
@@ -78,9 +83,22 @@ async function takeAdmin() {
   await activity.updateVoice(props.room.channel_id, { claim_admin: true });
 }
 
-async function memberAction(key: "invite_user_id" | "kick_user_id" | "ban_user_id") {
+function memberActionPayloadKey(action: MemberAction) {
+  if (action === "invite") return "invite_user_id";
+  if (action === "kick") return "kick_user_id";
+  return "ban_user_id";
+}
+
+async function memberAction(action: MemberAction) {
+  if (activeMemberAction.value !== action) {
+    activeMemberAction.value = action;
+    draft.targetUserId = "";
+    return;
+  }
   if (!draft.targetUserId) return;
-  await activity.updateVoice(props.room.channel_id, { [key]: draft.targetUserId });
+  await activity.updateVoice(props.room.channel_id, { [memberActionPayloadKey(action)]: draft.targetUserId });
+  activeMemberAction.value = null;
+  draft.targetUserId = "";
 }
 </script>
 
@@ -150,17 +168,48 @@ async function memberAction(key: "invite_user_id" | "kick_user_id" | "ban_user_i
       <button class="ghost-button danger compact" type="button" @click="activity.deleteVoice(room.channel_id)">Delete</button>
     </div>
 
-    <div class="voice-member-actions">
-      <select v-model="draft.targetUserId" aria-label="Target user">
-        <option value="">Target user</option>
-        <option v-for="member in actionMembers" :key="member.id" :value="member.id">
-          {{ member.display_name }}
-        </option>
-        <option v-if="actionMembers.length === 0" value="" disabled>No users in room</option>
-      </select>
-      <button class="ghost-button compact" type="button" @click="memberAction('invite_user_id')">Invite</button>
-      <button class="ghost-button compact" type="button" @click="memberAction('kick_user_id')">Kick</button>
-      <button class="ghost-button danger compact" type="button" @click="memberAction('ban_user_id')">Ban</button>
+    <div :class="['voice-member-actions', { 'is-selecting': activeMemberAction }]">
+      <TransitionGroup name="voice-action-button" tag="div" class="voice-action-button-row">
+        <button
+          v-if="!activeMemberAction || activeMemberAction === 'invite'"
+          key="invite"
+          :class="['ghost-button compact', { active: activeMemberAction === 'invite' }]"
+          type="button"
+          @click="memberAction('invite')"
+        >
+          Invite
+        </button>
+        <button
+          v-if="!activeMemberAction || activeMemberAction === 'kick'"
+          key="kick"
+          :class="['ghost-button compact', { active: activeMemberAction === 'kick' }]"
+          type="button"
+          @click="memberAction('kick')"
+        >
+          Kick
+        </button>
+        <button
+          v-if="!activeMemberAction || activeMemberAction === 'ban'"
+          key="ban"
+          :class="['ghost-button danger compact', { active: activeMemberAction === 'ban' }]"
+          type="button"
+          @click="memberAction('ban')"
+        >
+          Ban
+        </button>
+      </TransitionGroup>
+
+      <Transition name="voice-target-slide">
+        <select v-if="activeMemberAction" v-model="draft.targetUserId" aria-label="Target user">
+          <option value="" disabled>Target user</option>
+          <option v-for="member in activeTargetMembers" :key="member.id" :value="member.id">
+            {{ member.display_name }}
+          </option>
+          <option v-if="activeTargetMembers.length === 0" value="" disabled>
+            {{ activeMemberAction === "invite" ? "No users on server" : "No users in room" }}
+          </option>
+        </select>
+      </Transition>
     </div>
   </article>
 </template>

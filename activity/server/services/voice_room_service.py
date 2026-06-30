@@ -57,6 +57,7 @@ class VoiceRoomService:
         room = await self._get_authorized_room(payload.guild_id, channel_id, user, access)
         patch: dict[str, Any] = {}
         channel: Optional[dict[str, Any]] = None
+        admin_cleared_by_ban = False
 
         if payload.name is not None:
             patch["name"] = payload.name
@@ -75,10 +76,16 @@ class VoiceRoomService:
         if payload.ban_user_id is not None:
             await self._validate_member_removal(payload.ban_user_id, channel_id, room, user)
             channel = channel or await self._discord.bot_request("GET", f"/channels/{channel_id}")
+            if room.get("admin_id") and int(room["admin_id"]) == int(payload.ban_user_id):
+                channel["permission_overwrites"] = clear_member_overwrite(channel, payload.ban_user_id)
+                await get_db().execute("UPDATE voice_rooms SET admin_id = NULL WHERE channel_id = ?", (channel_id,))
+                admin_cleared_by_ban = True
+                logger.info("Voice admin cleared because admin was banned channel_id=%s admin_id=%s", channel_id, payload.ban_user_id)
             patch["permission_overwrites"] = build_member_connect_overwrites(channel, payload.ban_user_id, allowed=False)
             channel["permission_overwrites"] = patch["permission_overwrites"]
 
         admin_changed = await self._apply_admin_payload(channel_id, payload, room, user, access, patch, channel)
+        admin_changed = admin_changed or admin_cleared_by_ban
 
         if patch:
             await self._discord.bot_request("PATCH", f"/channels/{channel_id}", json_body=patch)

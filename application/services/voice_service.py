@@ -374,6 +374,9 @@ class VoiceService(VoiceServiceInterface):
         if target.id == owner_id:
             logger.warning("User %s attempted to remove owner %s from channel_id=%s", user.id, target.id, channel.id)
             raise PermissionError("Owner cannot be kicked or banned from the room")
+        if ban and room.get("admin_id") and int(room["admin_id"]) == target.id:
+            await self._clear_admin(channel, target)
+            logger.info("Temporary voice admin cleared before ban: channel_id=%s admin_id=%s", channel.id, target.id)
 
         try:
             await channel.set_permissions(target, connect=False)
