@@ -709,7 +709,7 @@ a {
 
 .loading-dots {
   position: relative;
-  --dot-cycle: 900ms;
+  --dot-cycle: 500ms;
   width: 86px;
   height: 42px;
   margin: 0 auto;
@@ -743,6 +743,7 @@ a {
 
 .dot-4 {
   offset-path: path("M 72 0 C 72 -24 0 -24 0 0");
+  offset-anchor: 0 0;
   offset-rotate: 0deg;
   animation: dotLeap var(--dot-cycle) linear infinite;
 }
@@ -1446,13 +1447,13 @@ input[type="color"] {
 }
 
 .bot-settings-heading {
-  align-items: flex-end;
-  text-align: right;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .bot-settings-heading > div {
   display: grid;
-  justify-items: end;
+  justify-items: start;
 }
 
 .access-role-list {
@@ -1956,8 +1957,8 @@ input[type="color"] {
   0% {
     offset-distance: 0%;
   }
-  56% {
-    offset-distance: 100%;
+  55% {
+    offset-distance: 72%;
   }
   100% {
     offset-distance: 100%;
@@ -1966,13 +1967,12 @@ input[type="color"] {
 
 @keyframes dotWaveOne {
   0%,
-  56% {
+  68% {
     transform: translate(0, 0);
   }
-  70% {
+  84% {
     transform: translate(24px, -5px);
   }
-  86%,
   100% {
     transform: translate(24px, 0);
   }
@@ -1980,13 +1980,12 @@ input[type="color"] {
 
 @keyframes dotWaveTwo {
   0%,
-  62% {
+  72% {
     transform: translate(24px, 0);
   }
-  78% {
+  88% {
     transform: translate(48px, -4px);
   }
-  94%,
   100% {
     transform: translate(48px, 0);
   }
@@ -1994,13 +1993,12 @@ input[type="color"] {
 
 @keyframes dotWaveThree {
   0%,
-  68% {
+  76% {
     transform: translate(48px, 0);
   }
-  84% {
+  92% {
     transform: translate(72px, -3px);
   }
-  98%,
   100% {
     transform: translate(72px, 0);
   }
