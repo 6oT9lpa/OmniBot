@@ -34,8 +34,19 @@ class ActivityStatsService:
                 "SELECT * FROM user_stats WHERE guild_id = ? AND user_id = ?",
                 (guild_id, int(member.id)),
             )
-            stats.append({"member": member.model_dump(), "stats": row})
+            stats.append({"member": member.model_dump(), "stats": row or self._empty_user_stats(guild_id, int(member.id))})
         return stats
+
+    def _empty_user_stats(self, guild_id: int, user_id: int) -> dict[str, Any]:
+        return {
+            "user_id": user_id,
+            "guild_id": guild_id,
+            "messages_count": 0,
+            "voice_minutes": 0,
+            "warnings_count": 0,
+            "last_message": None,
+            "joined_at": None,
+        }
 
     async def _query_server_stats(self, guild_id: int, period: int) -> dict[str, Any]:
         cutoff = f"-{period} days"

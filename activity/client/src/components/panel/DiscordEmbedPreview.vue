@@ -18,7 +18,10 @@ function previewText(value: string) {
     .replaceAll("{member_count}", "1,248")
     .replaceAll("{joined_at}", "today")
     .replaceAll("{rules}", "#rules")
-    .replaceAll("{roles}", "#roles");
+    .replaceAll("{roles}", "#roles")
+    .replace(/\{channel\.(\d{15,25})\}/g, "#$1")
+    .replace(/\{role\.(\d{15,25})\}/g, "@role-$1")
+    .replace(/\{user\.(\d{15,25})\}/g, "@user-$1");
 }
 </script>
 
@@ -28,13 +31,13 @@ function previewText(value: string) {
       <span>Discord preview</span>
       <strong>{{ config.is_enabled ? "Enabled" : "Disabled" }}</strong>
     </div>
-    <h3>{{ config.title }}</h3>
+    <h3>{{ previewText(config.title) }}</h3>
     <p>{{ previewText(config.description) }}</p>
     <div class="preview-media">
       {{ config.thumbnail_url || "Thumbnail area" }}
     </div>
     <footer>
-      <span>{{ config.footer_text || "OmniBot Activity" }}</span>
+      <span>{{ previewText(config.footer_text || "OmniBot Activity") }}</span>
       <span>{{ config.footer_icon_url || hexColor(config.color) }}</span>
     </footer>
   </article>

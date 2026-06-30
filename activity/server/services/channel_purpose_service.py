@@ -21,7 +21,8 @@ class ChannelPurposeService:
             "SELECT purpose, channel_id FROM server_channel_purposes WHERE guild_id = ?",
             (guild_id,),
         )
-        return {row["purpose"]: str(row["channel_id"]) for row in rows}
+        allowed_purposes = {purpose.value for purpose in ChannelPurpose}
+        return {row["purpose"]: str(row["channel_id"]) for row in rows if row["purpose"] in allowed_purposes}
 
     async def save_channel_purpose(self, payload: ChannelPurposePayload, access_token: str) -> dict[str, str]:
         logger.info("Saving channel purpose guild_id=%s purpose=%s channel_id=%s", payload.guild_id, payload.purpose.value, payload.channel_id)

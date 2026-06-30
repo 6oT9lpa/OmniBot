@@ -73,6 +73,7 @@ class VoiceRoomService:
             patch["permission_overwrites"] = build_member_connect_overwrites(channel, payload.invite_user_id, allowed=True)
             channel["permission_overwrites"] = patch["permission_overwrites"]
         if payload.ban_user_id is not None:
+            await self._validate_member_removal(payload.ban_user_id, channel_id, room, user)
             channel = channel or await self._discord.bot_request("GET", f"/channels/{channel_id}")
             patch["permission_overwrites"] = build_member_connect_overwrites(channel, payload.ban_user_id, allowed=False)
             channel["permission_overwrites"] = patch["permission_overwrites"]
@@ -82,6 +83,7 @@ class VoiceRoomService:
         if patch:
             await self._discord.bot_request("PATCH", f"/channels/{channel_id}", json_body=patch)
         if payload.kick_user_id is not None:
+            await self._validate_member_removal(payload.kick_user_id, channel_id, room, user)
             await self._discord.bot_request(
                 "PATCH",
                 f"/guilds/{payload.guild_id}/members/{payload.kick_user_id}",
@@ -176,7 +178,11 @@ class VoiceRoomService:
         user: dict[str, Any],
     ) -> int | None | str:
         if payload.claim_admin:
-            raise HTTPException(status_code=400, detail="Use owner admin assignment controls")
+            if room.get("admin_id"):
+                raise HTTPException(status_code=409, detail="Admin rights are already taken")
+            if int(room["owner_id"]) == int(user["id"]):
+                raise HTTPException(status_code=400, detail="Owner cannot become admin")
+            return int(user["id"])
         if payload.release_admin:
             admin_id = int(room["admin_id"]) if room.get("admin_id") else None
             if admin_id != int(user["id"]):
@@ -212,9 +218,23 @@ class VoiceRoomService:
         access: dict[str, Any],
         payload: VoiceRoomUpdatePayload,
     ) -> bool:
-        if payload.release_admin:
+        if payload.claim_admin or payload.release_admin:
             return True
         return int(room["owner_id"]) == int(user["id"])
+
+    async def _validate_member_removal(
+        self,
+        target_id: int,
+        channel_id: int,
+        room: dict[str, Any],
+        user: dict[str, Any],
+    ) -> None:
+        if target_id == int(user["id"]):
+            raise HTTPException(status_code=400, detail="You cannot kick or ban yourself")
+        if target_id == int(room["owner_id"]):
+            raise HTTPException(status_code=400, detail="Owner cannot be kicked or banned from the room")
+        if target_id not in await self._load_voice_member_ids(channel_id):
+            raise HTTPException(status_code=400, detail="Target must be a current voice room member")
 
     def _can_manage_all(self, access: dict[str, Any]) -> bool:
         return bool(access.get("is_admin")) or access.get("access_level") == "moderator"

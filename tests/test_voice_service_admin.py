@@ -28,6 +28,9 @@ class FakeMember:
         self.voice = None
         guild.members[member_id] = self
 
+    async def move_to(self, channel):
+        self.voice = channel
+
 
 class FakeChannel:
     def __init__(self, channel_id, guild):
@@ -127,3 +130,21 @@ async def test_manage_permissions_cannot_assign_admin_without_owner():
         await service.assign_admin(channel, target, moderator)
 
     assert repo.room["admin_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_kick_owner_or_self():
+    repo = FakeVoiceRepository()
+    repo.room["admin_id"] = 99
+    service = VoiceService(repo)
+    guild = FakeGuild()
+    owner = FakeMember(42, guild)
+    admin = FakeMember(99, guild)
+    channel = FakeChannel(10, guild)
+
+    with pytest.raises(PermissionError):
+        await service.kick(channel, admin, admin)
+    with pytest.raises(PermissionError):
+        await service.ban(channel, owner, admin)
+
+    assert channel.permission_calls == []

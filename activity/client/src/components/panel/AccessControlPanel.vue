@@ -59,49 +59,37 @@ function setAccessValue(roleId: number, modules: Record<ModuleKey, PermissionLev
       </button>
     </form>
 
-    <div class="rbac-table-wrap">
-      <table class="rbac-table">
-        <thead>
-          <tr>
-            <th>Activity role</th>
-            <th v-for="module in visibleModules" :key="module">{{ moduleLabels[module] }}</th>
-            <th>Status</th>
-            <th>Delete</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="role in visibleRoles" :key="role.id">
-            <td>
-              <strong>{{ role.name }}</strong>
-              <span>{{ role.is_builtin ? "universal" : "custom" }}</span>
-            </td>
-            <td v-for="module in visibleModules" :key="`${role.id}-${module}`">
-              <select
-                :value="accessValue(role.modules[module])"
-                :disabled="role.slug === 'administrator'"
-                @change="setAccessValue(role.id, role.modules, module, ($event.target as HTMLSelectElement).value)"
-              >
-                <option value="access">access</option>
-                <option value="deny">deny</option>
-              </select>
-            </td>
-            <td>
-              <span>{{ savingRoleId === role.id ? "saving" : "auto" }}</span>
-            </td>
-            <td>
-              <button
-                v-if="!role.is_builtin"
-                class="icon-button danger"
-                type="button"
-                title="Delete role"
-                @click="deleteRole(role.id)"
-              >
-                <X :size="16" />
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="access-role-list">
+      <article v-for="role in visibleRoles" :key="role.id" class="access-role-card">
+        <header>
+          <div>
+            <strong>{{ role.name }}</strong>
+            <span>{{ role.is_builtin ? "universal" : "custom" }} - {{ savingRoleId === role.id ? "saving" : "saved" }}</span>
+          </div>
+          <button
+            v-if="!role.is_builtin"
+            class="icon-button danger"
+            type="button"
+            title="Delete role"
+            @click="deleteRole(role.id)"
+          >
+            <X :size="16" />
+          </button>
+        </header>
+        <div class="access-module-grid">
+          <label v-for="module in visibleModules" :key="`${role.id}-${module}`">
+            <span>{{ moduleLabels[module] }}</span>
+            <select
+              :value="accessValue(role.modules[module])"
+              :disabled="role.slug === 'administrator'"
+              @change="setAccessValue(role.id, role.modules, module, ($event.target as HTMLSelectElement).value)"
+            >
+              <option value="access">access</option>
+              <option value="deny">deny</option>
+            </select>
+          </label>
+        </div>
+      </article>
     </div>
   </section>
 </template>

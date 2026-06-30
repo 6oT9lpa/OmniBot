@@ -198,6 +198,10 @@ async def test_voice_room_serializes_snowflakes_and_runs_member_actions(activity
         "INSERT INTO voice_room_members (channel_id, guild_id, user_id) VALUES (?, ?, ?)",
         (1515345606816694403, 100, 42),
     )
+    await activity_db.execute(
+        "INSERT INTO voice_room_members (channel_id, guild_id, user_id) VALUES (?, ?, ?)",
+        (1515345606816694403, 100, 99),
+    )
     await activity_db.commit()
 
     rooms = await service.list_rooms(100, "token")
@@ -210,7 +214,7 @@ async def test_voice_room_serializes_snowflakes_and_runs_member_actions(activity
     assert rooms[0]["channel_id"] == "1515345606816694403"
     assert rooms[0]["owner_id"] == "42"
     assert rooms[0]["admin_id"] is None
-    assert rooms[0]["voice_member_ids"] == ["42"]
+    assert rooms[0]["voice_member_ids"] == ["42", "99"]
     assert any(call[1] == "/guilds/100/members/99" and call[2] == {"channel_id": None} for call in calls)
 
 
@@ -280,13 +284,19 @@ async def test_voice_room_rejects_admin_assignment_when_target_is_not_in_room(ac
 
 
 @pytest.mark.asyncio
-async def test_voice_room_rejects_legacy_claim_admin_payload(activity_db, monkeypatch):
+async def test_voice_room_claims_free_admin_without_changing_owner(activity_db, monkeypatch):
     service = VoiceRoomService()
 
     async def ensure_voice(*_):
         return {"id": "99", "username": "member"}, {"access_level": "moderator", "is_admin": False}
 
+    async def bot_request(method, path, *, json_body=None, **_):
+        if method == "GET":
+            return {"id": "702", "name": "Room", "permission_overwrites": []}
+        return {"id": "702", "name": "Room"}
+
     monkeypatch.setattr(service._access_service, "ensure_module_access", ensure_voice)
+    monkeypatch.setattr(service._discord, "bot_request", bot_request)
     await activity_db.execute(
         "INSERT INTO voice_rooms (channel_id, guild_id, owner_id, name) VALUES (?, ?, ?, ?)",
         (702, 100, 42, "Room"),
@@ -297,7 +307,39 @@ async def test_voice_room_rejects_legacy_claim_admin_payload(activity_db, monkey
     )
     await activity_db.commit()
 
-    with pytest.raises(HTTPException) as exc_info:
-        await service.update_room(702, VoiceRoomUpdatePayload(guild_id=100, claim_admin=True), "token")
+    await service.update_room(702, VoiceRoomUpdatePayload(guild_id=100, claim_admin=True), "token")
+    room = await activity_db.fetch_one("SELECT owner_id, admin_id FROM voice_rooms WHERE channel_id = ?", (702,))
 
-    assert exc_info.value.status_code == 400
+    assert room["owner_id"] == 42
+    assert room["admin_id"] == 99
+
+
+@pytest.mark.asyncio
+async def test_voice_room_rejects_self_and_owner_removal(activity_db, monkeypatch):
+    service = VoiceRoomService()
+
+    async def ensure_voice(*_):
+        return {"id": "99", "username": "admin"}, {"access_level": "ordinary", "is_admin": False}
+
+    monkeypatch.setattr(service._access_service, "ensure_module_access", ensure_voice)
+    await activity_db.execute(
+        "INSERT INTO voice_rooms (channel_id, guild_id, owner_id, admin_id, name) VALUES (?, ?, ?, ?, ?)",
+        (703, 100, 42, 99, "Room"),
+    )
+    await activity_db.execute(
+        "INSERT INTO voice_room_members (channel_id, guild_id, user_id) VALUES (?, ?, ?)",
+        (703, 100, 99),
+    )
+    await activity_db.execute(
+        "INSERT INTO voice_room_members (channel_id, guild_id, user_id) VALUES (?, ?, ?)",
+        (703, 100, 42),
+    )
+    await activity_db.commit()
+
+    with pytest.raises(HTTPException) as self_exc:
+        await service.update_room(703, VoiceRoomUpdatePayload(guild_id=100, kick_user_id=99), "token")
+    with pytest.raises(HTTPException) as owner_exc:
+        await service.update_room(703, VoiceRoomUpdatePayload(guild_id=100, ban_user_id=42), "token")
+
+    assert self_exc.value.status_code == 400
+    assert owner_exc.value.status_code == 400

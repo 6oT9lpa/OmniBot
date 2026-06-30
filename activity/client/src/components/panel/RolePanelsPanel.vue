@@ -38,33 +38,23 @@ async function toggleAssignment(discordRoleId: string, accessRoleId: number, ena
       </button>
     </div>
 
-    <div class="rbac-table-wrap">
-      <table class="rbac-table role-assignment-table">
-        <thead>
-          <tr>
-            <th>Discord role</th>
-            <th v-for="accessRole in availableRoles" :key="accessRole.id">{{ accessRole.name }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="role in activity.syncedRoles" :key="role.role_id">
-            <td>
-              <strong>{{ role.name }}</strong>
-              <span>{{ role.is_admin ? "Discord Administrator" : `permissions: ${role.permissions}` }}</span>
-            </td>
-            <td v-for="accessRole in availableRoles" :key="`${role.role_id}-${accessRole.id}`">
-              <label class="role-check">
-                <input
-                  type="checkbox"
-                  :checked="hasAssignment(role.role_id, accessRole.id)"
-                  @change="toggleAssignment(role.role_id, accessRole.id, ($event.target as HTMLInputElement).checked)"
-                />
-                <span aria-hidden="true"></span>
-              </label>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="role-map-list">
+      <article v-for="role in activity.syncedRoles" :key="role.role_id" class="role-map-row">
+        <div class="role-main">
+          <strong>{{ role.name }}</strong>
+          <span>{{ role.is_admin ? "Discord Administrator" : `permissions: ${role.permissions}` }}</span>
+        </div>
+        <div class="role-chip-row">
+          <label v-for="accessRole in availableRoles" :key="`${role.role_id}-${accessRole.id}`" class="role-chip selectable">
+            <input
+              type="checkbox"
+              :checked="hasAssignment(role.role_id, accessRole.id)"
+              @change="toggleAssignment(role.role_id, accessRole.id, ($event.target as HTMLInputElement).checked)"
+            />
+            <span>{{ accessRole.name }}</span>
+          </label>
+        </div>
+      </article>
     </div>
   </section>
 </template>

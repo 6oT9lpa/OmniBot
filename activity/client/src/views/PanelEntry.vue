@@ -56,6 +56,13 @@ const sessionActionLabel = computed(() => {
 const activeModuleLoaded = computed(() => Boolean(activity.loadedModules[activeModule.value]));
 const activeModulePending = computed(() => activity.moduleLoading && !activeModuleLoaded.value);
 const activeModuleFailed = computed(() => Boolean(activity.moduleError && !activeModuleLoaded.value));
+const visibleError = computed(() => activity.moduleError || activity.healthError || activity.error);
+
+function clearVisibleError() {
+  activity.moduleError = null;
+  activity.healthError = null;
+  activity.error = null;
+}
 
 async function handleSessionAction() {
   if (activity.accessError?.can_sync_roles) {
@@ -89,6 +96,13 @@ watch(
 
     <section class="panel-workspace">
       <PanelTopbar :title="activeTitle" :subtitle="subtitle" />
+      <div v-if="visibleError && !activeModuleFailed" class="activity-error-banner" role="alert">
+        <div>
+          <strong>Request failed</strong>
+          <span>{{ visibleError }}</span>
+        </div>
+        <button class="icon-button" type="button" aria-label="Dismiss error" @click="clearVisibleError">x</button>
+      </div>
 
       <div v-if="!activity.session" class="panel-content">
         <NoAccessState

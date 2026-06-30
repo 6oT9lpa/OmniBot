@@ -277,7 +277,13 @@ export const useActivityStore = defineStore("activity", {
         return;
       }
 
-      this.welcome = await saveWelcomeConfig(payload, this.token);
+      try {
+        this.welcome = await saveWelcomeConfig(payload, this.token);
+        this.moduleError = null;
+      } catch (error) {
+        this.moduleError = error instanceof Error ? error.message : String(error);
+        throw error;
+      }
     },
 
     async resetWelcome() {
@@ -288,12 +294,25 @@ export const useActivityStore = defineStore("activity", {
         return;
       }
 
-      this.welcome = await resetWelcomeConfig(this.session.guild_id, this.token);
+      try {
+        this.welcome = await resetWelcomeConfig(this.session.guild_id, this.token);
+        this.moduleError = null;
+      } catch (error) {
+        this.moduleError = error instanceof Error ? error.message : String(error);
+        throw error;
+      }
     },
 
     async testWelcome() {
       if (!this.session || !this.token || this.mode === "local") return null;
-      return await testWelcomeConfig(this.session.guild_id, this.token);
+      try {
+        const result = await testWelcomeConfig(this.session.guild_id, this.token);
+        this.moduleError = null;
+        return result;
+      } catch (error) {
+        this.moduleError = error instanceof Error ? error.message : String(error);
+        throw error;
+      }
     },
 
     async refreshHealth(force = false) {
@@ -420,7 +439,13 @@ export const useActivityStore = defineStore("activity", {
         this.channelPurposes[purpose] = channelId;
         return;
       }
-      this.channelPurposes = await saveChannelPurpose(this.session.guild_id, this.token, purpose, channelId);
+      try {
+        this.channelPurposes = await saveChannelPurpose(this.session.guild_id, this.token, purpose, channelId);
+        this.moduleError = null;
+      } catch (error) {
+        this.moduleError = error instanceof Error ? error.message : String(error);
+        throw error;
+      }
     },
 
     async createDevBlog(draft: Omit<DevBlogDraft, "guild_id">) {
@@ -442,14 +467,26 @@ export const useActivityStore = defineStore("activity", {
 
     async updateVoice(channelId: string, payload: Record<string, unknown>) {
       if (!this.session || !this.token) return;
-      await updateVoiceRoom(this.session.guild_id, this.token, channelId, payload);
-      await this.loadModuleData("voice-rooms");
+      try {
+        await updateVoiceRoom(this.session.guild_id, this.token, channelId, payload);
+        await this.loadModuleData("voice-rooms");
+        this.moduleError = null;
+      } catch (error) {
+        this.moduleError = error instanceof Error ? error.message : String(error);
+        throw error;
+      }
     },
 
     async deleteVoice(channelId: string) {
       if (!this.session || !this.token) return;
-      await deleteVoiceRoom(this.session.guild_id, this.token, channelId);
-      await this.loadModuleData("voice-rooms");
+      try {
+        await deleteVoiceRoom(this.session.guild_id, this.token, channelId);
+        await this.loadModuleData("voice-rooms");
+        this.moduleError = null;
+      } catch (error) {
+        this.moduleError = error instanceof Error ? error.message : String(error);
+        throw error;
+      }
     },
 
     async searchStatsUsers(query: string) {
@@ -457,7 +494,13 @@ export const useActivityStore = defineStore("activity", {
         this.userStatsResults = [];
         return;
       }
-      this.userStatsResults = await searchUserStats(this.session.guild_id, this.token, query.trim());
+      try {
+        this.userStatsResults = await searchUserStats(this.session.guild_id, this.token, query.trim());
+        this.moduleError = null;
+      } catch (error) {
+        this.moduleError = error instanceof Error ? error.message : String(error);
+        throw error;
+      }
     },
 
     async loadLogs(source = "all", eventType = "", query = "") {

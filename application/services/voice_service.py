@@ -293,15 +293,13 @@ class VoiceService(VoiceServiceInterface):
             channel = await guild.create_voice_channel(
                 name=room_name,
                 category=trigger_channel.category,
-                overwrites={
-                    guild.default_role: disnake.PermissionOverwrite(connect=False),
-                    member: disnake.PermissionOverwrite(
-                        connect=True,
-                        manage_channels=True,
-                        manage_permissions=True,
-                        move_members=True,
-                    ),
-                },
+            )
+            await channel.set_permissions(
+                member,
+                connect=True,
+                manage_channels=True,
+                manage_permissions=True,
+                move_members=True,
             )
             await member.move_to(channel)
             await self._repo.create(
@@ -368,6 +366,14 @@ class VoiceService(VoiceServiceInterface):
         if not await self._can_control(user, channel):
             logger.warning("User %s lacks voice control for kick/ban in %s", user.id, channel.id)
             raise PermissionError("Not enough rights to remove users")
+        room = await self._require_room(channel)
+        owner_id = int(room["owner_id"])
+        if target.id == user.id:
+            logger.warning("User %s attempted to remove themselves from channel_id=%s", user.id, channel.id)
+            raise PermissionError("You cannot kick or ban yourself")
+        if target.id == owner_id:
+            logger.warning("User %s attempted to remove owner %s from channel_id=%s", user.id, target.id, channel.id)
+            raise PermissionError("Owner cannot be kicked or banned from the room")
 
         try:
             await channel.set_permissions(target, connect=False)

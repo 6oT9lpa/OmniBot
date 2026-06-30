@@ -15,7 +15,6 @@ const channelPurposes: Array<{ key: ChannelPurpose; label: string }> = [
   { key: "channel_log", label: "Log channel" },
   { key: "stream_announce", label: "Stream alerts" },
   { key: "dev_blog", label: "Dev Blog" },
-  { key: "admin_log", label: "Admin log" },
 ];
 const rolePurposes: Array<{ key: ActivityRolePurpose; label: string }> = [
   { key: "activity_admin", label: "Activity admin" },
@@ -51,7 +50,7 @@ async function toggleWelcome(value: boolean) {
 
 <template>
   <RevealOnScroll tag="section" class="panel-section">
-    <div class="section-heading role-panel-heading">
+    <div class="section-heading bot-settings-heading">
       <span>Bot settings</span>
       <h2>Discord bot controls.</h2>
       <div>

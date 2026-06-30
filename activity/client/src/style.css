@@ -894,6 +894,32 @@ a {
   padding: clamp(20px, 3vw, 40px);
 }
 
+.activity-error-banner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin: 16px clamp(20px, 3vw, 40px) 0;
+  padding: 14px 16px;
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.5);
+  border: 1px solid rgba(239, 68, 68, 0.48);
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(239, 68, 68, 0.16);
+}
+
+.activity-error-banner div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.activity-error-banner span {
+  overflow-wrap: anywhere;
+  color: #fee2e2;
+  line-height: 1.45;
+}
+
 .panel-content > .reveal-on-scroll {
   width: 100%;
 }
@@ -1407,6 +1433,64 @@ input[type="color"] {
   align-items: center;
 }
 
+.bot-settings-heading {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.bot-settings-heading > div {
+  display: grid;
+  justify-items: end;
+}
+
+.access-role-list {
+  display: grid;
+  gap: 12px;
+}
+
+.access-role-card {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  overflow-wrap: anywhere;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.access-role-card header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.access-role-card header div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.access-role-card header span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.access-module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.access-module-grid label {
+  min-width: 0;
+}
+
+.access-module-grid select {
+  max-width: none;
+}
+
 .role-map-list {
   display: grid;
   gap: 12px;
@@ -1455,6 +1539,24 @@ input[type="color"] {
 
 .role-chip {
   cursor: pointer;
+}
+
+.role-chip.selectable {
+  position: relative;
+  cursor: pointer;
+}
+
+.role-chip.selectable input {
+  position: absolute;
+  width: 1px;
+  min-height: 1px;
+  opacity: 0;
+}
+
+.role-chip.selectable:has(input:checked) {
+  color: #fff;
+  background: rgba(88, 101, 242, 0.28);
+  border-color: rgba(88, 101, 242, 0.58);
 }
 
 .role-add select {
@@ -1706,10 +1808,45 @@ input[type="color"] {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.user-suggestion-list,
+.user-stat-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.user-suggestion-list button {
+  min-height: 40px;
+  padding: 0 12px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.user-suggestion-list button:hover {
+  border-color: rgba(88, 101, 242, 0.46);
+}
+
+.user-stat-list article {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.user-stat-list article span {
+  display: grid;
+  gap: 3px;
+}
+
+.user-stat-list article span strong {
+  color: var(--text);
+}
+
 .integration-grid,
 .voice-room-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: 14px;
 }
 
@@ -1717,6 +1854,8 @@ input[type="color"] {
 .voice-room-card {
   display: grid;
   gap: 14px;
+  width: 100%;
+  min-width: 0;
   padding: 18px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -1741,6 +1880,7 @@ input[type="color"] {
 .voice-room-head > div {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .voice-room-head span,
@@ -1756,7 +1896,7 @@ input[type="color"] {
 
 .voice-member-actions {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto);
   gap: 10px;
   align-items: center;
 }
@@ -1989,8 +2129,20 @@ input[type="color"] {
   .voice-room-grid,
   .voice-control-grid,
   .voice-member-actions,
+  .role-map-row,
   .log-record {
     grid-template-columns: 1fr;
+  }
+
+  .inline-actions,
+  .role-chip-row {
+    justify-content: flex-start;
+  }
+
+  .inline-actions .ghost-button,
+  .voice-member-actions .ghost-button,
+  .voice-member-actions .ghost-button.danger {
+    width: 100%;
   }
 
   .stats-daily {

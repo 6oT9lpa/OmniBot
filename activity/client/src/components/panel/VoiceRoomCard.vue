@@ -24,6 +24,15 @@ const currentUserId = computed(() => activity.session?.user.id || "");
 const isOwner = computed(() => currentUserId.value === String(props.room.owner_id));
 const isAdmin = computed(() => currentUserId.value === String(props.room.admin_id || ""));
 const hasAdmin = computed(() => Boolean(props.room.admin_id));
+const isCurrentVoiceMember = computed(() => (props.room.voice_member_ids || []).map(String).includes(currentUserId.value));
+const actionMembers = computed(() => {
+  const ids = new Set((props.room.voice_member_ids || []).map(String));
+  return activity.members.filter((member) => {
+    if (!ids.has(member.id) || member.id === currentUserId.value) return false;
+    if (isAdmin.value && member.id === props.room.owner_id) return false;
+    return true;
+  });
+});
 
 function memberName(id?: string | null) {
   if (!id) return "Free";
@@ -58,7 +67,15 @@ async function assignAdmin() {
 
 async function clearAdmin() {
   draft.adminId = "";
+  if (isAdmin.value && !isOwner.value) {
+    await activity.updateVoice(props.room.channel_id, { release_admin: true });
+    return;
+  }
   await activity.updateVoice(props.room.channel_id, { admin_id: null });
+}
+
+async function takeAdmin() {
+  await activity.updateVoice(props.room.channel_id, { claim_admin: true });
 }
 
 async function memberAction(key: "invite_user_id" | "kick_user_id" | "ban_user_id") {
@@ -128,21 +145,18 @@ async function memberAction(key: "invite_user_id" | "kick_user_id" | "ban_user_i
     <div class="inline-actions">
       <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { locked: true })">Lock</button>
       <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { locked: false })">Unlock</button>
-      <button v-if="isOwner" class="ghost-button compact" type="button" @click="clearAdmin">Take admin</button>
-      <button v-if="isOwner && hasAdmin" class="ghost-button compact" type="button" @click="clearAdmin">Clear admin</button>
-      <button v-if="isAdmin" class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { release_admin: true })">Release admin</button>
-      <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { persistent: !room.is_persistent })">
-        {{ room.is_persistent ? "Temporary" : "Persist" }}
-      </button>
+      <button v-if="!hasAdmin && isCurrentVoiceMember && !isOwner" class="ghost-button compact" type="button" @click="takeAdmin">Take admin</button>
+      <button v-if="hasAdmin && (isOwner || isAdmin)" class="ghost-button compact" type="button" @click="clearAdmin">Clear admin</button>
       <button class="ghost-button danger compact" type="button" @click="activity.deleteVoice(room.channel_id)">Delete</button>
     </div>
 
     <div class="voice-member-actions">
       <select v-model="draft.targetUserId" aria-label="Target user">
         <option value="">Target user</option>
-        <option v-for="member in activity.members" :key="member.id" :value="member.id">
+        <option v-for="member in actionMembers" :key="member.id" :value="member.id">
           {{ member.display_name }}
         </option>
+        <option v-if="actionMembers.length === 0" value="" disabled>No users in room</option>
       </select>
       <button class="ghost-button compact" type="button" @click="memberAction('invite_user_id')">Invite</button>
       <button class="ghost-button compact" type="button" @click="memberAction('kick_user_id')">Kick</button>

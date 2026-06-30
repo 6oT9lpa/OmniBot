@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useActivityStore } from "../../stores/activity.store";
 import StatCard from "./StatCard.vue";
 
 const activity = useActivityStore();
 const userSearch = ref("");
+let searchTimer: number | undefined;
 const dailyStats = computed(() => activity.serverStats?.daily?.slice(-30) || []);
 const maxDaily = computed(() => Math.max(1, ...dailyStats.value.map((row) => row.count)));
 const summaryCards = computed(() => {
@@ -31,6 +32,11 @@ async function searchStatsUsers() {
   await activity.searchStatsUsers(userSearch.value);
 }
 
+function selectUser(row: Record<string, unknown>) {
+  const member = row.member as Record<string, unknown> | undefined;
+  userSearch.value = String(member?.display_name || member?.username || "");
+}
+
 function formatRecordValue(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
   if (typeof value === "object") return JSON.stringify(value);
@@ -42,6 +48,23 @@ function nestedValue(row: Record<string, unknown>, key: string, nestedKey: strin
   if (!nested || typeof nested !== "object") return "-";
   return formatRecordValue((nested as Record<string, unknown>)[nestedKey]);
 }
+
+function statValue(row: Record<string, unknown>, key: string) {
+  const stats = row.stats;
+  if (!stats || typeof stats !== "object") return "-";
+  return formatRecordValue((stats as Record<string, unknown>)[key]);
+}
+
+watch(userSearch, (value) => {
+  if (searchTimer) window.clearTimeout(searchTimer);
+  if (value.trim().length < 2) {
+    activity.userStatsResults = [];
+    return;
+  }
+  searchTimer = window.setTimeout(() => {
+    void searchStatsUsers();
+  }, 250);
+});
 </script>
 
 <template>
@@ -80,10 +103,23 @@ function nestedValue(row: Record<string, unknown>, key: string, nestedKey: strin
       <input v-model="userSearch" placeholder="Search Discord user" />
       <button class="primary-button" type="submit">Search</button>
     </form>
-    <div class="record-list">
+    <div v-if="activity.userStatsResults.length > 0" class="user-suggestion-list">
+      <button
+        v-for="row in activity.userStatsResults"
+        :key="nestedValue(row, 'member', 'id')"
+        type="button"
+        @click="selectUser(row)"
+      >
+        {{ nestedValue(row, 'member', 'display_name') }}
+      </button>
+    </div>
+    <div class="record-list user-stat-list">
       <article v-for="row in activity.userStatsResults" :key="nestedValue(row, 'member', 'id')">
         <strong>{{ nestedValue(row, 'member', 'display_name') }}</strong>
-        <span>{{ formatRecordValue(row.stats) }}</span>
+        <span>Messages: {{ statValue(row, 'messages_count') }}</span>
+        <span>Voice minutes: {{ statValue(row, 'voice_minutes') }}</span>
+        <span>Warnings: {{ statValue(row, 'warnings_count') }}</span>
+        <span>Last message: {{ statValue(row, 'last_message') }}</span>
       </article>
     </div>
   </section>

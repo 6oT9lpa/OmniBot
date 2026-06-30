@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 from fastapi import HTTPException
@@ -119,7 +120,7 @@ class ActivityWelcomeService:
             embed["thumbnail"] = {"url": config["thumbnail_url"]}
         if config.get("footer_text"):
             embed["footer"] = {
-                "text": config["footer_text"],
+                "text": self._replace_placeholders(config["footer_text"], actor),
                 **({"icon_url": config["footer_icon_url"]} if config.get("footer_icon_url") else {}),
             }
         return {"content": "", "embeds": [embed], "allowed_mentions": {"parse": []}}
@@ -128,12 +129,18 @@ class ActivityWelcomeService:
         display_name = actor.get("global_name") or actor.get("username") or "Discord user"
         replacements = {
             "{user}": display_name,
+            "{user_name}": actor.get("username") or display_name,
             "{server}": "this Discord server",
+            "{guild}": "this Discord server",
             "{member_count}": "current member count",
             "{joined_at}": "join date",
         }
         for key, replacement in replacements.items():
             value = value.replace(key, replacement)
+        value = re.sub(r"\{channel\.(\d{15,25})\}", r"<#\1>", value)
+        value = re.sub(r"\{role\.(\d{15,25})\}", r"<@&\1>", value)
+        value = re.sub(r"\{user\.(\d{15,25})\}", r"<@\1>", value)
+        logger.debug("Activity welcome test placeholders normalized actor_id=%s", actor.get("id"))
         return value
 
     def _display_name(self, user: dict[str, Any]) -> str:

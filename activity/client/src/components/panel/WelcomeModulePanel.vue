@@ -122,6 +122,9 @@ function setColor(value: string) {
         <span>{server}</span>
         <span>{member_count}</span>
         <span>{joined_at}</span>
+        <span>{channel.ID}</span>
+        <span>{role.ID}</span>
+        <span>{user.ID}</span>
       </div>
 
       <div class="form-actions">

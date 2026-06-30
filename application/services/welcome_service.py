@@ -1,5 +1,8 @@
+import re
+from datetime import timezone
+from typing import Any, Dict, Optional
+
 import disnake
-from typing import Optional, Dict, Any
 
 from core.interfaces.repositories import WelcomeConfigRepositoryInterface
 from core.interfaces.services import WelcomeServiceInterface
@@ -53,12 +56,7 @@ class WelcomeService(WelcomeServiceInterface):
         rules_channel_id: Optional[int] = None,
         roles_channel_id: Optional[int] = None,
     ) -> str:
-        result = description
-
-        result = result.replace("{user}", member.mention)
-        result = result.replace("{user_name}", str(member))
-        result = result.replace("{guild}", guild.name)
-        result = result.replace("{member_count}", str(guild.member_count))
+        result = self.normalize_text(description, member, guild)
 
         if rules_channel_id:
             channel = guild.get_channel(rules_channel_id)
@@ -72,6 +70,33 @@ class WelcomeService(WelcomeServiceInterface):
         else:
             result = result.replace("{roles}", "#роли")
 
+        return result
+
+    def normalize_text(self, value: str, member: disnake.Member, guild: disnake.Guild) -> str:
+        if not value:
+            return ""
+
+        joined_at = member.joined_at
+        if joined_at and joined_at.tzinfo is None:
+            joined_at = joined_at.replace(tzinfo=timezone.utc)
+        joined_text = joined_at.strftime("%d.%m.%Y %H:%M") if joined_at else ""
+
+        replacements = {
+            "{user}": member.display_name,
+            "{user_name}": str(member),
+            "{server}": guild.name,
+            "{guild}": guild.name,
+            "{member_count}": str(guild.member_count or 0),
+            "{joined_at}": joined_text,
+        }
+        result = value
+        for placeholder, replacement in replacements.items():
+            result = result.replace(placeholder, replacement)
+
+        result = re.sub(r"\{channel\.(\d{15,25})\}", r"<#\1>", result)
+        result = re.sub(r"\{role\.(\d{15,25})\}", r"<@&\1>", result)
+        result = re.sub(r"\{user\.(\d{15,25})\}", r"<@\1>", result)
+        logger.debug("Welcome text normalized guild_id=%s member_id=%s", guild.id, member.id)
         return result
 
     def build_embed(
@@ -93,6 +118,8 @@ class WelcomeService(WelcomeServiceInterface):
         footer_icon_url = config.get("footer_icon_url")
         rules_channel_id = config.get("rules_channel_id")
         roles_channel_id = config.get("roles_channel_id")
+        title = self.normalize_text(title, member, guild)
+        footer_text = self.normalize_text(footer_text or "", member, guild)
 
         formatted_description = self.format_description(
             description, member, guild, rules_channel_id, roles_channel_id
