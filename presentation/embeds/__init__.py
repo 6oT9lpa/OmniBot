@@ -11,7 +11,8 @@ from presentation.embeds.logging_embed import (
     RoleCreateEmbedBuilder,
     RoleDeleteEmbedBuilder,
     RoleUpdateEmbedBuilder,
-    MemberRoleUpdateEmbedBuilder
+    MemberRoleUpdateEmbedBuilder,
+    MemberEventEmbedBuilder
 )
 from presentation.embeds.moderation_embed import (
     ModerationBanEmbedBuilder,
@@ -44,5 +45,6 @@ __all__ = [
     'RoleCreateEmbedBuilder',
     'RoleDeleteEmbedBuilder',
     'RoleUpdateEmbedBuilder',
-    'MemberRoleUpdateEmbedBuilder'
+    'MemberRoleUpdateEmbedBuilder',
+    'MemberEventEmbedBuilder'
 ]

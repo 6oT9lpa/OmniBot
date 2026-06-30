@@ -13,6 +13,15 @@ class FakeGuild:
     name = "Omni"
     member_count = 42
 
+    def get_channel(self, channel_id):
+        return type("Channel", (), {"id": channel_id, "name": "rules"})()
+
+    def get_role(self, role_id):
+        return type("Role", (), {"id": role_id, "name": "support"})()
+
+    def get_member(self, user_id):
+        return type("Member", (), {"id": user_id, "display_name": "Target"})()
+
 
 class FakeMember:
     id = 55
@@ -37,3 +46,14 @@ def test_welcome_text_normalizes_supported_placeholders():
     assert "<#123456789012345678>" in result
     assert "<@&123456789012345679>" in result
     assert "<@123456789012345680>" in result
+
+
+def test_welcome_text_normalizes_dm_placeholders_as_plain_names():
+    service = WelcomeService(FakeWelcomeRepo())
+    text = "{channel.123456789012345678} {role.123456789012345679} {user.123456789012345680}"
+
+    result = service.normalize_text(text, FakeMember(), FakeGuild(), mention_style="plain")
+
+    assert "#rules" in result
+    assert "@support" in result
+    assert "@Target" in result

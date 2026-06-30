@@ -372,7 +372,57 @@ class MessageLogEmbedBuilder:
             timestamp = datetime.now(timezone.utc)
         builder.set_footer(text=f"Time: {format_datetime(timestamp)}")
         return builder.build()
-    
+
+
+class MemberEventEmbedBuilder:
+    @staticmethod
+    def build_leave(
+        member: disnake.Member,
+        timestamp: Optional[datetime] = None,
+    ) -> disnake.Embed:
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+
+        builder = EmbedBuilder(color=0xED4245)
+        builder.set_title(f"Member left: {member} (ID: {member.id})")
+        builder.add_field("Event", "member_leave", inline=True)
+        builder.add_field("User", f"{member.mention} (`{member}` ID: {member.id})", inline=False)
+
+        joined_at = getattr(member, "joined_at", None)
+        if joined_at:
+            builder.add_field("Joined", f"<t:{int(joined_at.timestamp())}:R>", inline=True)
+
+        roles = [
+            role.name
+            for role in getattr(member, "roles", [])
+            if not getattr(role, "is_default", lambda: False)()
+        ]
+        if roles:
+            visible_roles = ", ".join(roles[:10])
+            if len(roles) > 10:
+                visible_roles = f"{visible_roles}..."
+            builder.add_field("Roles", visible_roles, inline=False)
+
+        builder.set_footer(text=f"Time: {format_datetime(timestamp)}")
+        return builder.build()
+
+    @staticmethod
+    def build_update(
+        member: disnake.Member,
+        changes: List[str],
+        timestamp: Optional[datetime] = None,
+    ) -> disnake.Embed:
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+
+        builder = EmbedBuilder(color=0xFEE75C)
+        builder.set_title(f"Member updated: {member} (ID: {member.id})")
+        builder.add_field("Event", "member_update", inline=True)
+        builder.add_field("User", f"{member.mention} (`{member}` ID: {member.id})", inline=False)
+        builder.add_field("Changes", "\n".join(f"- {change}" for change in changes) or "-", inline=False)
+        builder.set_footer(text=f"Time: {format_datetime(timestamp)}")
+        return builder.build()
+
 class BulkDeleteEmbedBuilder:
     @staticmethod
     def build_bulk_delete(

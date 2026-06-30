@@ -55,8 +55,9 @@ class WelcomeService(WelcomeServiceInterface):
         guild: disnake.Guild,
         rules_channel_id: Optional[int] = None,
         roles_channel_id: Optional[int] = None,
+        mention_style: str = "mentions",
     ) -> str:
-        result = self.normalize_text(description, member, guild)
+        result = self.normalize_text(description, member, guild, mention_style=mention_style)
 
         if rules_channel_id:
             channel = guild.get_channel(rules_channel_id)
@@ -72,7 +73,14 @@ class WelcomeService(WelcomeServiceInterface):
 
         return result
 
-    def normalize_text(self, value: str, member: disnake.Member, guild: disnake.Guild) -> str:
+    def normalize_text(
+        self,
+        value: str,
+        member: disnake.Member,
+        guild: disnake.Guild,
+        *,
+        mention_style: str = "mentions",
+    ) -> str:
         if not value:
             return ""
 
@@ -93,11 +101,42 @@ class WelcomeService(WelcomeServiceInterface):
         for placeholder, replacement in replacements.items():
             result = result.replace(placeholder, replacement)
 
-        result = re.sub(r"\{channel\.(\d{15,25})\}", r"<#\1>", result)
-        result = re.sub(r"\{role\.(\d{15,25})\}", r"<@&\1>", result)
-        result = re.sub(r"\{user\.(\d{15,25})\}", r"<@\1>", result)
+        result = re.sub(
+            r"\{channel\.(\d{15,25})\}",
+            lambda match: self._format_channel_placeholder(guild, int(match.group(1)), mention_style),
+            result,
+        )
+        result = re.sub(
+            r"\{role\.(\d{15,25})\}",
+            lambda match: self._format_role_placeholder(guild, int(match.group(1)), mention_style),
+            result,
+        )
+        result = re.sub(
+            r"\{user\.(\d{15,25})\}",
+            lambda match: self._format_user_placeholder(guild, int(match.group(1)), mention_style),
+            result,
+        )
         logger.debug("Welcome text normalized guild_id=%s member_id=%s", guild.id, member.id)
         return result
+
+    def _format_channel_placeholder(self, guild: disnake.Guild, channel_id: int, mention_style: str) -> str:
+        if mention_style == "plain":
+            channel = guild.get_channel(channel_id)
+            return f"#{channel.name}" if channel else f"#{channel_id}"
+        return f"<#{channel_id}>"
+
+    def _format_role_placeholder(self, guild: disnake.Guild, role_id: int, mention_style: str) -> str:
+        if mention_style == "plain":
+            role = guild.get_role(role_id)
+            return f"@{role.name}" if role else f"@{role_id}"
+        return f"<@&{role_id}>"
+
+    def _format_user_placeholder(self, guild: disnake.Guild, user_id: int, mention_style: str) -> str:
+        if mention_style == "plain":
+            user = guild.get_member(user_id)
+            display_name = getattr(user, "display_name", None) if user else None
+            return f"@{display_name or user_id}"
+        return f"<@{user_id}>"
 
     def build_embed(
         self,
@@ -118,11 +157,11 @@ class WelcomeService(WelcomeServiceInterface):
         footer_icon_url = config.get("footer_icon_url")
         rules_channel_id = config.get("rules_channel_id")
         roles_channel_id = config.get("roles_channel_id")
-        title = self.normalize_text(title, member, guild)
-        footer_text = self.normalize_text(footer_text or "", member, guild)
+        title = self.normalize_text(title, member, guild, mention_style="plain")
+        footer_text = self.normalize_text(footer_text or "", member, guild, mention_style="plain")
 
         formatted_description = self.format_description(
-            description, member, guild, rules_channel_id, roles_channel_id
+            description, member, guild, rules_channel_id, roles_channel_id, mention_style="plain"
         )
 
         embed = disnake.Embed(

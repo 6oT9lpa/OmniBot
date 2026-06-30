@@ -1257,6 +1257,7 @@ input[type="color"] {
 
 .discord-preview {
   position: sticky;
+  min-width: 0;
   top: 112px;
   border-left: 4px solid var(--accent);
 }
@@ -1275,13 +1276,17 @@ input[type="color"] {
 
 .discord-preview h3 {
   margin: 0 0 12px;
+  overflow-wrap: anywhere;
   font-size: 1.5rem;
 }
 
 .discord-preview p {
   margin: 0;
+  overflow-wrap: anywhere;
   color: var(--muted);
   line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .preview-media {
@@ -1300,8 +1305,15 @@ input[type="color"] {
   display: flex;
   justify-content: space-between;
   gap: 16px;
+  min-width: 0;
   color: var(--soft);
   font-size: 0.82rem;
+}
+
+.discord-preview footer span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .matrix-wrap {

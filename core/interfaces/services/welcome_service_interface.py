@@ -42,6 +42,7 @@ class WelcomeServiceInterface(ABC):
         guild: disnake.Guild,
         rules_channel_id: Optional[int] = None,
         roles_channel_id: Optional[int] = None,
+        mention_style: str = "mentions",
     ) -> str:
         pass
 

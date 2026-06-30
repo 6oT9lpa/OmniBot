@@ -25,6 +25,7 @@ from presentation.embeds import (
     RoleDeleteEmbedBuilder,
     RoleUpdateEmbedBuilder,
     MemberRoleUpdateEmbedBuilder,
+    MemberEventEmbedBuilder,
 )
 
 logger = get_logger(__name__)
@@ -322,13 +323,18 @@ class LoggingService(LoggingServiceInterface):
         if event_type == EventType.MEMBER_JOIN:
             logger.debug("Skipping generic member_join log for member %s", member.id)
             return
+        embed = self._build_member_event_embed(event_type, member, extra_data)
         await self._persist_and_send(
             guild_id=member.guild.id,
             event_type=event_type.value,
+            actor_id=member.id,
+            actor_name=str(member),
             target_id=member.id,
             target_name=str(member),
             details=extra_data,
+            embed=embed,
         )
+        logger.info("Logged member event %s for member %s", event_type.value, member.id)
 
     async def log_voice_event(
         self,
@@ -681,6 +687,20 @@ class LoggingService(LoggingServiceInterface):
         )
 
         return embed
+
+    def _build_member_event_embed(
+        self,
+        event_type: EventType,
+        member: disnake.Member,
+        details: Optional[Dict[str, Any]],
+    ) -> disnake.Embed:
+        timestamp = datetime.now(timezone.utc)
+        if event_type == EventType.MEMBER_LEAVE:
+            return MemberEventEmbedBuilder.build_leave(member, timestamp)
+        if event_type == EventType.MEMBER_UPDATE:
+            changes = details.get("changes", []) if details else []
+            return MemberEventEmbedBuilder.build_update(member, [str(change) for change in changes], timestamp)
+        return self._build_embed(event_type.value, details)
 
     def _format_details(self, details: Optional[Dict[str, Any]]) -> str:
         if not details:

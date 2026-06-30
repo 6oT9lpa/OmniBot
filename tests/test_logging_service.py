@@ -88,3 +88,30 @@ async def test_log_member_join_is_skipped():
 
     assert len(guild_repo.rows) == 0
     assert len(audit.embeds) == 0
+
+
+@pytest.mark.asyncio
+async def test_log_member_update_uses_member_event_embed():
+    message_repo = FakeMessageLogRepository()
+    guild_repo = FakeGuildEventLogRepository()
+    audit = FakeAuditLogService()
+    service = LoggingService(message_repo, guild_repo, audit, config=None)
+    service._config = type("Config", (), {"message_log_retention_days": 30})()
+
+    member = type("Member", (), {
+        "guild": type("Guild", (), {"id": 1})(),
+        "id": 2,
+        "mention": "<@2>",
+        "joined_at": None,
+        "roles": [],
+        "__str__": lambda self: "user",
+    })()
+
+    await service.log_member_event(
+        EventType.MEMBER_UPDATE,
+        member,
+        extra_data={"changes": ["pending: True -> False"]},
+    )
+
+    assert guild_repo.rows[0].event_type == "member_update"
+    assert audit.embeds[0][1].title == "Member updated: user (ID: 2)"

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from presentation.embeds.logging_embed import (
     VoiceLogEmbedBuilder,
     MessageLogEmbedBuilder,
+    MemberEventEmbedBuilder,
 )
 
 
@@ -11,6 +12,9 @@ class MockMember:
     def __init__(self, id: int, name: str):
         self.id = id
         self.name = name
+        self.mention = f"<@{id}>"
+        self.joined_at = None
+        self.roles = []
         self._str = name
 
     def __str__(self):
@@ -75,3 +79,21 @@ def test_message_log_embed_build_edit():
     
     assert embed.title == "TestUser (123456789)"
     assert embed.color.value == 0xFEE75C
+
+
+def test_member_event_embed_build_leave():
+    member = MockMember(123456789, "TestUser")
+    embed = MemberEventEmbedBuilder.build_leave(member)
+
+    assert embed.title == "Member left: TestUser (ID: 123456789)"
+    assert embed.color.value == 0xED4245
+    assert any(field.name == "Event" and field.value == "member_leave" for field in embed.fields)
+
+
+def test_member_event_embed_build_update():
+    member = MockMember(123456789, "TestUser")
+    embed = MemberEventEmbedBuilder.build_update(member, ["pending: True -> False"])
+
+    assert embed.title == "Member updated: TestUser (ID: 123456789)"
+    assert embed.color.value == 0xFEE75C
+    assert any(field.name == "Changes" and "pending: True -> False" in field.value for field in embed.fields)
