@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -366,7 +367,7 @@ class ActivityRbacService:
             is_admin=bool(row["is_admin"]),
             managed=bool(row["managed"]),
             mentionable=bool(row["mentionable"]),
-            synced_at=row["synced_at"],
+            synced_at=self._format_datetime(row.get("synced_at")),
             access_roles=access_roles,
         )
 
@@ -415,3 +416,10 @@ class ActivityRbacService:
 
     def _display_name(self, user: dict[str, Any]) -> str:
         return user.get("global_name") or user.get("username") or str(user.get("id"))
+
+    def _format_datetime(self, value: Any) -> str | None:
+        if isinstance(value, datetime):
+            return value.isoformat(sep=" ", timespec="seconds")
+        if value is None:
+            return None
+        return str(value)

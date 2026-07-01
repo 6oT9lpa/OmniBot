@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Optional
 
 from activity.server.dependencies import get_db
@@ -92,7 +93,7 @@ class ActivityDashboardService:
     async def _count_creator_sources(self, guild_id: int) -> int:
         try:
             row = await get_db().fetch_one(
-                "SELECT COUNT(*) AS total FROM streamers WHERE guild_id = ?",
+                "SELECT COUNT(*) AS total FROM creator_alert_subscriptions WHERE guild_id = ?",
                 (guild_id,),
             )
             return int(row["total"] if row else 0)
@@ -150,8 +151,29 @@ class ActivityDashboardService:
             total_row = {"total": 0}
             rows = []
         return ActivityAuditPage(
-            items=[ActivityAuditEvent(**row) for row in rows],
+            items=[self._to_audit_event(row) for row in rows],
             total=int(total_row["total"] if total_row else 0),
             limit=limit,
             offset=offset,
         )
+
+    def _to_audit_event(self, row: dict[str, Any]) -> ActivityAuditEvent:
+        return ActivityAuditEvent(
+            id=row["id"],
+            guild_id=row["guild_id"],
+            actor_id=row.get("actor_id"),
+            actor_name=row.get("actor_name"),
+            target_id=row.get("target_id"),
+            target_name=row.get("target_name"),
+            event_type=row["event_type"],
+            details=row.get("details"),
+            created_at=self._format_datetime(row.get("created_at")),
+        )
+
+    def _format_datetime(self, value: Any) -> str:
+        if isinstance(value, datetime):
+            return value.isoformat(sep=" ", timespec="seconds")
+        if value is None:
+            logger.warning("Dashboard audit row has empty created_at")
+            return ""
+        return str(value)

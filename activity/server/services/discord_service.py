@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Any, Literal, Optional
 
@@ -15,6 +16,9 @@ logger = get_logger(__name__)
 
 
 class DiscordService:
+    _CACHE_TTL_SECONDS = 15
+    _bot_resource_cache: dict[tuple[str, str], tuple[float, Any]] = {}
+
     async def bot_request(
         self,
         method: str,
@@ -30,14 +34,32 @@ class DiscordService:
 
         started = time.perf_counter()
         logger.info("Discord bot request started method=%s path=%s", method, path)
+        response = None
         async with discord_async_client(timeout=15) as client:
-            response = await client.request(
-                method,
-                f"{activity_server_config.discord_api_base}{path}",
-                params=params,
-                json=json_body,
-                headers=headers,
-            )
+            for attempt in range(3):
+                response = await client.request(
+                    method,
+                    f"{activity_server_config.discord_api_base}{path}",
+                    params=params,
+                    json=json_body,
+                    headers=headers,
+                )
+                if response.status_code != 429:
+                    break
+
+                retry_after = self._retry_after_seconds(response)
+                logger.warning(
+                    "Discord bot request rate limited method=%s path=%s attempt=%s retry_after=%s",
+                    method,
+                    path,
+                    attempt + 1,
+                    retry_after,
+                )
+                await asyncio.sleep(retry_after)
+
+        if response is None:
+            logger.error("Discord bot request did not return a response method=%s path=%s", method, path)
+            raise HTTPException(status_code=503, detail="Discord API response was not received")
 
         elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
         logger.info(
@@ -71,7 +93,7 @@ class DiscordService:
     async def list_channels(self, guild_id: str, kind: Optional[Literal["text", "voice"]] = None) -> list[DiscordChannel]:
         logger.info("Listing Discord channels guild_id=%s kind=%s", guild_id, kind or "all")
         channel_types = {"text": 0, "voice": 2}
-        channels = await self.bot_request("GET", f"/guilds/{guild_id}/channels")
+        channels = await self._cached_bot_resource("channels", guild_id, f"/guilds/{guild_id}/channels")
         if kind:
             channels = [channel for channel in channels if channel.get("type") == channel_types[kind]]
         return [
@@ -87,7 +109,7 @@ class DiscordService:
 
     async def list_roles(self, guild_id: str) -> list[DiscordRole]:
         logger.info("Listing Discord roles guild_id=%s", guild_id)
-        roles = await self.bot_request("GET", f"/guilds/{guild_id}/roles")
+        roles = await self._cached_bot_resource("roles", guild_id, f"/guilds/{guild_id}/roles")
         return [
             DiscordRole(
                 id=role["id"],
@@ -168,3 +190,27 @@ class DiscordService:
         latency = round((time.perf_counter() - started) * 1000)
         logger.info("Discord latency measured latency_ms=%s", latency)
         return latency
+
+    async def _cached_bot_resource(self, resource: str, guild_id: str, path: str) -> Any:
+        cache_key = (resource, guild_id)
+        cached = self._bot_resource_cache.get(cache_key)
+        if cached and time.monotonic() - cached[0] <= self._CACHE_TTL_SECONDS:
+            logger.info("Discord bot resource cache hit resource=%s guild_id=%s", resource, guild_id)
+            return cached[1]
+
+        payload = await self.bot_request("GET", path)
+        self._bot_resource_cache[cache_key] = (time.monotonic(), payload)
+        logger.info("Discord bot resource cached resource=%s guild_id=%s", resource, guild_id)
+        return payload
+
+    def _retry_after_seconds(self, response: httpx.Response) -> float:
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = {}
+        retry_after = payload.get("retry_after") or response.headers.get("Retry-After") or 1
+        try:
+            return min(max(float(retry_after), 0.25), 5)
+        except (TypeError, ValueError):
+            logger.warning("Discord retry_after value is invalid value=%s", retry_after)
+            return 1

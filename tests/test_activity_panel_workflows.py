@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException
@@ -50,6 +52,25 @@ async def test_dashboard_returns_empty_metrics_when_optional_tables_are_missing(
     assert dashboard.metrics.ai_flagged_today == 0
     assert dashboard.metrics.creator_sources == 0
     assert dashboard.audit == []
+
+
+def test_dashboard_serializes_postgres_audit_datetime():
+    service = ActivityDashboardService()
+    event = service._to_audit_event(
+        {
+            "id": 1,
+            "guild_id": 100,
+            "actor_id": 42,
+            "actor_name": "Admin",
+            "target_id": None,
+            "target_name": None,
+            "event_type": "activity_roles_synced",
+            "details": "Synced roles",
+            "created_at": datetime(2026, 7, 1, 23, 54, 21),
+        }
+    )
+
+    assert event.created_at == "2026-07-01 23:54:21"
 
 
 @pytest.mark.asyncio

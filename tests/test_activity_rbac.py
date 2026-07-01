@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException
@@ -162,6 +164,33 @@ async def test_rbac_service_deletes_custom_access_role(activity_db, monkeypatch)
 
     assert result["deleted"] is True
     assert deleted is None
+
+
+@pytest.mark.asyncio
+async def test_rbac_service_serializes_postgres_synced_datetime(activity_db, monkeypatch):
+    service = ActivityRbacService()
+
+    async def no_assignments(*_):
+        return []
+
+    monkeypatch.setattr(service, "_get_assignments", no_assignments)
+
+    role = await service._to_synced_role(
+        {
+            "role_id": 10,
+            "guild_id": 100,
+            "name": "Admins",
+            "color": 0,
+            "position": 1,
+            "permissions": 8,
+            "is_admin": True,
+            "managed": False,
+            "mentionable": True,
+            "synced_at": datetime(2026, 6, 28, 15, 16, 31),
+        }
+    )
+
+    assert role.synced_at == "2026-06-28 15:16:31"
 
 
 @pytest.mark.asyncio
