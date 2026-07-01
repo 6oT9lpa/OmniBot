@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Set, Tuple
 
@@ -25,6 +26,7 @@ class VoiceService(VoiceServiceInterface):
     def __init__(self, repo: VoiceRepositoryInterface) -> None:
         self._repo = repo
         self._delete_tasks: Dict[int, asyncio.Task] = {}
+        self._owner_transfer_tasks: Dict[int, asyncio.Task] = {}
         self._creating: Set[Tuple[int, int]] = set()
 
     async def create(
@@ -60,6 +62,7 @@ class VoiceService(VoiceServiceInterface):
     async def delete(self, channel: disnake.VoiceChannel) -> None:
         logger.info("Voice room delete requested: channel_id=%s", channel.id)
         try:
+            self._cancel_owner_task(channel.id)
             await self._repo.delete(channel.id)
             await channel.delete()
             logger.info("Voice room deleted: channel_id=%s name=%s", channel.id, channel.name)
@@ -82,12 +85,33 @@ class VoiceService(VoiceServiceInterface):
     async def cancel_delete(self, channel_id: int) -> None:
         self._cancel_task(channel_id)
 
+    async def schedule_owner_transfer(
+        self,
+        channel: disnake.VoiceChannel,
+        old_owner: disnake.Member,
+        delay: float = 10.0,
+    ) -> None:
+        self._cancel_owner_task(channel.id)
+
+        async def _delayed_transfer() -> None:
+            try:
+                await asyncio.sleep(delay)
+                await self._transfer_owner_if_absent(channel, old_owner)
+            finally:
+                self._owner_transfer_tasks.pop(channel.id, None)
+
+        self._owner_transfer_tasks[channel.id] = asyncio.create_task(_delayed_transfer())
+        logger.info("Owner transfer scheduled: channel_id=%s owner_id=%s delay=%.0fs", channel.id, old_owner.id, delay)
+
+    async def cancel_owner_transfer(self, channel_id: int) -> None:
+        self._cancel_owner_task(channel_id)
+
     async def handle_admin_leave(
         self,
         channel: disnake.VoiceChannel,
         old_admin: disnake.Member,
     ) -> None:
-        # Admin is intentionally temporary; owner_id remains the creator forever.
+        # Admin remains temporary and is independent from delayed owner transfer.
         room = await self._repo.get(channel.id)
         admin_id = int(room["admin_id"]) if room and room.get("admin_id") else None
         if not room or admin_id != old_admin.id:
@@ -224,6 +248,9 @@ class VoiceService(VoiceServiceInterface):
             await member.move_to(None)
             logger.info("Banned voice member removed on join: channel_id=%s user_id=%s", channel.id, member.id)
             return
+        if int(room["owner_id"]) == member.id:
+            await self.cancel_owner_transfer(channel.id)
+            logger.info("Owner transfer cancelled because owner rejoined: channel_id=%s owner_id=%s", channel.id, member.id)
         await self._repo.add_member(channel.id, member.guild.id, member.id)
         logger.debug("Voice member join tracked: guild_id=%s channel_id=%s user_id=%s", member.guild.id, channel.id, member.id)
 
@@ -435,9 +462,74 @@ class VoiceService(VoiceServiceInterface):
             task.cancel()
             logger.debug("Delete task cancelled for channel_id=%s", channel_id)
 
+    def _cancel_owner_task(self, channel_id: int) -> None:
+        task = self._owner_transfer_tasks.pop(channel_id, None)
+        if task:
+            task.cancel()
+            logger.debug("Owner transfer task cancelled for channel_id=%s", channel_id)
+
+    async def _transfer_owner_if_absent(
+        self,
+        channel: disnake.VoiceChannel,
+        old_owner: disnake.Member,
+    ) -> None:
+        room = await self._repo.get(channel.id)
+        if not room:
+            logger.debug("Owner transfer skipped because room is missing channel_id=%s", channel.id)
+            return
+        if int(room["owner_id"]) != old_owner.id:
+            logger.debug("Owner transfer skipped because owner already changed channel_id=%s", channel.id)
+            return
+        if self._is_connected_to_channel(old_owner, channel):
+            logger.debug("Owner transfer skipped because owner returned channel_id=%s owner_id=%s", channel.id, old_owner.id)
+            return
+
+        candidates = [
+            member
+            for member in channel.members
+            if not member.bot and member.id != old_owner.id and self._is_connected_to_channel(member, channel)
+        ]
+        if not candidates:
+            logger.info("Owner transfer skipped because no candidates remain channel_id=%s owner_id=%s", channel.id, old_owner.id)
+            return
+
+        new_owner = random.choice(candidates)
+        await self._grant_owner(channel, old_owner, new_owner, room)
+        logger.info(
+            "Voice owner transferred: channel_id=%s old_owner_id=%s new_owner_id=%s",
+            channel.id,
+            old_owner.id,
+            new_owner.id,
+        )
+
+    async def _grant_owner(
+        self,
+        channel: disnake.VoiceChannel,
+        old_owner: disnake.Member,
+        new_owner: disnake.Member,
+        room: dict,
+    ) -> None:
+        if room.get("admin_id") and int(room["admin_id"]) == new_owner.id:
+            await self._repo.update_admin(channel.id, None)
+            logger.info("Temporary admin cleared because admin became owner: channel_id=%s user_id=%s", channel.id, new_owner.id)
+        await channel.set_permissions(old_owner, overwrite=None)
+        await channel.set_permissions(
+            new_owner,
+            connect=True,
+            manage_channels=True,
+            manage_permissions=True,
+            move_members=True,
+        )
+        await self._repo.update_owner(channel.id, new_owner.id)
+
     @staticmethod
     def _has_manage_permissions(user: disnake.Member, channel: disnake.VoiceChannel) -> bool:
         return channel.permissions_for(user).manage_permissions
+
+    @staticmethod
+    def _is_connected_to_channel(member: disnake.Member, channel: disnake.VoiceChannel) -> bool:
+        voice_state = getattr(member, "voice", None)
+        return voice_state == channel or getattr(voice_state, "channel", None) == channel
 
     @staticmethod
     def _is_banned_from_room(channel: disnake.VoiceChannel, member: disnake.Member) -> bool:

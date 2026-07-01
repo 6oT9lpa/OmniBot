@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from application.services.voice_service import VoiceService
@@ -10,11 +12,17 @@ class FakePermissions:
 
 class FakeGuild:
     def __init__(self):
+        self.id = 1
         self.members = {}
         self.default_role = object()
 
     def get_member(self, member_id):
         return self.members.get(member_id)
+
+
+class FakeVoiceState:
+    def __init__(self, channel):
+        self.channel = channel
 
 
 class FakeMember:
@@ -29,7 +37,15 @@ class FakeMember:
         guild.members[member_id] = self
 
     async def move_to(self, channel):
-        self.voice = channel
+        current_channel = getattr(self.voice, "channel", self.voice)
+        if current_channel and self in current_channel.members:
+            current_channel.members.remove(self)
+        if channel:
+            if self not in channel.members:
+                channel.members.append(self)
+            self.voice = FakeVoiceState(channel)
+        else:
+            self.voice = None
 
 
 class FakeChannel:
@@ -38,6 +54,7 @@ class FakeChannel:
         self.guild = guild
         self.permission_calls = []
         self.banned_ids = set()
+        self.members = []
 
     async def set_permissions(self, target, **kwargs):
         self.permission_calls.append((getattr(target, "id", target), kwargs))
@@ -60,6 +77,10 @@ class FakeVoiceRepository:
     async def update_admin(self, channel_id, admin_id):
         assert channel_id == self.room["channel_id"]
         self.room["admin_id"] = admin_id
+
+    async def update_owner(self, channel_id, owner_id):
+        assert channel_id == self.room["channel_id"]
+        self.room["owner_id"] = owner_id
 
     async def add_member(self, channel_id, guild_id, user_id):
         self.added_members.append((channel_id, guild_id, user_id))
@@ -188,3 +209,59 @@ async def test_banned_member_is_removed_on_join_without_tracking():
 
     assert member.voice is None
     assert repo.added_members == []
+
+
+@pytest.mark.asyncio
+async def test_owner_leave_transfers_owner_to_remaining_member():
+    repo = FakeVoiceRepository()
+    service = VoiceService(repo)
+    guild = FakeGuild()
+    owner = FakeMember(42, guild)
+    candidate = FakeMember(77, guild)
+    channel = FakeChannel(10, guild)
+    await candidate.move_to(channel)
+
+    await service.schedule_owner_transfer(channel, owner, delay=0)
+    await asyncio.sleep(0.05)
+
+    assert repo.room["owner_id"] == 77
+    assert channel.permission_calls == [
+        (42, {"overwrite": None}),
+        (77, {"connect": True, "manage_channels": True, "manage_permissions": True, "move_members": True}),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_owner_transfer_is_cancelled_when_owner_returns():
+    repo = FakeVoiceRepository()
+    service = VoiceService(repo)
+    guild = FakeGuild()
+    owner = FakeMember(42, guild)
+    candidate = FakeMember(77, guild)
+    channel = FakeChannel(10, guild)
+    await candidate.move_to(channel)
+
+    await service.schedule_owner_transfer(channel, owner, delay=0.05)
+    await owner.move_to(channel)
+    await service.track_member_join(channel, owner)
+    await asyncio.sleep(0.1)
+
+    assert repo.room["owner_id"] == 42
+
+
+@pytest.mark.asyncio
+async def test_owner_transfer_clears_admin_when_admin_becomes_owner():
+    repo = FakeVoiceRepository()
+    repo.room["admin_id"] = 77
+    service = VoiceService(repo)
+    guild = FakeGuild()
+    owner = FakeMember(42, guild)
+    candidate = FakeMember(77, guild)
+    channel = FakeChannel(10, guild)
+    await candidate.move_to(channel)
+
+    await service.schedule_owner_transfer(channel, owner, delay=0)
+    await asyncio.sleep(0.05)
+
+    assert repo.room["owner_id"] == 77
+    assert repo.room["admin_id"] is None

@@ -104,6 +104,26 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
             )
             raise
 
+    async def update_owner(self, channel_id: int, owner_id: int) -> None:
+        try:
+            await self.execute(
+                "UPDATE voice_rooms SET owner_id = ? WHERE channel_id = ?",
+                (owner_id, channel_id),
+            )
+            await self.commit()
+            logger.debug(
+                "Voice room owner updated: channel_id=%s owner_id=%s",
+                channel_id,
+                owner_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "Failed to update owner channel_id=%s: %s",
+                channel_id,
+                exc,
+            )
+            raise
+
     async def add_member(self, channel_id: int, guild_id: int, user_id: int) -> None:
         try:
             await self.execute(

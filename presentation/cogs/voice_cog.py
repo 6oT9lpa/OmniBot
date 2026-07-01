@@ -73,6 +73,8 @@ class VoiceCog(commands.Cog):
                 if len(before.channel.members) == 0:
                     await self._service.schedule_delete(before.channel)
                     logger.info("Voice room became empty, deletion scheduled: channel_id=%s", before.channel.id)
+                elif int(room["owner_id"]) == member.id:
+                    await self._service.schedule_owner_transfer(before.channel, member)
 
         if after.channel:
             room = await self._service._repo.get(after.channel.id)

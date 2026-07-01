@@ -38,6 +38,11 @@ class VoiceRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def update_owner(self, channel_id: int, owner_id: int) -> None:
+        """Update dynamic voice room owner."""
+        pass
+
+    @abstractmethod
     async def add_member(self, channel_id: int, guild_id: int, user_id: int) -> None:
         """Track a member currently connected to a dynamic voice room."""
         pass

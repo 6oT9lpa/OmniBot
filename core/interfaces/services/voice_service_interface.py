@@ -28,6 +28,21 @@ class VoiceServiceInterface(ABC):
         pass
 
     @abstractmethod
+    async def schedule_owner_transfer(
+        self,
+        channel: disnake.VoiceChannel,
+        old_owner: disnake.Member,
+        delay: float = 10.0,
+    ) -> None:
+        """Schedule automatic owner transfer after the current owner leaves."""
+        pass
+
+    @abstractmethod
+    async def cancel_owner_transfer(self, channel_id: int) -> None:
+        """Cancel scheduled automatic owner transfer."""
+        pass
+
+    @abstractmethod
     async def handle_admin_leave(self, channel: disnake.VoiceChannel, old_admin: disnake.Member) -> None:
         """Обработка ухода владельца комнаты"""
         pass
