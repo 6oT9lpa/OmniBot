@@ -8,6 +8,7 @@ from core.interfaces.services.channel_service_interface import ChannelServiceInt
 from core.interfaces.services.stats_service_interface import StatsServiceInterface
 from core.interfaces.services.voice_service_interface import VoiceServiceInterface
 from core.interfaces.services.server_role_purpose_service_interface import ServerRolePurposeServiceInterface
+from core.interfaces.services.creator_alert_service_interface import CreatorAlertServiceInterface
 
 
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
     'ChannelServiceInterface',
     'StatsServiceInterface',
     'VoiceServiceInterface',
-    'ServerRolePurposeServiceInterface'
+    'ServerRolePurposeServiceInterface',
+    'CreatorAlertServiceInterface'
 ]

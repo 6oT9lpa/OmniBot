@@ -9,6 +9,7 @@ from core.interfaces.repositories.punishment_repository_interface import Punishm
 from core.interfaces.repositories.stats_repository_interface import StatsRepositoryInterface
 from core.interfaces.repositories.voice_repository_interface import VoiceRepositoryInterface
 from core.interfaces.repositories.server_role_purpose_repository_interface import ServerRolePurposeRepositoryInterface
+from core.interfaces.repositories.creator_alert_repository_interface import CreatorAlertRepositoryInterface
 
 
 __all__ = [
@@ -22,5 +23,6 @@ __all__ = [
     'PunishmentRepositoryInterface',
     'StatsRepositoryInterface',
     'VoiceRepositoryInterface',
-    'ServerRolePurposeRepositoryInterface'
+    'ServerRolePurposeRepositoryInterface',
+    'CreatorAlertRepositoryInterface'
 ]

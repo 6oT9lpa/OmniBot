@@ -14,8 +14,10 @@ async def test_database_manager_creates_logging_tables(tmp_path):
         assert "guild_event_logs" in names
         assert "punishments" in names
         assert "voice_room_members" in names
+        assert "creator_alert_subscriptions" in names
     finally:
         await manager.close()
+
 
 @pytest.mark.asyncio
 async def test_database_manager_uses_extended_sqlite_busy_timeout(tmp_path):
@@ -26,6 +28,7 @@ async def test_database_manager_uses_extended_sqlite_busy_timeout(tmp_path):
         assert row["timeout"] == 30000
     finally:
         await manager.close()
+
 
 @pytest.mark.asyncio
 async def test_database_manager_execute_write_commits_and_returns_metadata(tmp_path):

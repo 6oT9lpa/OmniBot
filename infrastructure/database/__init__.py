@@ -9,6 +9,7 @@ from infrastructure.database.repositories.role_panel_button_repository import Ro
 from infrastructure.database.repositories.role_panel_message_repository import RolePanelMessageRepository
 from infrastructure.database.repositories.welcome_config_repository import WelcomeConfigRepository
 from infrastructure.database.repositories.server_role_purpose_repository import ServerRolePurposeRepository
+from infrastructure.database.repositories.creator_alert_repository import CreatorAlertRepository
 from infrastructure.database.repositories.stats_repository import StatsRepository
 from infrastructure.database.repositories.voice_repository import VoiceRepository
 from core.domain.channel_purpose import ChannelPurpose
@@ -28,5 +29,6 @@ __all__ = [
     'WelcomeConfigRepository',
     'StatsRepository',
     'VoiceRepository',
-    'ServerRolePurposeRepository'
+    'ServerRolePurposeRepository',
+    'CreatorAlertRepository'
 ]
