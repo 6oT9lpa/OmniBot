@@ -93,7 +93,7 @@ class VoiceServiceInterface(ABC):
         pass
 
     @abstractmethod
-    async def track_member_join(self, channel: disnake.VoiceChannel, member: disnake.Member) -> None:
+    async def track_member_join(self, channel: disnake.VoiceChannel, member: disnake.Member) -> bool:
         """Track a member currently connected to a dynamic voice room."""
         pass
 

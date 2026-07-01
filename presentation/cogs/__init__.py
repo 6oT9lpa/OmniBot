@@ -4,8 +4,10 @@ from presentation.cogs.roles_cog import RolesCog
 from presentation.cogs.member_events_cog import MemberEventsCog
 from presentation.cogs.voice_cog import VoiceCog
 from presentation.cogs.stats_cog import StatsCog
+from presentation.cogs.general_cog import GeneralCog
 
 __all__ = [
+    'GeneralCog',
     'LoggingCog',
     'ModerationCog',
     'RolesCog',

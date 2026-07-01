@@ -36,6 +36,7 @@ class DiscordBot(commands.Bot):
         self._presence_index = random.randrange(len(self._presence_items))
         self._global_command_sync_service = GlobalApplicationCommandSyncService()
         self._global_commands_synced = False
+        self._global_command_sync_task: asyncio.Task | None = None
 
         intents = disnake.Intents.default()
         intents.message_content = True
@@ -89,9 +90,11 @@ class DiscordBot(commands.Bot):
                         await self._role_service.sync_roles(guild)
                     except Exception as e:
                         logger.error("Failed to sync roles for guild id=%s: %s", guild.id, e)
+
     async def on_connect(self):
         logger.info("Connected to Discord gateway")
         await self._start_presence_rotation()
+        self._schedule_global_command_sync()
 
     async def _ensure_global_commands_synced(self) -> None:
         if self._global_commands_synced:
@@ -106,6 +109,21 @@ class DiscordBot(commands.Bot):
         if commands:
             self._global_commands_synced = True
             await self._global_command_sync_service.remove_legacy_guild_commands(self, commands)
+
+    def _schedule_global_command_sync(self) -> None:
+        if self._global_commands_synced:
+            return
+        if self._global_command_sync_task and not self._global_command_sync_task.done():
+            return
+
+        self._global_command_sync_task = self.loop.create_task(
+            self._sync_global_commands_after_connect()
+        )
+        logger.info("Scheduled background global application command sync")
+
+    async def _sync_global_commands_after_connect(self) -> None:
+        await asyncio.sleep(1)
+        await self._ensure_global_commands_synced()
 
     async def on_application_command_error(self, interaction: disnake.Interaction, error: Exception):
         logger.error("Application command error command=%s error=%s", getattr(interaction, "command", None), error, exc_info=True)
@@ -142,6 +160,8 @@ class DiscordBot(commands.Bot):
         logger.info("Closing bot...")
         if self._presence_rotator.is_running():
             self._presence_rotator.cancel()
+        if self._global_command_sync_task and not self._global_command_sync_task.done():
+            self._global_command_sync_task.cancel()
         await super().close()
 
     async def _start_presence_rotation(self):

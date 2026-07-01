@@ -15,8 +15,9 @@ class DatabaseManager:
         self,
         database_url: str,
         *,
-        retry_attempts: int = 5,
+        retry_attempts: int = 8,
         retry_base_delay: float = 0.1,
+        sqlite_timeout_seconds: float = 30.0,
     ):
         if database_url.startswith("sqlite:///"):
             self.db_path = database_url[10:]
@@ -28,6 +29,7 @@ class DatabaseManager:
         self.database_url = database_url
         self.retry_attempts = retry_attempts
         self.retry_base_delay = retry_base_delay
+        self.sqlite_timeout_seconds = sqlite_timeout_seconds
         self._connection: Optional[aiosqlite.Connection] = None
         logger.info(f"Database path: {self.db_path}")
 
@@ -41,10 +43,15 @@ class DatabaseManager:
 
     async def connect(self) -> aiosqlite.Connection:
         if not self._connection:
-            self._connection = await aiosqlite.connect(self.db_path)
+            self._connection = await aiosqlite.connect(
+                self.db_path,
+                timeout=self.sqlite_timeout_seconds,
+            )
             self._connection.row_factory = aiosqlite.Row
             await self._connection.execute("PRAGMA foreign_keys=ON")
-            await self._connection.execute("PRAGMA busy_timeout=5000")
+            await self._connection.execute(
+                f"PRAGMA busy_timeout={int(self.sqlite_timeout_seconds * 1000)}"
+            )
             await self._connection.execute("SELECT datetime('now', 'localtime')")
 
             logger.info("Database connection established")

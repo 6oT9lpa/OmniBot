@@ -58,6 +58,7 @@ class VoiceRoomService:
         patch: dict[str, Any] = {}
         channel: Optional[dict[str, Any]] = None
         admin_cleared_by_ban = False
+        final_admin_id: int | None | str = "unchanged"
 
         if payload.name is not None:
             patch["name"] = payload.name
@@ -78,14 +79,16 @@ class VoiceRoomService:
             channel = channel or await self._discord.bot_request("GET", f"/channels/{channel_id}")
             if room.get("admin_id") and int(room["admin_id"]) == int(payload.ban_user_id):
                 channel["permission_overwrites"] = clear_member_overwrite(channel, payload.ban_user_id)
-                await get_db().execute("UPDATE voice_rooms SET admin_id = NULL WHERE channel_id = ?", (channel_id,))
                 admin_cleared_by_ban = True
+                final_admin_id = None
                 logger.info("Voice admin cleared because admin was banned channel_id=%s admin_id=%s", channel_id, payload.ban_user_id)
             patch["permission_overwrites"] = build_member_connect_overwrites(channel, payload.ban_user_id, allowed=False)
             channel["permission_overwrites"] = patch["permission_overwrites"]
 
-        admin_changed = await self._apply_admin_payload(channel_id, payload, room, user, access, patch, channel)
+        admin_changed, requested_admin_id = await self._apply_admin_payload(channel_id, payload, room, user, access, patch, channel)
         admin_changed = admin_changed or admin_cleared_by_ban
+        if requested_admin_id != "unchanged":
+            final_admin_id = requested_admin_id
 
         if patch:
             await self._discord.bot_request("PATCH", f"/channels/{channel_id}", json_body=patch)
@@ -104,12 +107,18 @@ class VoiceRoomService:
             )
         if payload.owner_id is not None:
             logger.info("Ignored immutable owner update request channel_id=%s requested_owner_id=%s", channel_id, payload.owner_id)
+        db_changed = False
+        if final_admin_id != "unchanged":
+            await get_db().execute("UPDATE voice_rooms SET admin_id = ? WHERE channel_id = ?", (final_admin_id, channel_id))
+            db_changed = True
         if payload.persistent is not None:
             await get_db().execute(
                 "UPDATE voice_rooms SET is_persistent = ? WHERE channel_id = ?",
                 (1 if payload.persistent else 0, channel_id),
             )
-        await get_db().commit()
+            db_changed = True
+        if db_changed:
+            await get_db().commit()
         await self._audit_service.log_action(
             guild_id=payload.guild_id,
             actor_id=int(user["id"]),
@@ -151,10 +160,10 @@ class VoiceRoomService:
         access: dict[str, Any],
         patch: dict[str, Any],
         channel: Optional[dict[str, Any]],
-    ) -> bool:
+    ) -> tuple[bool, int | None | str]:
         requested_admin_id = self._resolve_requested_admin_id(payload, room, user)
         if requested_admin_id == "unchanged":
-            return False
+            return False, "unchanged"
 
         if not self._can_assign_admin(room, user, access, payload):
             logger.warning("Voice admin update denied channel_id=%s user_id=%s", channel_id, user.get("id"))
@@ -180,9 +189,8 @@ class VoiceRoomService:
             patch["permission_overwrites"] = build_member_admin_overwrites(channel, requested_admin_id)
             channel["permission_overwrites"] = patch["permission_overwrites"]
 
-        await get_db().execute("UPDATE voice_rooms SET admin_id = ? WHERE channel_id = ?", (requested_admin_id, channel_id))
         logger.info("Voice admin payload applied channel_id=%s old_admin_id=%s new_admin_id=%s", channel_id, current_admin_id, requested_admin_id)
-        return True
+        return True, requested_admin_id
 
     def _resolve_requested_admin_id(
         self,

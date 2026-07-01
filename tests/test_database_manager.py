@@ -16,3 +16,13 @@ async def test_database_manager_creates_logging_tables(tmp_path):
         assert "voice_room_members" in names
     finally:
         await manager.close()
+
+@pytest.mark.asyncio
+async def test_database_manager_uses_extended_sqlite_busy_timeout(tmp_path):
+    manager = DatabaseManager(f"sqlite:///{tmp_path / 'busy.db'}")
+    try:
+        await manager.initialize()
+        row = await manager.fetch_one("PRAGMA busy_timeout")
+        assert row["timeout"] == 30000
+    finally:
+        await manager.close()

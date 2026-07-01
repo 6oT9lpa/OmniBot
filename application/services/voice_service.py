@@ -240,20 +240,21 @@ class VoiceService(VoiceServiceInterface):
         else:
             logger.info("Temporary voice admin cleared by owner: channel_id=%s owner_id=%s", channel.id, user.id)
 
-    async def track_member_join(self, channel: disnake.VoiceChannel, member: disnake.Member) -> None:
+    async def track_member_join(self, channel: disnake.VoiceChannel, member: disnake.Member) -> bool:
         room = await self._repo.get(channel.id)
         if not room:
             logger.debug("Skip voice member join tracking because room is missing channel_id=%s user_id=%s", channel.id, member.id)
-            return
+            return False
         if self._is_banned_from_room(channel, member):
             await member.move_to(None)
             logger.info("Banned voice member removed on join: channel_id=%s user_id=%s", channel.id, member.id)
-            return
+            return False
         if int(room["owner_id"]) == member.id:
             await self.cancel_owner_transfer(channel.id)
             logger.info("Owner transfer cancelled because owner rejoined: channel_id=%s owner_id=%s", channel.id, member.id)
         await self._repo.add_member(channel.id, member.guild.id, member.id)
         logger.debug("Voice member join tracked: guild_id=%s channel_id=%s user_id=%s", member.guild.id, channel.id, member.id)
+        return True
 
     async def track_member_leave(self, channel: disnake.VoiceChannel, member: disnake.Member) -> None:
         room = await self._repo.get(channel.id)
@@ -321,6 +322,8 @@ class VoiceService(VoiceServiceInterface):
         guild = member.guild
         room_name = f"🔊 {member.display_name}"
 
+        channel: Optional[disnake.VoiceChannel] = None
+
         try:
             channel = await guild.create_voice_channel(
                 name=room_name,
@@ -348,6 +351,16 @@ class VoiceService(VoiceServiceInterface):
             logger.info("Voice room created: channel_id=%s name=%s owner=%s", channel.id, room_name, member.id)
             return channel
         except Exception as exc:
+            if channel:
+                try:
+                    await channel.delete(reason="OmniBot voice room metadata creation failed")
+                    logger.warning("Rolled back orphan voice room after create failure: channel_id=%s", channel.id)
+                except Exception as rollback_exc:
+                    logger.error(
+                        "Failed to roll back orphan voice room channel_id=%s: %s",
+                        channel.id,
+                        rollback_exc,
+                    )
             logger.error("Failed to create voice room for user_id=%s: %s", member.id, exc)
             raise
 

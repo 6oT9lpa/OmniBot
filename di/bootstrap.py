@@ -5,11 +5,16 @@ import sys
 from di import Container
 from presentation import DiscordBot
 from infrastructure.logging import get_logger
-from presentation.cogs.roles_cog import RolesCog
-from presentation.cogs.stats_cog import StatsCog
-from presentation.cogs.voice_cog import VoiceCog
 
-from di.modules import StatsModule, VoiceModule, LoggingModule, ModerationModule, MemberEventsModule
+from di.modules import (
+    GeneralModule,
+    LoggingModule,
+    MemberEventsModule,
+    ModerationModule,
+    RolesModule,
+    StatsModule,
+    VoiceModule,
+)
 
 logger = get_logger(__name__)
 
@@ -23,6 +28,8 @@ class Bootstrap:
         self._voice_service = None
 
         # Модули для когов
+        self._general_module = None
+        self._roles_module = None
         self._stats_module = None
         self._voice_module = None
         self._logging_module = None
@@ -53,6 +60,8 @@ class Bootstrap:
             moderator_service.set_bot(self.bot)
 
             # Инициализация модулей
+            self._general_module = GeneralModule(self.container)
+            self._roles_module = RolesModule(self.container)
             self._stats_module = StatsModule(self.container)
             self._voice_module = VoiceModule(self.container)
             self._logging_module = LoggingModule(self.container)
@@ -60,6 +69,7 @@ class Bootstrap:
             self._member_events_module = MemberEventsModule(self.container)
 
             # Регистрация всех когов через модули
+            await self._register_general_cog()
             await self._register_roles_cog()
             await self._register_stats_cog()
             await self._register_voice_cog()
@@ -100,10 +110,23 @@ class Bootstrap:
             logger.warning(f"Could not setup signal handlers: {e}")
 
     # ---------- Регистрация когов через модули ----------
+    async def _register_general_cog(self):
+        logger.info("Registering GeneralCog via GeneralModule...")
+        cog = await self._general_module.get_cog(self.bot)
+        if cog:
+            self.bot.add_cog(cog)
+            logger.info("GeneralCog registered")
+        else:
+            logger.warning("Failed to register GeneralCog")
+
     async def _register_roles_cog(self):
-        logger.info("Registering RolesCog...")
-        self.bot.add_cog(RolesCog(self.bot, self._role_service))
-        logger.info("RolesCog registered")
+        logger.info("Registering RolesCog via RolesModule...")
+        cog = await self._roles_module.get_cog(self.bot)
+        if cog:
+            self.bot.add_cog(cog)
+            logger.info("RolesCog registered")
+        else:
+            logger.warning("Failed to register RolesCog")
 
     async def _register_stats_cog(self):
         logger.info("Registering StatsCog via StatsModule...")
@@ -161,6 +184,10 @@ class Bootstrap:
     async def _shutdown(self):
         logger.info("Shutting down...")
 
+        if self._general_module:
+            await self._general_module.shutdown()
+        if self._roles_module:
+            await self._roles_module.shutdown()
         if self._stats_module:
             await self._stats_module.shutdown()
         if self._voice_module:

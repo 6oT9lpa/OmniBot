@@ -57,10 +57,17 @@ class VoiceCog(commands.Cog):
                         logger.warning("Failed to redirect member %s: %s", member.id, exc)
                     return
             else:
-                channel = await self._service.create(member, after.channel)
+                try:
+                    channel = await self._service.create(member, after.channel)
+                except Exception:
+                    logger.exception("Dynamic voice room creation failed guild_id=%s user_id=%s", guild.id, member.id)
+                    return
                 if channel:
-                    await channel.send(embed=build_voice_control_embed(member), view=VoiceControlView(self._service))
-                    logger.info("Voice control panel sent: channel_id=%s owner_id=%s", channel.id, member.id)
+                    try:
+                        await channel.send(embed=build_voice_control_embed(member), view=VoiceControlView(self._service))
+                        logger.info("Voice control panel sent: channel_id=%s owner_id=%s", channel.id, member.id)
+                    except Exception:
+                        logger.exception("Failed to send voice control panel: channel_id=%s owner_id=%s", channel.id, member.id)
             return
 
         if before.channel:
@@ -76,12 +83,15 @@ class VoiceCog(commands.Cog):
                 elif int(room["owner_id"]) == member.id:
                     await self._service.schedule_owner_transfer(before.channel, member)
 
-        if after.channel:
-            room = await self._service._repo.get(after.channel.id)
+        joined_channel = after.channel
+        if joined_channel:
+            room = await self._service._repo.get(joined_channel.id)
             if room:
-                await self._service.track_member_join(after.channel, member)
-                await self._service.cancel_delete(after.channel.id)
-                logger.debug("Voice room delete cancelled after join: channel_id=%s user_id=%s", after.channel.id, member.id)
+                tracked = await self._service.track_member_join(joined_channel, member)
+                if not tracked:
+                    return
+                await self._service.cancel_delete(joined_channel.id)
+                logger.debug("Voice room delete cancelled after join: channel_id=%s user_id=%s", joined_channel.id, member.id)
 
     @commands.slash_command(description="Голосовые комнаты")
     async def voice(self, inter: disnake.ApplicationCommandInteraction) -> None:

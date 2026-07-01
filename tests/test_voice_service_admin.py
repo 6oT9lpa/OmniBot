@@ -213,8 +213,9 @@ async def test_banned_member_is_removed_on_join_without_tracking():
     channel.banned_ids.add(77)
     member.voice = channel
 
-    await service.track_member_join(channel, member)
+    tracked = await service.track_member_join(channel, member)
 
+    assert tracked is False
     assert member.voice is None
     assert repo.added_members == []
 
@@ -253,9 +254,10 @@ async def test_owner_transfer_is_cancelled_when_owner_returns():
 
     await service.schedule_owner_transfer(channel, owner, delay=0.05)
     await owner.move_to(channel)
-    await service.track_member_join(channel, owner)
+    tracked = await service.track_member_join(channel, owner)
     await asyncio.sleep(0.1)
 
+    assert tracked is True
     assert repo.room["owner_id"] == 42
 
 
