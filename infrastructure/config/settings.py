@@ -1,44 +1,45 @@
 from typing import Optional
-from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings
+from pydantic import SecretStr, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class BotConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
     # Discord
-    discord_token: SecretStr = Field(..., env="DISCORD_TOKEN")
-    discord_guild_id: Optional[int] = Field(None, env="DISCORD_GUILD_ID")
-    discord_owner_id: int = Field(..., env="DISCORD_OWNER_ID")
-    discord_proxy_url: Optional[str] = Field(None, env="DISCORD_PROXY_URL")
+    discord_token: SecretStr
+    discord_guild_id: Optional[int] = None
+    discord_owner_id: int
+    discord_proxy_url: Optional[str] = None
 
     # Database
-    database_url: str = Field(..., env="DATABASE_URL")
+    database_url: str
 
     # Optional IDs for channels and roles
-    auto_role_id: Optional[int] = Field(None, env="AUTO_ROLE_ID")
+    auto_role_id: Optional[int] = None
 
-    log_channel_id: Optional[int] = Field(None, env="LOG_CHANNEL_ID")
-    welcome_channel_id: Optional[int] = Field(None, env="WELCOME_CHANNEL_ID")
+    log_channel_id: Optional[int] = None
+    welcome_channel_id: Optional[int] = None
 
     # Logging
-    log_level: str = Field("INFO", env="LOG_LEVEL")
+    log_level: str = "INFO"
 
     # Retention
-    message_log_retention_days: int = Field(30, env="MESSAGE_LOG_RETENTION_DAYS")
-    punishment_retention_days: int = Field(365, env="PUNISHMENT_RETENTION_DAYS")
-    retention_cleanup_interval_hours: int = Field(6, env="RETENTION_CLEANUP_INTERVAL_HOURS")
+    message_log_retention_days: int = 30
+    punishment_retention_days: int = 365
+    retention_cleanup_interval_hours: int = 6
 
-    command_prefix: str = Field("!", env="COMMAND_PREFIX")
-    activity_name: str = Field("Omnibot | центр управления", env="ACTIVITY_NAME")
-    bot_status: str = Field("online", env="BOT_STATUS")
-    activity_rotation_enabled: bool = Field(True, env="ACTIVITY_ROTATION_ENABLED")
-    activity_rotation_interval_seconds: int = Field(600, env="ACTIVITY_ROTATION_INTERVAL_SECONDS")
-    presence_activities: str = Field("", env="PRESENCE_ACTIVITIES")
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        extra = "ignore"
+    command_prefix: str = "!"
+    activity_name: str = "Omnibot | центр управления"
+    bot_status: str = "online"
+    activity_rotation_enabled: bool = True
+    activity_rotation_interval_seconds: int = 600
+    presence_activities: str = ""
 
     # Validators
     @field_validator('discord_guild_id', 'discord_owner_id')
