@@ -190,13 +190,15 @@ class DiscordBot(commands.Bot):
 
         return [
             PresenceItem("playing", activity_name, default_status),
-            PresenceItem("watching", "щит Omnibot над {members} участниками", disnake.Status.online),
-            PresenceItem("listening", "/help | роли, логи, голосовые комнаты", disnake.Status.idle),
-            PresenceItem("competing", "DDoS-штормами | аудитом гос-архитектур", disnake.Status.dnd),
+            PresenceItem("watching", "щит OmniBot над {members} участниками", disnake.Status.online),
+            PresenceItem("listening", "/help | роли, логи, войсы", disnake.Status.idle),
+            PresenceItem("competing", "с хаосом в логах и побеждаю", disnake.Status.dnd),
             PresenceItem("watching", "пульс сервера: роли, входы, события", disnake.Status.online),
             PresenceItem("playing", "Omnibot OS | порядок без шума", disnake.Status.online),
             PresenceItem("listening", "модераторов и тревожные сигналы", disnake.Status.idle),
             PresenceItem("competing", "за чистый чат и спокойный сервер", disnake.Status.dnd),
+            PresenceItem("watching", "dynamic voice rooms как диспетчер", disnake.Status.online),
+            PresenceItem("playing", "панель управления без паники", disnake.Status.online),
         ]
 
     def _parse_presence_activities(self, raw_activities: str) -> list[PresenceItem]:

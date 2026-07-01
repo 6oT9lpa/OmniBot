@@ -31,7 +31,7 @@ class BotConfig(BaseSettings):
     activity_name: str = Field("Omnibot | центр управления", env="ACTIVITY_NAME")
     bot_status: str = Field("online", env="BOT_STATUS")
     activity_rotation_enabled: bool = Field(True, env="ACTIVITY_ROTATION_ENABLED")
-    activity_rotation_interval_seconds: int = Field(60, env="ACTIVITY_ROTATION_INTERVAL_SECONDS")
+    activity_rotation_interval_seconds: int = Field(600, env="ACTIVITY_ROTATION_INTERVAL_SECONDS")
     presence_activities: str = Field("", env="PRESENCE_ACTIVITIES")
 
     class Config:

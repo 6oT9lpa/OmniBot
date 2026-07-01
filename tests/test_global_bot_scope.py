@@ -12,6 +12,8 @@ def test_discord_bot_registers_application_commands_globally():
         discord_token="test-token",
         discord_owner_id=1,
         database_url="sqlite:///test.db",
+        presence_activities="",
+        _env_file=None,
     )
 
     bot = DiscordBot(config)
@@ -19,6 +21,8 @@ def test_discord_bot_registers_application_commands_globally():
     assert bot._test_guilds is None
     assert bot._command_sync_flags.sync_global_commands is False
     assert bot._command_sync_flags.sync_guild_commands is False
+    assert config.activity_rotation_interval_seconds == 600
+    assert len(bot._presence_items) == 10
 
 
 @pytest.mark.asyncio
