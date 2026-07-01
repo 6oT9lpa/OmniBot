@@ -41,6 +41,7 @@ class DiscordBot(commands.Bot):
         intents = disnake.Intents.default()
         intents.message_content = True
         intents.members = True
+        intents.presences = True
         intents.voice_states = True
 
         initial_presence = self._presence_items[self._presence_index]

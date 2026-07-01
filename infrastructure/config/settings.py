@@ -41,6 +41,10 @@ class BotConfig(BaseSettings):
     activity_rotation_interval_seconds: int = 600
     presence_activities: str = ""
 
+    twitch_client_id: Optional[str] = None
+    twitch_client_secret: Optional[SecretStr] = None
+    youtube_api_key: Optional[SecretStr] = None
+
     # Validators
     @field_validator('discord_guild_id', 'discord_owner_id')
     @classmethod

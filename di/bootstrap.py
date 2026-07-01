@@ -14,6 +14,7 @@ from di.modules import (
     RolesModule,
     StatsModule,
     VoiceModule,
+    StreamsModule
 )
 
 logger = get_logger(__name__)
@@ -35,6 +36,7 @@ class Bootstrap:
         self._logging_module = None
         self._moderation_module = None
         self._member_events_module = None
+        self._streams_module = None
 
     async def run(self):
         try:
@@ -67,6 +69,7 @@ class Bootstrap:
             self._logging_module = LoggingModule(self.container)
             self._moderation_module = ModerationModule(self.container)
             self._member_events_module = MemberEventsModule(self.container)
+            self._streams_module = StreamsModule(self.container)
 
             # Регистрация всех когов через модули
             await self._register_general_cog()
@@ -76,6 +79,7 @@ class Bootstrap:
             await self._register_member_events_cog()
             await self._register_logging_cog()
             await self._register_moderation_cog()
+            await self._register_streams_cog()
 
             self._setup_signal_handlers()
 
@@ -180,6 +184,15 @@ class Bootstrap:
         else:
             logger.warning("Failed to register ModerationCog")
 
+    async def _register_streams_cog(self):
+        logger.info("Registering streams cog...")
+        cog = await self._streams_module.get_cog(self.bot)
+        if cog:
+            self.bot.add_cog(cog)
+            logger.info("StreamsCog registered")
+        else:
+            logger.warning("Failed to register StreamsCog")
+
     # ---------- Завершение работы ----------
     async def _shutdown(self):
         logger.info("Shutting down...")
@@ -198,6 +211,8 @@ class Bootstrap:
             await self._moderation_module.shutdown()
         if self._member_events_module:
             await self._member_events_module.shutdown()
+        if self._streams_module:
+            await self._streams_module.shutdown()
 
         if self.bot and not self.bot.is_closed():
             try:

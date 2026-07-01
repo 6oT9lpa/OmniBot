@@ -14,7 +14,8 @@ from infrastructure.database import (
     PunishmentRepository,
     StatsRepository,
     VoiceRepository,
-    ServerRolePurposeRepository
+    ServerRolePurposeRepository,
+    CreatorAlertRepository
 )
 from application.services import (
     RoleService,
@@ -26,8 +27,13 @@ from application.services import (
     ModeratorService,
     VoiceService,
     StatsService,
-    ServerRolePurposeService
+    ServerRolePurposeService,
+    CreatorAlertService
 )
+from core.domain.creator_alert import CreatorPlatform
+from infrastructure.api.kick_client import KickClient
+from infrastructure.api.twitch_client import TwitchClient
+from infrastructure.api.youtube_client import YouTubeClient
 from infrastructure.logging import get_logger
 from di.modules import MemberEventsModule, LoggingModule, ModerationModule
 
@@ -46,6 +52,7 @@ class Container:
         self._voice_service: Optional[VoiceService] = None
         self._voice_repo: Optional[VoiceRepository] = None
         self._server_role_purpose_repo: Optional[ServerRolePurposeRepository] = None
+        self._creator_alert_repo: Optional[CreatorAlertRepository] = None
         self._panel_message_repo: Optional[RolePanelMessageRepository] = None
         self._panel_button_repo: Optional[RolePanelButtonRepository] = None
         self._channel_config_repo: Optional[ChannelConfigRepository] = None
@@ -60,6 +67,7 @@ class Container:
         self._moderation_history_service: Optional[ModerationHistoryService] = None
         self._moderator_service: Optional[ModeratorService] = None
         self._server_role_purpose_service: Optional[ServerRolePurposeService] = None
+        self._creator_alert_service: Optional[CreatorAlertService] = None
         self._member_events_module: Optional[MemberEventsModule] = None
         self._logging_module: Optional[LoggingModule] = None
         self._moderation_module: Optional[ModerationModule] = None
@@ -140,6 +148,12 @@ class Container:
             self._server_role_purpose_repo = ServerRolePurposeRepository(db)
         return self._server_role_purpose_repo
 
+    async def get_creator_alert_repository(self) -> CreatorAlertRepository:
+        if not self._creator_alert_repo:
+            db = await self.get_database()
+            self._creator_alert_repo = CreatorAlertRepository(db)
+        return self._creator_alert_repo
+
     #=============== Service =====================
 
     async def get_stats_service(self) -> StatsService:
@@ -161,6 +175,38 @@ class Container:
             self._server_role_purpose_service = ServerRolePurposeService(repo)
             logger.info("ServerRolePurposeService created")
         return self._server_role_purpose_service
+
+    async def get_creator_alert_service(self) -> CreatorAlertService:
+        if not self._creator_alert_service:
+            repository = await self.get_creator_alert_repository()
+            channel_repository = await self.get_channel_config_repository()
+            role_purpose_service = await self.get_server_role_purpose_service()
+            twitch_secret = (
+                self.config.twitch_client_secret.get_secret_value()
+                if self.config.twitch_client_secret
+                else None
+            )
+            youtube_key = (
+                self.config.youtube_api_key.get_secret_value()
+                if self.config.youtube_api_key
+                else None
+            )
+            self._creator_alert_service = CreatorAlertService(
+                repository,
+                channel_repository,
+                role_purpose_service,
+                {
+                    CreatorPlatform.TWITCH: TwitchClient(
+                        self.config.twitch_client_id,
+                        twitch_secret,
+                        self.config.discord_proxy_url,
+                    ),
+                    CreatorPlatform.YOUTUBE: YouTubeClient(youtube_key, self.config.discord_proxy_url),
+                    CreatorPlatform.KICK: KickClient(),
+                },
+            )
+            logger.info("CreatorAlertService created")
+        return self._creator_alert_service
 
     async def get_role_service(self) -> RoleService:
         if not self._role_service:
