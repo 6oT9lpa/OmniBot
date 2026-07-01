@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: omnibot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-omnibot}
+      POSTGRES_USER: ${POSTGRES_USER:-omnibot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-omnibot_change_me}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-omnibot} -d ${POSTGRES_DB:-omnibot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   bot:
     build:
       context: .
@@ -10,6 +26,9 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
     command: ["python", "main.py"]
 
   activity-api:
@@ -25,6 +44,9 @@ services:
       - ./logs:/app/logs
     ports:
       - "8008:8008"
+    depends_on:
+      postgres:
+        condition: service_healthy
     command:
       [
         "python",
@@ -65,3 +87,6 @@ services:
       - "4040:4040"
     depends_on:
       - activity-client
+
+volumes:
+  postgres-data:

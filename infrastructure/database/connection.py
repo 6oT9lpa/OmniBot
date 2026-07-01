@@ -1,10 +1,14 @@
 import asyncio
 import sqlite3
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import aiosqlite
+import psycopg
+from psycopg.rows import dict_row
 
+from infrastructure.database.cursor_result import DatabaseCursorResult
+from infrastructure.database.postgres_schema import PostgresSchema
 from infrastructure.logging import get_logger
 
 logger = get_logger(__name__)
@@ -20,30 +24,52 @@ class DatabaseManager:
         sqlite_timeout_seconds: float = 30.0,
         sqlite_autocommit: bool = True,
     ):
-        if database_url.startswith("sqlite:///"):
-            self.db_path = database_url[10:]
-        else:
-            self.db_path = database_url
-
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-
         self.database_url = database_url
+        self.is_postgres = database_url.startswith(("postgresql://", "postgres://"))
+        self.is_sqlite = not self.is_postgres
+
+        if self.is_sqlite and database_url.startswith("sqlite:///"):
+            self.db_path = database_url[10:]
+        elif self.is_sqlite:
+            self.db_path = database_url
+        else:
+            self.db_path = ""
+
+        if self.is_sqlite:
+            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+
         self.retry_attempts = retry_attempts
         self.retry_base_delay = retry_base_delay
         self.sqlite_timeout_seconds = sqlite_timeout_seconds
         self.sqlite_autocommit = sqlite_autocommit
         self._connection: Optional[aiosqlite.Connection] = None
-        logger.info(f"Database path: {self.db_path}")
+        self._pg_connection: Optional[psycopg.AsyncConnection] = None
+        self._pg_lock = asyncio.Lock()
+        logger.info("Database backend initialized backend=%s target=%s", self.backend_name, self.db_path or self.database_url)
+
+    @property
+    def backend_name(self) -> str:
+        return "postgresql" if self.is_postgres else "sqlite"
 
     async def initialize(self) -> None:
         await self.connect()
-        #await self.run_migrations()
-        await self.enable_wal_mode()
+        if self.is_sqlite:
+            await self.enable_wal_mode()
         await self.create_tables()
 
         logger.info("Database initialized successfully")
 
-    async def connect(self) -> aiosqlite.Connection:
+    async def connect(self) -> Any:
+        if self.is_postgres:
+            if not self._pg_connection:
+                self._pg_connection = await psycopg.AsyncConnection.connect(
+                    self.database_url,
+                    autocommit=True,
+                    row_factory=dict_row,
+                )
+                logger.info("PostgreSQL database connection established")
+            return self._pg_connection
+
         if not self._connection:
             self._connection = await aiosqlite.connect(
                 self.db_path,
@@ -62,12 +88,19 @@ class DatabaseManager:
         return self._connection
 
     async def close(self) -> None:
+        if self._pg_connection:
+            await self._pg_connection.close()
+            self._pg_connection = None
+            logger.info("PostgreSQL database connection closed")
         if self._connection:
             await self._connection.close()
             self._connection = None
             logger.info("Database connection closed")
 
     async def enable_wal_mode(self) -> None:
+        if self.is_postgres:
+            logger.debug("WAL mode setup skipped for PostgreSQL")
+            return
         if not self._connection:
             await self.connect()
 
@@ -93,21 +126,41 @@ class DatabaseManager:
             logger.error(f"Failed to apply database migrations: {exc}", exc_info=True)
             raise
 
-    async def execute(self, query: str, params: tuple = ()) -> aiosqlite.Cursor:
-        async def _execute() -> aiosqlite.Cursor:
+    async def execute(self, query: str, params: tuple = ()) -> DatabaseCursorResult:
+        if self.is_postgres:
+            return await self._execute_postgres(query, params)
+
+        async def _execute() -> DatabaseCursorResult:
             conn = await self.connect()
-            return await conn.execute(query, params)
+            cursor = await conn.execute(query, params)
+            try:
+                return DatabaseCursorResult(
+                    rowcount=cursor.rowcount,
+                    lastrowid=cursor.lastrowid,
+                )
+            finally:
+                await cursor.close()
 
         return await self._with_retry(_execute)
 
-    async def executemany(self, query: str, values_list: list[tuple]) -> aiosqlite.Cursor:
-        async def _executemany() -> aiosqlite.Cursor:
+    async def executemany(self, query: str, values_list: list[tuple]) -> DatabaseCursorResult:
+        if self.is_postgres:
+            return await self._executemany_postgres(query, values_list)
+
+        async def _executemany() -> DatabaseCursorResult:
             conn = await self.connect()
-            return await conn.executemany(query, values_list)
+            cursor = await conn.executemany(query, values_list)
+            try:
+                return DatabaseCursorResult(rowcount=cursor.rowcount)
+            finally:
+                await cursor.close()
 
         return await self._with_retry(_executemany)
 
     async def fetch_one(self, query: str, params: tuple = ()) -> Optional[dict]:
+        if self.is_postgres:
+            return await self._fetch_one_postgres(query, params)
+
         async def _fetch_one() -> Optional[dict]:
             conn = await self.connect()
             async with conn.execute(query, params) as cursor:
@@ -117,6 +170,9 @@ class DatabaseManager:
         return await self._with_retry(_fetch_one)
 
     async def fetch_all(self, query: str, params: tuple = ()) -> list:
+        if self.is_postgres:
+            return await self._fetch_all_postgres(query, params)
+
         async def _fetch_all() -> list:
             conn = await self.connect()
             async with conn.execute(query, params) as cursor:
@@ -126,6 +182,9 @@ class DatabaseManager:
         return await self._with_retry(_fetch_all)
 
     async def commit(self) -> None:
+        if self.is_postgres:
+            return
+
         async def _commit() -> None:
             if self._connection:
                 await self._connection.commit()
@@ -133,6 +192,13 @@ class DatabaseManager:
         await self._with_retry(_commit)
 
     async def execute_write(self, query: str, params: tuple = ()) -> dict[str, Optional[int]]:
+        if self.is_postgres:
+            result = await self._execute_postgres(query, params)
+            return {
+                "lastrowid": result.lastrowid,
+                "rowcount": result.rowcount,
+            }
+
         async def _execute_write() -> dict[str, Optional[int]]:
             conn = await self.connect()
             cursor = await conn.execute(query, params)
@@ -147,6 +213,99 @@ class DatabaseManager:
             return result
 
         return await self._with_retry(_execute_write)
+
+    async def _execute_postgres(self, query: str, params: tuple = ()) -> DatabaseCursorResult:
+        async def _execute() -> DatabaseCursorResult:
+            conn = await self.connect()
+            sql = self._prepare_postgres_query(query)
+            async with self._pg_lock:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(sql, params)
+                    rowcount = cursor.rowcount
+                lastrowid = await self._load_postgres_lastrowid(conn, query)
+                return DatabaseCursorResult(rowcount=rowcount, lastrowid=lastrowid)
+
+        return await self._with_retry(_execute)
+
+    async def _executemany_postgres(self, query: str, values_list: list[tuple]) -> DatabaseCursorResult:
+        async def _executemany() -> DatabaseCursorResult:
+            conn = await self.connect()
+            sql = self._prepare_postgres_query(query)
+            async with self._pg_lock:
+                async with conn.cursor() as cursor:
+                    await cursor.executemany(sql, values_list)
+                    return DatabaseCursorResult(rowcount=cursor.rowcount)
+
+        return await self._with_retry(_executemany)
+
+    async def _fetch_one_postgres(self, query: str, params: tuple = ()) -> Optional[dict]:
+        async def _fetch_one() -> Optional[dict]:
+            sql = self._prepare_postgres_query(query)
+            conn = await self.connect()
+            async with self._pg_lock:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(sql, params)
+                    row = await cursor.fetchone()
+                    return dict(row) if row else None
+
+        return await self._with_retry(_fetch_one)
+
+    async def _fetch_all_postgres(self, query: str, params: tuple = ()) -> list[dict]:
+        async def _fetch_all() -> list[dict]:
+            sql = self._prepare_postgres_query(query)
+            conn = await self.connect()
+            async with self._pg_lock:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(sql, params)
+                    rows = await cursor.fetchall()
+                    return [dict(row) for row in rows]
+
+        return await self._with_retry(_fetch_all)
+
+    async def _load_postgres_lastrowid(self, conn: psycopg.AsyncConnection, query: str) -> Optional[int]:
+        if not query.lstrip().lower().startswith("insert"):
+            return None
+        try:
+            async with conn.cursor() as cursor:
+                await cursor.execute("SELECT LASTVAL() AS lastrowid")
+                row = await cursor.fetchone()
+                return int(row["lastrowid"]) if row and row.get("lastrowid") is not None else None
+        except Exception:
+            return None
+
+    def _prepare_postgres_query(self, query: str) -> str:
+        sql = query.strip()
+        lowered = " ".join(sql.lower().split())
+
+        if lowered == "pragma busy_timeout":
+            return "SELECT 0 AS timeout"
+        if "from sqlite_master" in lowered:
+            return """
+                SELECT table_name AS name
+                FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+            """
+
+        sql = sql.replace("datetime('now', 'localtime', ?)", "(CURRENT_TIMESTAMP + (%s)::interval)")
+        sql = sql.replace('datetime("now", "localtime", ?)', "(CURRENT_TIMESTAMP + (%s)::interval)")
+        sql = sql.replace("datetime('now', 'localtime')", "CURRENT_TIMESTAMP")
+        sql = sql.replace('datetime("now", "localtime")', "CURRENT_TIMESTAMP")
+        sql = sql.replace("date('now', 'localtime', ?)", "(CURRENT_DATE + (%s)::interval)")
+        sql = sql.replace("date('now', 'localtime')", "CURRENT_DATE")
+        sql = sql.replace("date(timestamp)", "DATE(timestamp)")
+
+        normalized = " ".join(sql.lower().split())
+        if normalized.startswith("insert or replace into voice_config"):
+            sql = """
+                INSERT INTO voice_config (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value
+            """
+        elif normalized.startswith("insert or ignore into messages"):
+            sql = sql.replace("INSERT OR IGNORE INTO messages", "INSERT INTO messages", 1)
+            sql = f"{sql} ON CONFLICT (id) DO NOTHING"
+
+        return sql.replace("?", "%s")
 
     async def cleanup_retention(
         self,
@@ -200,15 +359,20 @@ class DatabaseManager:
         for attempt in range(1, self.retry_attempts + 1):
             try:
                 return await operation()
-            except aiosqlite.OperationalError as exc:
+            except (aiosqlite.OperationalError, psycopg.OperationalError) as exc:
                 last_exc = exc
                 message = str(exc).lower()
-                if "database is locked" not in message and "database is busy" not in message:
+                if (
+                    "database is locked" not in message
+                    and "database is busy" not in message
+                    and "could not serialize access" not in message
+                    and "deadlock detected" not in message
+                ):
                     raise
                 if attempt >= self.retry_attempts:
                     break
                 logger.warning(
-                    "SQLite database is locked, retrying in %.2fs (attempt %s/%s)",
+                    "Database operation is busy, retrying in %.2fs (attempt %s/%s)",
                     delay,
                     attempt,
                     self.retry_attempts,
@@ -221,6 +385,11 @@ class DatabaseManager:
         raise sqlite3.OperationalError("database operation failed")
 
     async def create_tables(self) -> None:
+        if self.is_postgres:
+            await self._create_postgres_tables()
+            logger.info("All PostgreSQL tables created successfully")
+            return
+
         await self._create_messages_table()
         await self._create_punishments_table()
         await self._create_streamers_table()
@@ -249,6 +418,7 @@ class DatabaseManager:
         await self._create_activity_access_role_modules_table()
         await self._create_activity_synced_role_assignments_table()
         await self._create_dev_blog_posts_table()
+        await self._create_creator_alert_subscriptions_table()
 
         logger.info("All tables created successfully")
 
@@ -619,9 +789,25 @@ class DatabaseManager:
         await self.commit()
 
     async def _column_exists(self, table: str, column: str) -> bool:
+        if self.is_postgres:
+            row = await self.fetch_one(
+                """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = ? AND column_name = ?
+                LIMIT 1
+                """,
+                (table, column),
+            )
+            return row is not None
+
         async with self._connection.execute(f"PRAGMA table_info({table})") as cursor:
             rows = await cursor.fetchall()
         return any(row[1] == column for row in rows)
+
+    async def _create_postgres_tables(self) -> None:
+        for statement in PostgresSchema.statements():
+            await self.execute_write(statement)
 
     async def _create_server_channel_purposes_table(self) -> None:
         await self._connection.execute("""
@@ -878,3 +1064,42 @@ class DatabaseManager:
         """)
         await self.commit()
         logger.info("Created dev_blog_posts table")
+
+    async def _create_creator_alert_subscriptions_table(self) -> None:
+        await self._connection.execute("""
+            CREATE TABLE IF NOT EXISTS creator_alert_subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                platform TEXT NOT NULL CHECK(platform IN ('twitch', 'youtube', 'kick')),
+                channel_url TEXT NOT NULL,
+                channel_name TEXT,
+                external_channel_id TEXT,
+                alert_kind TEXT NOT NULL DEFAULT 'stream',
+                title_template TEXT NOT NULL,
+                description_template TEXT NOT NULL,
+                button_label TEXT NOT NULL DEFAULT 'Watch',
+                color INTEGER NOT NULL DEFAULT 5793266,
+                ping_role_id INTEGER,
+                active BOOLEAN DEFAULT 1,
+                last_event_id TEXT,
+                last_checked_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                UNIQUE(guild_id, user_id, platform, channel_url, alert_kind)
+            )
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_creator_alerts_guild
+            ON creator_alert_subscriptions(guild_id)
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_creator_alerts_user
+            ON creator_alert_subscriptions(guild_id, user_id)
+        """)
+        await self._connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_creator_alerts_active
+            ON creator_alert_subscriptions(active)
+        """)
+        await self.commit()
+        logger.info("Created creator_alert_subscriptions table")

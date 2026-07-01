@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from infrastructure.config import BotConfig
@@ -9,6 +11,8 @@ from presentation.bot import DiscordBot
 
 def test_discord_bot_registers_application_commands_globally(monkeypatch):
     monkeypatch.delenv("ACTIVITY_ROTATION_INTERVAL_SECONDS", raising=False)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
     config = BotConfig(
         discord_token="test-token",
@@ -18,13 +22,17 @@ def test_discord_bot_registers_application_commands_globally(monkeypatch):
         _env_file=None,
     )
 
-    bot = DiscordBot(config)
+    try:
+        bot = DiscordBot(config)
 
-    assert bot._test_guilds is None
-    assert bot._command_sync_flags.sync_global_commands is False
-    assert bot._command_sync_flags.sync_guild_commands is False
-    assert config.activity_rotation_interval_seconds == 600
-    assert len(bot._presence_items) == 10
+        assert bot._test_guilds is None
+        assert bot._command_sync_flags.sync_global_commands is False
+        assert bot._command_sync_flags.sync_guild_commands is False
+        assert config.activity_rotation_interval_seconds == 600
+        assert len(bot._presence_items) == 10
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
 
 
 @pytest.mark.asyncio

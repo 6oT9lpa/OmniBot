@@ -7,7 +7,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://python.org)
 [![disnake](https://img.shields.io/badge/disnake-2.9.2-green.svg)](https://github.com/DisnakeDev/disnake)
 [![Ollama](https://img.shields.io/badge/Ollama-AI-orange.svg)](https://ollama.ai)
-[![SQLite](https://img.shields.io/badge/SQLite-Database-blue.svg)](https://sqlite.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-blue.svg)](https://postgresql.org)
 [![License](https://img.shields.io/badge/License-MIT-red.svg)](LICENSE)
 
 </div>
@@ -240,7 +240,7 @@ The Bot can store and publish logs for:
 - voice events;
 - channel and role updates.
 
-Database: SQLite.
+Database: PostgreSQL. SQLite is still supported as a local fallback and as the source format for migration.
 
 Default retention:
 
@@ -274,7 +274,7 @@ DISCORD_TOKEN=your_discord_bot_token_here
 DISCORD_GUILD_ID=123456789012345678
 DISCORD_OWNER_ID=987654321098765432
 
-DATABASE_URL=sqlite:///data/nexsusguard.db
+DATABASE_URL=postgresql://omnibot:change_me@localhost:5432/omnibot
 
 AUTO_ROLE_ID=123456789012345678
 LOG_CHANNEL_ID=123456789012345678
@@ -395,7 +395,7 @@ sudo systemctl status omnibot-bot omnibot-activity
 ### Daily SQLite Backups
 
 ```cron
-0 3 * * * sqlite3 /opt/discord-bot/data/bot.db ".backup '/opt/discord-bot/backups/bot_$(date +\%Y\%m\%d).db'"
+0 3 * * * pg_dump "$DATABASE_URL" > "/opt/discord-bot/backups/omnibot_$(date +\%Y\%m\%d).sql"
 ```
 
 ---

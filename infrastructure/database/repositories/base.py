@@ -7,8 +7,7 @@ from typing import (
     Optional,
 )
 
-import aiosqlite
-
+from infrastructure.database.cursor_result import DatabaseCursorResult
 from infrastructure.database.connection import DatabaseManager
 from infrastructure.logging.logger import get_logger
 
@@ -19,7 +18,7 @@ class BaseRepository:
     def __init__(self, db_manager: DatabaseManager):
         self._db_manager = db_manager
 
-    async def execute(self, query: str, params: tuple = ()) -> aiosqlite.Cursor:
+    async def execute(self, query: str, params: tuple = ()) -> DatabaseCursorResult:
         """Выполнить SQL запрос"""
         return await self._db_manager.execute(query, params)
 
