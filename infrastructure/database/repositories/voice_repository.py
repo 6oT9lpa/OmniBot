@@ -24,7 +24,7 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
     async def create(self, dto: VoiceRoomDTO) -> None:
         """Создать запись о голосовой комнате."""
         try:
-            await self.execute(
+            await self.execute_write(
                 """
                 INSERT INTO voice_rooms (channel_id, guild_id, owner_id, admin_id, name, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -38,7 +38,6 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
                     dto.created_at.isoformat(timespec="seconds"),
                 ),
             )
-            await self.commit()
             logger.debug(
                 "Voice room created: channel_id=%s owner_id=%s",
                 dto.channel_id, dto.owner_id,
@@ -51,11 +50,10 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
         """Удалить запись о голосовой комнате."""
         try:
             await self.clear_members(channel_id)
-            await self.execute(
+            await self.execute_write(
                 "DELETE FROM voice_rooms WHERE channel_id = ?",
                 (channel_id,),
             )
-            await self.commit()
             logger.debug("Voice room deleted: channel_id=%s", channel_id)
         except Exception as exc:
             logger.error("Failed to delete voice room channel_id=%s: %s", channel_id, exc)
@@ -89,11 +87,10 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
     async def update_admin(self, channel_id: int, admin_id: Optional[int]) -> None:
         """Обновить владельца комнаты."""
         try:
-            await self.execute(
+            await self.execute_write(
                 "UPDATE voice_rooms SET admin_id = ? WHERE channel_id = ?",
                 (admin_id, channel_id),
             )
-            await self.commit()
             logger.debug(
                 "Voice room admin updated: channel_id=%s admin_id=%s",
                 channel_id, admin_id,
@@ -106,11 +103,10 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
 
     async def update_owner(self, channel_id: int, owner_id: int) -> None:
         try:
-            await self.execute(
+            await self.execute_write(
                 "UPDATE voice_rooms SET owner_id = ? WHERE channel_id = ?",
                 (owner_id, channel_id),
             )
-            await self.commit()
             logger.debug(
                 "Voice room owner updated: channel_id=%s owner_id=%s",
                 channel_id,
@@ -126,7 +122,7 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
 
     async def add_member(self, channel_id: int, guild_id: int, user_id: int) -> None:
         try:
-            await self.execute(
+            await self.execute_write(
                 """
                 INSERT INTO voice_room_members (channel_id, guild_id, user_id)
                 VALUES (?, ?, ?)
@@ -135,7 +131,6 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
                 """,
                 (channel_id, guild_id, user_id),
             )
-            await self.commit()
             logger.debug("Voice room member tracked: channel_id=%s user_id=%s", channel_id, user_id)
         except Exception as exc:
             logger.error("Failed to track voice room member channel_id=%s user_id=%s: %s", channel_id, user_id, exc)
@@ -143,11 +138,10 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
 
     async def remove_member(self, channel_id: int, user_id: int) -> None:
         try:
-            await self.execute(
+            await self.execute_write(
                 "DELETE FROM voice_room_members WHERE channel_id = ? AND user_id = ?",
                 (channel_id, user_id),
             )
-            await self.commit()
             logger.debug("Voice room member untracked: channel_id=%s user_id=%s", channel_id, user_id)
         except Exception as exc:
             logger.error("Failed to untrack voice room member channel_id=%s user_id=%s: %s", channel_id, user_id, exc)
@@ -155,11 +149,10 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
 
     async def clear_members(self, channel_id: int) -> None:
         try:
-            await self.execute(
+            await self.execute_write(
                 "DELETE FROM voice_room_members WHERE channel_id = ?",
                 (channel_id,),
             )
-            await self.commit()
             logger.debug("Voice room members cleared: channel_id=%s", channel_id)
         except Exception as exc:
             logger.error("Failed to clear voice room members channel_id=%s: %s", channel_id, exc)
@@ -177,11 +170,10 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
     async def set_persistent(self, channel_id: int, persistent: bool) -> None:
         """Установить флаг постоянства комнаты."""
         try:
-            await self.execute(
+            await self.execute_write(
                 "UPDATE voice_rooms SET is_persistent = ? WHERE channel_id = ?",
                 (int(persistent), channel_id),
             )
-            await self.commit()
         except Exception as exc:
             logger.error(
                 "Failed to set persistent channel_id=%s: %s", channel_id, exc,
@@ -191,11 +183,10 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
     async def set_config(self, key: str, value: str) -> None:
         """Сохранить конфигурацию."""
         try:
-            await self.execute(
+            await self.execute_write(
                 "INSERT OR REPLACE INTO voice_config (key, value) VALUES (?, ?)",
                 (key, value),
             )
-            await self.commit()
             logger.debug("Voice config set: key=%s", key)
         except Exception as exc:
             logger.error("Failed to set voice config key=%s: %s", key, exc)

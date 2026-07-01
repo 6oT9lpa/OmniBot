@@ -26,7 +26,7 @@ class ActivityAuditService:
             actor_id,
             target_id,
         )
-        await get_db().execute(
+        await get_db().execute_write(
             """
             INSERT INTO guild_event_logs (
                 guild_id,
@@ -41,5 +41,4 @@ class ActivityAuditService:
             """,
             (guild_id, actor_id, actor_name, target_id, target_name, event_type, details),
         )
-        await get_db().commit()
         logger.info("Activity audit event written guild_id=%s event_type=%s", guild_id, event_type)

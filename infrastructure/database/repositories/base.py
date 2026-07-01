@@ -35,6 +35,10 @@ class BaseRepository:
         """Зафиксировать изменения"""
         await self._db_manager.commit()
 
+    async def execute_write(self, query: str, params: tuple = ()) -> dict[str, Optional[int]]:
+        """Execute a write statement and close its cursor immediately."""
+        return await self._db_manager.execute_write(query, params)
+
     async def insert(self, data: Dict[str, Any]) -> bool:
         """Вставить новую запись"""
         if not self._TABLE_NAME:
@@ -45,9 +49,8 @@ class BaseRepository:
         query = f'INSERT INTO {self._TABLE_NAME} ({columns}) VALUES ({placeholders})'
 
         try:
-            cursor = await self.execute(query, tuple(data.values()))
-            await self.commit()
-            return cursor.lastrowid if hasattr(cursor, "lastrowid") else None
+            result = await self.execute_write(query, tuple(data.values()))
+            return result["lastrowid"]
         except Exception as e:
             logger.error(f"Insert error in {self._TABLE_NAME}: {e}\nQuery: {query}\nData: {data}")
             return None
@@ -72,8 +75,7 @@ class BaseRepository:
             ON CONFLICT({conflict_column}) DO UPDATE SET {update_str}
         """
         try:
-            await self.execute(query, tuple(data.values()))
-            await self.commit()
+            await self.execute_write(query, tuple(data.values()))
             return True
         except Exception as e:
             logger.error(f"Upsert error: {e}")
@@ -85,8 +87,7 @@ class BaseRepository:
         query = f"UPDATE {self._TABLE_NAME} SET {set_parts} WHERE {where_column} = ?"
         params = tuple(data.values()) + (where_value,)
         try:
-            await self.execute(query, params)
-            await self.commit()
+            await self.execute_write(query, params)
             return True
         except Exception as e:
             logger.error(f"Update error: {e}")
@@ -96,8 +97,7 @@ class BaseRepository:
         """Удалить запись"""
         query = f"DELETE FROM {self._TABLE_NAME} WHERE {where_column} = ?"
         try:
-            await self.execute(query, (where_value,))
-            await self.commit()
+            await self.execute_write(query, (where_value,))
             return True
         except Exception as e:
             logger.error(f"Delete error: {e}")

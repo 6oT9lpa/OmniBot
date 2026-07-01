@@ -18,6 +18,7 @@ class DatabaseManager:
         retry_attempts: int = 8,
         retry_base_delay: float = 0.1,
         sqlite_timeout_seconds: float = 30.0,
+        sqlite_autocommit: bool = True,
     ):
         if database_url.startswith("sqlite:///"):
             self.db_path = database_url[10:]
@@ -30,6 +31,7 @@ class DatabaseManager:
         self.retry_attempts = retry_attempts
         self.retry_base_delay = retry_base_delay
         self.sqlite_timeout_seconds = sqlite_timeout_seconds
+        self.sqlite_autocommit = sqlite_autocommit
         self._connection: Optional[aiosqlite.Connection] = None
         logger.info(f"Database path: {self.db_path}")
 
@@ -46,6 +48,7 @@ class DatabaseManager:
             self._connection = await aiosqlite.connect(
                 self.db_path,
                 timeout=self.sqlite_timeout_seconds,
+                isolation_level=None if self.sqlite_autocommit else "",
             )
             self._connection.row_factory = aiosqlite.Row
             await self._connection.execute("PRAGMA foreign_keys=ON")
@@ -128,6 +131,22 @@ class DatabaseManager:
                 await self._connection.commit()
 
         await self._with_retry(_commit)
+
+    async def execute_write(self, query: str, params: tuple = ()) -> dict[str, Optional[int]]:
+        async def _execute_write() -> dict[str, Optional[int]]:
+            conn = await self.connect()
+            cursor = await conn.execute(query, params)
+            try:
+                result = {
+                    "lastrowid": cursor.lastrowid,
+                    "rowcount": cursor.rowcount,
+                }
+            finally:
+                await cursor.close()
+            await conn.commit()
+            return result
+
+        return await self._with_retry(_execute_write)
 
     async def cleanup_retention(
         self,

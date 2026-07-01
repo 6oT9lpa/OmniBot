@@ -107,18 +107,13 @@ class VoiceRoomService:
             )
         if payload.owner_id is not None:
             logger.info("Ignored immutable owner update request channel_id=%s requested_owner_id=%s", channel_id, payload.owner_id)
-        db_changed = False
         if final_admin_id != "unchanged":
-            await get_db().execute("UPDATE voice_rooms SET admin_id = ? WHERE channel_id = ?", (final_admin_id, channel_id))
-            db_changed = True
+            await get_db().execute_write("UPDATE voice_rooms SET admin_id = ? WHERE channel_id = ?", (final_admin_id, channel_id))
         if payload.persistent is not None:
-            await get_db().execute(
+            await get_db().execute_write(
                 "UPDATE voice_rooms SET is_persistent = ? WHERE channel_id = ?",
                 (1 if payload.persistent else 0, channel_id),
             )
-            db_changed = True
-        if db_changed:
-            await get_db().commit()
         await self._audit_service.log_action(
             guild_id=payload.guild_id,
             actor_id=int(user["id"]),
@@ -136,9 +131,8 @@ class VoiceRoomService:
         user, access = await self._access_service.ensure_module_access(access_token, str(guild_id), "voice-rooms")
         room = await self._get_authorized_room(guild_id, channel_id, user, access)
         await self._discord.safe_bot_request("DELETE", f"/channels/{channel_id}")
-        await get_db().execute("DELETE FROM voice_room_members WHERE channel_id = ?", (channel_id,))
-        await get_db().execute("DELETE FROM voice_rooms WHERE channel_id = ?", (channel_id,))
-        await get_db().commit()
+        await get_db().execute_write("DELETE FROM voice_room_members WHERE channel_id = ?", (channel_id,))
+        await get_db().execute_write("DELETE FROM voice_rooms WHERE channel_id = ?", (channel_id,))
         await self._audit_service.log_action(
             guild_id=guild_id,
             actor_id=int(user["id"]),

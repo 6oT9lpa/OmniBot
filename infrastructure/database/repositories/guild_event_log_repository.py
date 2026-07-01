@@ -43,12 +43,11 @@ class GuildEventLogRepository(GuildEventLogRepositoryInterface, BaseRepository):
         )
 
     async def cleanup_expired(self, cutoff_iso: str) -> int:
-        cursor = await self.execute(
+        result = await self.execute_write(
             "DELETE FROM guild_event_logs WHERE retention_until IS NOT NULL AND retention_until < ?",
             (cutoff_iso,),
         )
-        await self.commit()
-        return cursor.rowcount
+        return result["rowcount"] or 0
 
     async def log_event(
         self,
