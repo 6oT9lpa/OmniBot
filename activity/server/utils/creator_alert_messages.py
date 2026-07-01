@@ -1,29 +1,49 @@
 from typing import Any
 
+from application.utils.creator_alert_templates import CreatorAlertTemplateRenderer
 from activity.server.schemas.creator_alerts import CreatorAlertTestPayload
+from core.domain.creator_alert import CreatorAlertKind, CreatorContentEvent, CreatorPlatform
 
 
 def build_creator_alert_message(payload: CreatorAlertTestPayload) -> dict[str, Any]:
-    title = {
-        "twitch": "Stream is live",
-        "youtube": "New video published",
-        "kick": "Kick stream is live",
-    }[payload.platform]
-    template = payload.template or "{creator} is active on {platform}: {url}"
-    description = template.format(
-        creator=payload.channel_name,
-        platform=payload.platform.title(),
+    event = CreatorContentEvent(
+        platform=CreatorPlatform(payload.platform),
+        alert_kind=CreatorAlertKind(payload.alert_kind),
+        event_id="preview",
+        creator_name=payload.channel_name,
+        title="Preview alert",
         url=payload.channel_url,
+        game=payload.game,
+    )
+    title_template = payload.title_template or "{creator.name} is active on {platform}"
+    description_template = (
+        payload.description_template
+        or payload.template
+        or "{creator.ping} {creator.name} posted an update: {url}"
+    )
+    creator_ping = f"<@&{payload.ping_role_id}>" if payload.ping_role_id else ""
+    description = CreatorAlertTemplateRenderer.render(
+        description_template,
+        event,
+        creator_ping=creator_ping,
     )
     content = f"<@&{payload.ping_role_id}>" if payload.ping_role_id else ""
     return {
         "content": content,
         "embeds": [
             {
-                "title": title,
+                "title": CreatorAlertTemplateRenderer.render(
+                    title_template,
+                    event,
+                    creator_ping=creator_ping,
+                ),
                 "description": description,
                 "url": payload.channel_url,
-                "color": 0x5865F2,
+                "color": payload.color,
+                "fields": [
+                    {"name": "Platform", "value": payload.platform.title(), "inline": True},
+                    {"name": "Game", "value": payload.game, "inline": True},
+                ],
             }
         ],
         "allowed_mentions": {"roles": [str(payload.ping_role_id)] if payload.ping_role_id else []},

@@ -26,6 +26,15 @@ async def save_creator_alert_source(
     return await service.save_source(payload, access_token)
 
 
+@router.delete("/api/creator-alerts/sources/{source_id}")
+async def delete_creator_alert_source(
+    source_id: int,
+    guild_id: int = Query(gt=0),
+    access_token: str = Depends(require_bearer_token),
+) -> dict[str, Any]:
+    return await service.delete_source(guild_id, source_id, access_token)
+
+
 @router.post("/api/creator-alerts/test")
 async def preview_creator_alert(
     payload: CreatorAlertTestPayload,

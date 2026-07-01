@@ -20,6 +20,8 @@ const rolePurposes: Array<{ key: ActivityRolePurpose; label: string }> = [
   { key: "activity_admin", label: "Activity admin" },
   { key: "activity_streamer", label: "Activity creator" },
   { key: "activity_developer", label: "Activity developer" },
+  { key: "ping_stream", label: "Ping stream" },
+  { key: "ping_dev", label: "Ping Dev Blog" },
 ];
 const runtimeRows = computed(() => {
   return [
@@ -112,7 +114,7 @@ async function toggleWelcome(value: boolean) {
       <span>List roles</span>
       <h2>Set role commands.</h2>
       <div>
-        <p>Map Discord roles to Activity administrator, creator and developer purposes.</p>
+        <p>Map Discord roles to Activity access and default publication pings.</p>
       </div>
     </div>
     <div class="settings-list">

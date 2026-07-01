@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import Dict
 
 from application.services.role_service import RoleService
+from application.services.server_role_purpose_service import ServerRolePurposeService
+from core.domain.server_role_purpose import ServerRolePurpose
 from infrastructure.logging import get_logger
 from presentation.views import (
     CreatePanelRoleSelectView,
@@ -16,9 +18,15 @@ logger = get_logger(__name__)
 
 
 class RolesCog(commands.Cog):
-    def __init__(self, bot: commands.Bot, role_service: RoleService):
+    def __init__(
+        self,
+        bot: commands.Bot,
+        role_service: RoleService,
+        role_purpose_service: ServerRolePurposeService,
+    ):
         self._bot = bot
         self._role_service = role_service
+        self._role_purpose_service = role_purpose_service
         self._reaction_panels: Dict[int, RolePanelReactionView] = {}
         self._button_views: Dict[int, RolePanelView] = {}
         logger.info("RolesCog initialized")
@@ -230,6 +238,36 @@ class RolesCog(commands.Cog):
         )
         if not is_public:
             embed.set_footer(text="Эта роль больше не будет появляться в панелях ролей")
+        await ctx.response.send_message(embed=embed, ephemeral=True)
+
+    @commands.slash_command(name="set_role", description="Назначить роль для системного назначения бота")
+    async def set_role(
+        self,
+        ctx: disnake.ApplicationCommandInteraction,
+        purpose: str = commands.Param(choices=["dev-ping", "stream-ping"]),
+        role: disnake.Role = commands.Param(description="Discord роль"),
+    ):
+        logger.info(
+            "set_role invoked guild_id=%s user_id=%s purpose=%s role_id=%s",
+            ctx.guild.id if ctx.guild else None,
+            ctx.author.id,
+            purpose,
+            role.id,
+        )
+        if not ctx.author.guild_permissions.administrator:
+            await ctx.response.send_message("Только администраторы могут использовать эту команду", ephemeral=True)
+            return
+
+        purpose_map = {
+            "dev-ping": ServerRolePurpose.PING_DEV,
+            "stream-ping": ServerRolePurpose.PING_STREAM,
+        }
+        await self._role_purpose_service.set_role(ctx.guild.id, purpose_map[purpose], role.id)
+        embed = disnake.Embed(
+            title="Роль обновлена",
+            description=f"`{purpose}` теперь использует {role.mention}.",
+            color=disnake.Color.green(),
+        )
         await ctx.response.send_message(embed=embed, ephemeral=True)
 
     @commands.slash_command(name="create_panel", description="Создать панель ролей с кнопками или реакциями")

@@ -6,6 +6,7 @@ import {
   exchangeDiscordCode,
   createDevBlogPost,
   deleteActivityAccessRole,
+  deleteCreatorAlertSource,
   deleteVoiceRoom,
   getActivityAudit,
   getActivityDashboard,
@@ -457,6 +458,12 @@ export const useActivityStore = defineStore("activity", {
     async saveCreatorSource(source: Omit<CreatorAlertSource, "guild_id">) {
       if (!this.session || !this.token) return;
       await saveCreatorAlertSource({ ...source, guild_id: this.session.guild_id }, this.token);
+      await this.loadModuleData("creator-alerts");
+    },
+
+    async deleteCreatorSource(sourceId: number) {
+      if (!this.session || !this.token) return;
+      await deleteCreatorAlertSource(this.session.guild_id, sourceId, this.token);
       await this.loadModuleData("creator-alerts");
     },
 

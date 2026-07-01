@@ -191,6 +191,12 @@ export function saveCreatorAlertSource(source: CreatorAlertSource, token: string
   }, token);
 }
 
+export function deleteCreatorAlertSource(guildId: string, sourceId: number, token: string) {
+  return apiRequest<Record<string, unknown>>(`/api/creator-alerts/sources/${sourceId}?guild_id=${guildId}`, {
+    method: "DELETE",
+  }, token);
+}
+
 export function previewCreatorAlert(source: CreatorAlertSource, token: string) {
   return apiRequest<Record<string, unknown>>("/api/creator-alerts/test", {
     method: "POST",
@@ -199,7 +205,12 @@ export function previewCreatorAlert(source: CreatorAlertSource, token: string) {
       platform: source.platform,
       channel_name: source.channel_name || "Creator",
       channel_url: source.channel_url,
+      alert_kind: source.alert_kind || "stream",
+      title_template: source.title_template,
+      description_template: source.description_template,
       template: source.template,
+      button_label: source.button_label || "Watch",
+      color: source.color ?? 0x5865F2,
       ping_role_id: source.ping_role_id,
     }),
   }, token);

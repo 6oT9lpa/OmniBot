@@ -11,6 +11,7 @@ from activity.server.services.channel_purpose_service import ChannelPurposeServi
 from activity.server.services.discord_service import DiscordService
 from activity.server.utils.dev_blog_messages import build_dev_blog_message
 from core.domain.channel_purpose import ChannelPurpose
+from core.domain.server_role_purpose import ServerRolePurpose
 from infrastructure.logging import get_logger
 
 
@@ -56,6 +57,7 @@ class DevBlogService:
         message_id: Optional[int] = None
 
         if payload.status == "published":
+            await self._apply_default_ping_role(payload.guild_id, message_payload)
             logger.info("Publishing dev blog post to Discord guild_id=%s channel_id=%s", payload.guild_id, channel_id)
             message = await self._discord.bot_request(
                 "POST",
@@ -120,3 +122,20 @@ class DevBlogService:
 
     def _display_name(self, user: dict[str, Any]) -> str:
         return user.get("global_name") or user.get("username") or str(user.get("id"))
+
+    async def _apply_default_ping_role(self, guild_id: int, message_payload: dict[str, Any]) -> None:
+        row = await get_db().fetch_one(
+            """
+            SELECT role_id FROM server_role_purposes
+            WHERE guild_id = ? AND purpose = ?
+            """,
+            (guild_id, ServerRolePurpose.PING_DEV.value),
+        )
+        role_id = int(row["role_id"]) if row else None
+        if not role_id:
+            logger.info("Dev Blog default ping role is not configured guild_id=%s", guild_id)
+            return
+
+        message_payload["content"] = f"<@&{role_id}>"
+        message_payload["allowed_mentions"] = {"roles": [str(role_id)]}
+        logger.info("Applied Dev Blog default ping role guild_id=%s role_id=%s", guild_id, role_id)

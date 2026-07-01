@@ -139,7 +139,12 @@ export type DiscordMember = {
   avatar?: string | null;
 };
 
-export type ActivityRolePurpose = "activity_admin" | "activity_streamer" | "activity_developer";
+export type ActivityRolePurpose =
+  | "activity_admin"
+  | "activity_streamer"
+  | "activity_developer"
+  | "ping_stream"
+  | "ping_dev";
 
 export type ChannelPurpose =
   | "welcome"
@@ -183,14 +188,22 @@ export type DevBlogDraft = {
 
 export type CreatorAlertSource = {
   id?: number;
-  user_id?: number;
+  user_id?: string | number;
   guild_id: string | number;
   platform: "twitch" | "youtube" | "kick";
+  alert_kind?: "stream" | "video" | "short";
   channel_url: string;
   channel_name?: string | null;
+  external_channel_id?: string | null;
+  title_template?: string | null;
+  description_template?: string | null;
   template?: string | null;
+  button_label?: string | null;
+  color?: number;
   ping_role_id?: string | number | null;
   active: boolean;
+  last_event_id?: string | null;
+  last_checked_at?: string | null;
 };
 
 export type VoiceRoom = {
