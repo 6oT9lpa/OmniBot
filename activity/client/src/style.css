@@ -1443,7 +1443,13 @@ input[type="color"] {
 }
 
 .role-panel-heading {
-  align-items: center;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.role-panel-heading > div {
+  display: grid;
+  justify-items: start;
 }
 
 .bot-settings-heading {
@@ -1459,6 +1465,10 @@ input[type="color"] {
 .access-role-list {
   display: grid;
   gap: 12px;
+}
+
+.access-role-toolbar {
+  margin-bottom: 18px;
 }
 
 .access-role-card {

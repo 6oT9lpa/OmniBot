@@ -51,7 +51,7 @@ function setAccessValue(roleId: number, modules: Record<ModuleKey, PermissionLev
       </div>
     </div>
 
-    <form class="module-toolbar" @submit.prevent="addRole">
+    <form class="module-toolbar access-role-toolbar" @submit.prevent="addRole">
       <input v-model="newRoleName" maxlength="48" placeholder="Unique role name" />
       <button class="primary-button" type="submit" :disabled="!newRoleName.trim() || activity.moduleLoading">
         <Plus :size="16" />
