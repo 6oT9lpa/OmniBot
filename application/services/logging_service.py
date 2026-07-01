@@ -26,6 +26,7 @@ from presentation.embeds import (
     RoleUpdateEmbedBuilder,
     MemberRoleUpdateEmbedBuilder,
     MemberEventEmbedBuilder,
+    VoiceOwnerTransferEmbedBuilder,
 )
 
 logger = get_logger(__name__)
@@ -470,6 +471,32 @@ class LoggingService(LoggingServiceInterface):
 
         logger.info("Logged channel update for channel %s, changes: %s", after.id, changes)
 
+    async def log_voice_owner_transfer(
+        self,
+        channel: disnake.VoiceChannel,
+        old_owner: disnake.Member,
+        new_owner: disnake.Member,
+        timestamp: Optional[datetime] = None,
+    ) -> None:
+        embed = VoiceOwnerTransferEmbedBuilder.build_transfer(
+            channel,
+            old_owner,
+            new_owner,
+            timestamp or datetime.now(timezone.utc),
+        )
+        await self._persist_and_send(
+            guild_id=channel.guild.id,
+            event_type="voice_owner_transfer",
+            source_channel_id=channel.id,
+            actor_id=old_owner.id,
+            actor_name=str(old_owner),
+            target_id=new_owner.id,
+            target_name=str(new_owner),
+            details={"channel_id": channel.id, "old_owner_id": old_owner.id, "new_owner_id": new_owner.id},
+            embed=embed,
+        )
+        logger.info("Logged voice owner transfer channel_id=%s old_owner_id=%s new_owner_id=%s", channel.id, old_owner.id, new_owner.id)
+
     async def log_moderation_action(
         self,
         action_type: PunishmentType,
@@ -699,6 +726,9 @@ class LoggingService(LoggingServiceInterface):
             return MemberEventEmbedBuilder.build_leave(member, timestamp)
         if event_type == EventType.MEMBER_UPDATE:
             changes = details.get("changes", []) if details else []
+            pending_change = self._parse_pending_change(changes)
+            if pending_change:
+                return MemberEventEmbedBuilder.build_pending_update(member, pending_change[0], pending_change[1], timestamp)
             return MemberEventEmbedBuilder.build_update(member, [str(change) for change in changes], timestamp)
         return self._build_embed(event_type.value, details)
 
@@ -762,9 +792,7 @@ class LoggingService(LoggingServiceInterface):
         if hasattr(before, "overwrites") and hasattr(after, "overwrites"):
             if before.overwrites != after.overwrites:
                 voice_admin_change = self._detect_voice_admin_overwrite_change(before, after)
-                if voice_admin_change:
-                    changes.append(voice_admin_change)
-                else:
+                if not voice_admin_change:
                     changes.append("Изменены права доступа (overwrites)")
 
         if hasattr(before, "category") and hasattr(after, "category") and before.category != after.category:
@@ -829,6 +857,19 @@ class LoggingService(LoggingServiceInterface):
             new_value,
         )
         return f"Админ динамического войса: {old_value} → {new_value}"
+
+    @staticmethod
+    def _parse_pending_change(changes: List[Any]) -> Optional[tuple[bool, bool]]:
+        for change in changes:
+            text = str(change).strip()
+            if not text.startswith("pending:"):
+                continue
+            _, _, values = text.partition(":")
+            before_text, separator, after_text = values.strip().partition("->")
+            if not separator:
+                return None
+            return before_text.strip() == "True", after_text.strip() == "True"
+        return None
 
     def _voice_admin_overwrite_ids(self, channel) -> set[int]:
         admin_ids: set[int] = set()

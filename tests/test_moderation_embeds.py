@@ -74,11 +74,11 @@ def test_unban_embed_builder():
     target = MockUser(123456789, "TestUser")
     embed = ModerationBanEmbedBuilder.build_unban(target, reason="Test unban reason")
     
-    assert embed.title == "TestUser (123456789)"
+    assert embed.title == "User unbanned (ID: 123456789)"
     assert embed.color.value == 0x57F287
     
     field_names = [f.name for f in embed.fields]
-    assert "Unbanned User:" in field_names
+    assert "User ID:" in field_names
     assert "Reason:" in field_names
 
 

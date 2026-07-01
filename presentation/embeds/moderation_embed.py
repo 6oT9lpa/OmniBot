@@ -97,14 +97,16 @@ class ModerationBanEmbedBuilder:
         reason: Optional[str] = None,
     ) -> disnake.Embed:
         actual_target = target or moderator
-        return _build_embed(
-            target=actual_target,
-            moderator=moderator if target else None,
-            color=0x57F287,
-            action="User unbanned",
-            user_field="Unbanned User:",
-            reason=reason,
-        )
+        builder = EmbedBuilder(color=0x57F287)
+        builder.set_title(f"User unbanned (ID: {actual_target.id})")
+        if target:
+            builder.set_author(name=_title(moderator), icon_url=_avatar_url(moderator))
+        builder.set_description("User unbanned")
+        builder.add_field("User ID:", str(actual_target.id), inline=False)
+        if reason:
+            builder.add_field("Reason:", reason, inline=False)
+        builder.set_footer(text=f"User ID: {actual_target.id} | {format_date(datetime.now(timezone.utc))}")
+        return builder.build()
 
 
 class ModerationWarnEmbedBuilder:

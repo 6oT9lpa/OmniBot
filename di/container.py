@@ -151,7 +151,8 @@ class Container:
     async def get_voice_service(self) -> VoiceService:
         if not self._voice_service:
             repo = await self.get_voice_repository()
-            self._voice_service = VoiceService(repo)
+            logging_service = await self.get_logging_service()
+            self._voice_service = VoiceService(repo, logging_service)
         return self._voice_service
 
     async def get_server_role_purpose_service(self) -> ServerRolePurposeService:

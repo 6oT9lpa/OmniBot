@@ -95,6 +95,14 @@ class FakeVoiceRepository:
         return []
 
 
+class FakeLoggingService:
+    def __init__(self):
+        self.owner_transfers = []
+
+    async def log_voice_owner_transfer(self, channel, old_owner, new_owner):
+        self.owner_transfers.append((channel.id, old_owner.id, new_owner.id))
+
+
 @pytest.mark.asyncio
 async def test_owner_is_immutable_when_admin_is_assigned():
     repo = FakeVoiceRepository()
@@ -214,7 +222,8 @@ async def test_banned_member_is_removed_on_join_without_tracking():
 @pytest.mark.asyncio
 async def test_owner_leave_transfers_owner_to_remaining_member():
     repo = FakeVoiceRepository()
-    service = VoiceService(repo)
+    logging = FakeLoggingService()
+    service = VoiceService(repo, logging)
     guild = FakeGuild()
     owner = FakeMember(42, guild)
     candidate = FakeMember(77, guild)
@@ -229,6 +238,7 @@ async def test_owner_leave_transfers_owner_to_remaining_member():
         (42, {"overwrite": None}),
         (77, {"connect": True, "manage_channels": True, "manage_permissions": True, "move_members": True}),
     ]
+    assert logging.owner_transfers == [(10, 42, 77)]
 
 
 @pytest.mark.asyncio

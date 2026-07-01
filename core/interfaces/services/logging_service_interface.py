@@ -82,6 +82,17 @@ class LoggingServiceInterface(ABC):
     ) -> None:
         """Log channel update with detailed changes"""
         pass
+
+    @abstractmethod
+    async def log_voice_owner_transfer(
+        self,
+        channel: disnake.VoiceChannel,
+        old_owner: disnake.Member,
+        new_owner: disnake.Member,
+        timestamp: Optional[datetime] = None,
+    ) -> None:
+        """Log automatic dynamic voice owner transfer."""
+        pass
     
     @abstractmethod
     async def log_role_create(

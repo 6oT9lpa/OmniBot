@@ -14,7 +14,7 @@ from application.schemas.voice_schemas import (
     VoiceRenameSchema,
 )
 from core.interfaces.repositories import VoiceRepositoryInterface
-from core.interfaces.services import VoiceServiceInterface
+from core.interfaces.services import LoggingServiceInterface, VoiceServiceInterface
 from infrastructure.logging import get_logger
 
 logger = get_logger(__name__)
@@ -23,8 +23,9 @@ _MSK = timezone(timedelta(hours=3))
 
 
 class VoiceService(VoiceServiceInterface):
-    def __init__(self, repo: VoiceRepositoryInterface) -> None:
+    def __init__(self, repo: VoiceRepositoryInterface, logging_service: Optional[LoggingServiceInterface] = None) -> None:
         self._repo = repo
+        self._logging_service = logging_service
         self._delete_tasks: Dict[int, asyncio.Task] = {}
         self._owner_transfer_tasks: Dict[int, asyncio.Task] = {}
         self._creating: Set[Tuple[int, int]] = set()
@@ -521,6 +522,8 @@ class VoiceService(VoiceServiceInterface):
             move_members=True,
         )
         await self._repo.update_owner(channel.id, new_owner.id)
+        if self._logging_service:
+            await self._logging_service.log_voice_owner_transfer(channel, old_owner, new_owner)
 
     @staticmethod
     def _has_manage_permissions(user: disnake.Member, channel: disnake.VoiceChannel) -> bool:

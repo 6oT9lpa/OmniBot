@@ -97,3 +97,12 @@ def test_member_event_embed_build_update():
     assert embed.title == "Member updated: TestUser (ID: 123456789)"
     assert embed.color.value == 0xFEE75C
     assert any(field.name == "Changes" and "pending: True -> False" in field.value for field in embed.fields)
+
+
+def test_member_event_embed_build_pending_update():
+    member = MockMember(123456789, "TestUser")
+    embed = MemberEventEmbedBuilder.build_pending_update(member, True, False)
+
+    assert embed.title == "Проверка участника обновлена: TestUser (ID: 123456789)"
+    assert embed.color.value == 0x57F287
+    assert any(field.name == "Статус" and "ожидает проверки" in field.value for field in embed.fields)

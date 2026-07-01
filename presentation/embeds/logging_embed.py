@@ -231,6 +231,25 @@ class ChannelLogEmbedBuilder:
 
         return builder.build()
 
+class VoiceOwnerTransferEmbedBuilder:
+    @staticmethod
+    def build_transfer(
+        channel: disnake.VoiceChannel,
+        old_owner: disnake.Member,
+        new_owner: disnake.Member,
+        timestamp: Optional[datetime] = None,
+    ) -> disnake.Embed:
+        builder = EmbedBuilder(color=0x5865F2)
+        builder.set_title(f"Владелец динамического войса изменён: #{channel.name} (ID: {channel.id})")
+        builder.add_field("Канал", channel.mention if getattr(channel, "mention", None) else f"#{channel.name}", inline=False)
+        builder.add_field("Старый владелец", f"{old_owner.mention} (`{old_owner}` ID: {old_owner.id})", inline=False)
+        builder.add_field("Новый владелец", f"{new_owner.mention} (`{new_owner}` ID: {new_owner.id})", inline=False)
+        builder.add_field("Причина", "Owner вышел из канала и не вернулся в течение 10 секунд", inline=False)
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+        builder.set_footer(text=f"Время: {format_datetime(timestamp)}")
+        return builder.build()
+
 class MessageEditLogEmbedBuilder:
     @staticmethod
     def build_edit(
@@ -421,6 +440,25 @@ class MemberEventEmbedBuilder:
         builder.add_field("User", f"{member.mention} (`{member}` ID: {member.id})", inline=False)
         builder.add_field("Changes", "\n".join(f"- {change}" for change in changes) or "-", inline=False)
         builder.set_footer(text=f"Time: {format_datetime(timestamp)}")
+        return builder.build()
+
+    @staticmethod
+    def build_pending_update(
+        member: disnake.Member,
+        before_pending: bool,
+        after_pending: bool,
+        timestamp: Optional[datetime] = None,
+    ) -> disnake.Embed:
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+
+        builder = EmbedBuilder(color=0x57F287 if before_pending and not after_pending else 0xFEE75C)
+        builder.set_title(f"Проверка участника обновлена: {member} (ID: {member.id})")
+        builder.add_field("Пользователь", f"{member.mention} (`{member}` ID: {member.id})", inline=False)
+        before_value = "ожидает проверки" if before_pending else "прошёл проверку"
+        after_value = "ожидает проверки" if after_pending else "прошёл проверку"
+        builder.add_field("Статус", f"{before_value} → {after_value}", inline=False)
+        builder.set_footer(text=f"Время: {format_datetime(timestamp)}")
         return builder.build()
 
 class BulkDeleteEmbedBuilder:

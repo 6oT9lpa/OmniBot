@@ -114,4 +114,15 @@ async def test_log_member_update_uses_member_event_embed():
     )
 
     assert guild_repo.rows[0].event_type == "member_update"
-    assert audit.embeds[0][1].title == "Member updated: user (ID: 2)"
+    assert audit.embeds[0][1].title == "Проверка участника обновлена: user (ID: 2)"
+    assert any(field.name == "Статус" and "ожидает проверки" in field.value for field in audit.embeds[0][1].fields)
+
+
+def test_voice_admin_overwrite_change_is_suppressed_from_channel_update():
+    service = LoggingService(FakeMessageLogRepository(), FakeGuildEventLogRepository(), FakeAuditLogService(), config=None)
+    service._detect_voice_admin_overwrite_change = lambda before, after: "voice admin changed"
+
+    before = type("Channel", (), {"name": "Room", "position": 1, "overwrites": {"old": object()}})()
+    after = type("Channel", (), {"name": "Room", "position": 1, "overwrites": {"new": object()}})()
+
+    assert service._detect_channel_changes(before, after) == []
