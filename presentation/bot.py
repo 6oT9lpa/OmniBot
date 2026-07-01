@@ -77,6 +77,8 @@ class DiscordBot(commands.Bot):
                 logger.info("Guild: %s id=%s members=%s", guild.name, guild.id, guild.member_count)
             
             logger.info("=" * 50)
+            await self._start_presence_rotation()
+
             await self._ensure_global_commands_synced()
             await self._global_command_sync_service.remove_legacy_guild_commands(self)
             
@@ -87,12 +89,9 @@ class DiscordBot(commands.Bot):
                         await self._role_service.sync_roles(guild)
                     except Exception as e:
                         logger.error("Failed to sync roles for guild id=%s: %s", guild.id, e)
-
-            await self._start_presence_rotation()
-
     async def on_connect(self):
-        await asyncio.sleep(1)
-        await self._ensure_global_commands_synced()
+        logger.info("Connected to Discord gateway")
+        await self._start_presence_rotation()
 
     async def _ensure_global_commands_synced(self) -> None:
         if self._global_commands_synced:
@@ -155,7 +154,10 @@ class DiscordBot(commands.Bot):
         )
 
         if not self._presence_rotator.is_running():
-            await self._apply_presence(self._presence_items[self._presence_index])
+            try:
+                await self._apply_presence(self._presence_items[self._presence_index])
+            except Exception:
+                logger.exception("Initial presence update failed")
             self._presence_rotator.start()
             logger.info(
                 "Presence rotation started: %s items, %s seconds interval",
@@ -165,17 +167,29 @@ class DiscordBot(commands.Bot):
 
     @tasks.loop(seconds=60)
     async def _presence_rotator(self):
-        self._presence_index = (self._presence_index + 1) % len(self._presence_items)
-        await self._apply_presence(self._presence_items[self._presence_index])
+        next_index = (self._presence_index + 1) % len(self._presence_items)
+        try:
+            await self._apply_presence(self._presence_items[next_index])
+        except Exception:
+            logger.exception("Presence rotation failed index=%s", next_index)
+            return
+
+        self._presence_index = next_index
 
     @_presence_rotator.before_loop
     async def _before_presence_rotator(self):
-        await self.wait_until_ready()
+        await asyncio.sleep(self._config.activity_rotation_interval_seconds)
 
     async def _apply_presence(self, item: PresenceItem):
         await self.change_presence(
             activity=self._build_activity(item),
             status=item.status,
+        )
+        logger.info(
+            "Presence updated type=%s status=%s name=%s",
+            item.activity_type,
+            item.status,
+            self._format_presence_text(item.name),
         )
 
     def _load_presence_items(self) -> list[PresenceItem]:
