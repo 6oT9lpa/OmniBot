@@ -7,7 +7,9 @@ from infrastructure.database.repositories.voice_repository import VoiceRepositor
 from presentation.bot import DiscordBot
 
 
-def test_discord_bot_registers_application_commands_globally():
+def test_discord_bot_registers_application_commands_globally(monkeypatch):
+    monkeypatch.delenv("ACTIVITY_ROTATION_INTERVAL_SECONDS", raising=False)
+
     config = BotConfig(
         discord_token="test-token",
         discord_owner_id=1,
