@@ -12,12 +12,14 @@ _DEFAULT_TITLE_TEMPLATES = {
     "",
     "{creator.name} is live on {platform}",
     "{creator.name} is active on {platform}",
+    "{creator.name} начал стрим на {platform}",
 }
 _DEFAULT_DESCRIPTION_TEMPLATES = {
     "",
     "{creator.ping} {creator.name} started streaming {game}\n{url}",
     "{creator.ping} {title}\nGame: {game}\n{url}",
     "{creator.ping} {creator.name} posted an update: {url}",
+    "{creator.ping}\n\n**{creator.name} уже в эфире.**\n\n**Название:** {title}\n**Категория:** {game}\n\n{url}",
 }
 
 

@@ -274,7 +274,7 @@ class StreamsCog(commands.Cog):
             return
 
         ping_role_id = subscription.ping_role_id or await self._creator_alert_service.get_default_ping_role_id(guild.id)
-        creator_ping = f"<@&{ping_role_id}>" if ping_role_id else f"<@{subscription.user_id}>"
+        creator_ping = f"||<@&{ping_role_id}>||" if ping_role_id else f"<@{subscription.user_id}>"
         creator_icon_url = await self._member_avatar_url(guild, subscription.user_id)
         embed = CreatorAlertEmbedBuilder.build(
             event,
@@ -285,7 +285,12 @@ class StreamsCog(commands.Cog):
             creator_icon_url=creator_icon_url,
         )
         content = creator_ping if ping_role_id else ""
-        await channel.send(content=content, embed=embed, allowed_mentions=disnake.AllowedMentions(roles=True, users=False))
+        await channel.send(
+            content=content,
+            embed=embed,
+            components=self._stream_link_components(subscription.button_label, event.url),
+            allowed_mentions=disnake.AllowedMentions(roles=True, users=False),
+        )
         logger.info(
             "Published creator alert guild_id=%s subscription_id=%s event_id=%s",
             guild.id,
@@ -305,7 +310,7 @@ class StreamsCog(commands.Cog):
             logger.warning("Default stream announce skipped because channel is missing guild_id=%s", guild.id)
             return
         ping_role_id = await self._creator_alert_service.get_default_ping_role_id(guild.id)
-        content = f"<@&{ping_role_id}>" if ping_role_id else ""
+        content = f"||<@&{ping_role_id}>||" if ping_role_id else ""
         embed = CreatorAlertEmbedBuilder.build(
             event,
             title_template="",
@@ -314,8 +319,18 @@ class StreamsCog(commands.Cog):
             creator_ping=f"<@{user_id}>",
             creator_icon_url=await self._member_avatar_url(guild, user_id),
         )
-        await channel.send(content=content, embed=embed, allowed_mentions=disnake.AllowedMentions(roles=True, users=False))
+        await channel.send(
+            content=content,
+            embed=embed,
+            components=self._stream_link_components("Watch", event.url),
+            allowed_mentions=disnake.AllowedMentions(roles=True, users=False),
+        )
         logger.info("Published Discord activity fallback stream alert guild_id=%s user_id=%s", guild.id, user_id)
+
+    def _stream_link_components(self, label: str, url: str) -> list[disnake.ui.Button]:
+        if not url.startswith(("http://", "https://")):
+            return []
+        return [disnake.ui.Button(label=(label or "Watch")[:80], url=url)]
 
     def _build_discord_stream_event(
         self,

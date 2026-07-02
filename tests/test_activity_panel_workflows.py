@@ -176,7 +176,7 @@ async def test_dev_blog_publishes_ten_images_in_one_components_v2_message(activi
 
 
 @pytest.mark.asyncio
-async def test_dev_blog_default_ping_stays_inside_components_v2(activity_db, monkeypatch):
+async def test_dev_blog_default_ping_is_spoiler_component_outside_container(activity_db, monkeypatch):
     service = DevBlogService()
     sent_payloads = []
 
@@ -213,7 +213,8 @@ async def test_dev_blog_default_ping_stays_inside_components_v2(activity_db, mon
 
     assert "content" not in message_payload
     assert message_payload["allowed_mentions"] == {"roles": ["777"]}
-    assert message_payload["components"][0]["components"][0] == {"type": 10, "content": "<@&777>"}
+    assert message_payload["components"][0] == {"type": 10, "content": "||<@&777>||"}
+    assert message_payload["components"][1]["type"] == 17
 
 
 def test_dev_blog_can_render_images_between_text_blocks():

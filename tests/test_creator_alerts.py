@@ -61,9 +61,11 @@ def test_creator_alert_preview_renders_extended_placeholders(creator_event):
 
     message = build_creator_alert_message(payload)
 
-    assert message["content"] == "<@&777>"
+    assert message["content"] == "||<@&777>||"
     assert message["embeds"][0]["title"] == "Arnetik on Twitch"
-    assert "<@&777> Minecraft https://twitch.tv/arnetik Preview alert" in message["embeds"][0]["description"]
+    assert "||<@&777>|| Minecraft https://twitch.tv/arnetik Preview alert" in message["embeds"][0]["description"]
+    assert message["components"][0]["components"][0]["label"] == "Watch"
+    assert message["components"][0]["components"][0]["url"] == "https://twitch.tv/arnetik"
 
 
 def test_creator_url_parser_handles_twitch_and_youtube_urls():
@@ -298,6 +300,70 @@ async def test_activity_creator_alert_service_applies_default_ping_role(tmp_path
         activity_dependencies._db = previous_db
         activity_dependencies._role_purpose_service = previous_role_service
         await db.close()
+
+
+@pytest.mark.asyncio
+async def test_activity_creator_alert_service_updates_platform_and_restricts_creator_ping_role(tmp_path, monkeypatch):
+    db = DatabaseManager(f"sqlite:///{tmp_path / 'activity_creator_alerts_update.db'}")
+    await db.initialize()
+    previous_db = activity_dependencies._db
+    previous_role_service = activity_dependencies._role_purpose_service
+    activity_dependencies._db = db
+    activity_dependencies._role_purpose_service = _RolePurposeService()
+    service = ActivityCreatorAlertService()
+
+    async def ensure_access(*_):
+        return {"id": "42", "username": "creator"}, {"is_admin": False, "is_streamer": True}
+
+    monkeypatch.setattr(service._access_service, "ensure_module_access", ensure_access)
+    try:
+        saved = await service.save_source(
+            CreatorAlertSourcePayload(
+                guild_id=100,
+                platform="twitch",
+                channel_url="https://example.com/creator",
+                channel_name="Creator",
+                ping_role_id=999,
+            ),
+            "token",
+        )
+        updated = await service.save_source(
+            CreatorAlertSourcePayload(
+                guild_id=100,
+                id=saved["id"],
+                platform="youtube",
+                channel_url="https://youtube.com/@creator",
+                channel_name="Creator",
+                ping_role_id=999,
+            ),
+            "token",
+        )
+
+        assert updated["platform"] == "youtube"
+        assert updated["ping_role_id"] == "777"
+    finally:
+        activity_dependencies._db = previous_db
+        activity_dependencies._role_purpose_service = previous_role_service
+        await db.close()
+
+
+def test_activity_creator_alert_preview_uses_styled_embed_button_and_spoiler_ping():
+    message = build_creator_alert_message(
+        CreatorAlertTestPayload(
+            guild_id=100,
+            platform="youtube",
+            channel_name="Creator",
+            channel_url="https://youtube.com/watch?v=bhu63w-yd9k",
+            ping_role_id=777,
+            button_label="Watch live",
+        )
+    )
+
+    assert message["content"] == "||<@&777>||"
+    assert message["embeds"][0]["fields"][0]["value"] == "YouTube"
+    assert "прямой эфир на YouTube" in message["embeds"][0]["description"]
+    assert message["embeds"][0]["image"]["url"].endswith("bhu63w-yd9k/maxresdefault.jpg")
+    assert message["components"][0]["components"][0]["label"] == "Watch live"
 
 
 @pytest.mark.asyncio

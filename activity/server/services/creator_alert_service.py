@@ -54,7 +54,12 @@ class CreatorAlertService:
             raise HTTPException(status_code=403, detail="Creator or administrator access is required")
 
         owner_id = payload.user_id if access["is_admin"] and payload.user_id else int(user["id"])
-        if not payload.ping_role_id:
+        if not access["is_admin"]:
+            payload.ping_role_id = await get_role_purpose_service().get_role(
+                payload.guild_id,
+                ServerRolePurpose.PING_STREAM,
+            )
+        elif not payload.ping_role_id:
             payload.ping_role_id = await get_role_purpose_service().get_role(
                 payload.guild_id,
                 ServerRolePurpose.PING_STREAM,
@@ -79,6 +84,7 @@ class CreatorAlertService:
             or "{creator.ping} {creator.name} started streaming {game}\n{url}"
         )
         values = (
+            payload.platform,
             payload.channel_url,
             payload.channel_name,
             payload.external_channel_id,
@@ -94,7 +100,7 @@ class CreatorAlertService:
             await get_db().execute(
                 """
                 UPDATE creator_alert_subscriptions
-                SET channel_url = ?, channel_name = ?, external_channel_id = ?, alert_kind = ?,
+                SET platform = ?, channel_url = ?, channel_name = ?, external_channel_id = ?, alert_kind = ?,
                     title_template = ?, description_template = ?, button_label = ?, color = ?,
                     ping_role_id = ?, active = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
@@ -115,7 +121,6 @@ class CreatorAlertService:
                 (
                     owner_id,
                     payload.guild_id,
-                    payload.platform,
                     *values,
                 ),
             )
@@ -153,7 +158,12 @@ class CreatorAlertService:
         _, access = await self._access_service.ensure_module_access(access_token, str(payload.guild_id), "creator-alerts", "edit")
         if not (access["is_admin"] or access["is_streamer"]):
             raise HTTPException(status_code=403, detail="Creator or administrator access is required")
-        if not payload.ping_role_id:
+        if not access["is_admin"]:
+            payload.ping_role_id = await get_role_purpose_service().get_role(
+                payload.guild_id,
+                ServerRolePurpose.PING_STREAM,
+            )
+        elif not payload.ping_role_id:
             payload.ping_role_id = await get_role_purpose_service().get_role(
                 payload.guild_id,
                 ServerRolePurpose.PING_STREAM,

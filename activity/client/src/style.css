@@ -858,6 +858,7 @@ a {
 
 .panel-workspace {
   min-width: 0;
+  overflow-x: hidden;
 }
 
 .panel-topbar {
@@ -892,6 +893,9 @@ a {
 .panel-content {
   display: grid;
   gap: 24px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
   padding: clamp(20px, 3vw, 40px);
 }
 
@@ -1290,6 +1294,101 @@ input[type="color"] {
   word-break: break-word;
 }
 
+.readonly-value {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 10px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.creator-alerts-grid,
+.creator-alerts-grid > *,
+.creator-preview,
+.creator-source-list,
+.creator-source-list > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.creator-preview {
+  overflow: hidden;
+}
+
+.preview-content {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 30px;
+  align-items: center;
+  margin-bottom: 12px !important;
+  padding: 4px 10px;
+  color: var(--text) !important;
+  background: rgba(88, 101, 242, 0.18);
+  border: 1px solid rgba(88, 101, 242, 0.38);
+  border-radius: 8px;
+}
+
+.preview-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.preview-fields span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  overflow-wrap: anywhere;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.preview-fields strong {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.preview-image {
+  width: 100%;
+  margin: 18px 0;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  aspect-ratio: 16 / 9;
+}
+
+.preview-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.stream-link-button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  overflow-wrap: anywhere;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+
 .preview-media {
   display: grid;
   min-height: 120px;
@@ -1626,6 +1725,89 @@ input[type="color"] {
 
 .source-list span {
   color: var(--muted);
+}
+
+.creator-source-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+}
+
+.creator-source-list article {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.creator-source-list article:hover {
+  border-color: rgba(88, 101, 242, 0.48);
+  box-shadow: 0 18px 44px rgba(88, 101, 242, 0.12);
+  transform: translateY(-2px);
+}
+
+.creator-source-list header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.creator-source-list header div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.creator-source-list strong,
+.creator-source-list span,
+.creator-source-list dd {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.source-link {
+  width: 100%;
+}
+
+.creator-source-list dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.creator-source-list dl div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.creator-source-list dt {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.creator-source-list dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.source-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .record-list,
@@ -2185,6 +2367,11 @@ input[type="color"] {
   .source-list article {
     grid-template-columns: 1fr;
     padding: 16px;
+  }
+
+  .preview-fields,
+  .creator-source-list dl {
+    grid-template-columns: 1fr;
   }
 
   .integration-grid,

@@ -139,7 +139,6 @@ class DevBlogService:
             logger.info("Dev Blog default ping role is not configured guild_id=%s", guild_id)
             return
 
-        components = message_payload["components"][0]["components"]
-        components.insert(0, {"type": 10, "content": f"<@&{role_id}>"})
+        message_payload["components"].insert(0, {"type": 10, "content": f"||<@&{role_id}>||"})
         message_payload["allowed_mentions"] = {"roles": [str(role_id)]}
         logger.info("Applied Dev Blog default ping role guild_id=%s role_id=%s", guild_id, role_id)
