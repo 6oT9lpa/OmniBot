@@ -184,6 +184,8 @@ class StreamsCog(commands.Cog):
             description=f"{source.platform.value.title()} source connected for {source.channel_name or source.channel_url}.",
             color=disnake.Color.green(),
         )
+        if await self._publish_source_if_live(ctx.guild, source, "streamer_add"):
+            embed.description += "\nLive event was found and published to the stream announce channel."
         await ctx.edit_original_response(embed=embed)
 
     @streamer.sub_command(name="remove", description="Remove a creator source")
@@ -297,6 +299,47 @@ class StreamsCog(commands.Cog):
             subscription.id,
             event.event_id,
         )
+
+    async def _publish_source_if_live(
+        self,
+        guild: disnake.Guild,
+        subscription: CreatorAlertSubscription,
+        reason: str,
+    ) -> bool:
+        # This keeps command-created sources responsive while the Activity panel still uses the scheduled monitor.
+        if subscription.id is None:
+            logger.warning("Creator alert immediate publish skipped because source id is missing reason=%s", reason)
+            return False
+        try:
+            event = await self._creator_alert_service.check_subscription(subscription)
+            if not event:
+                logger.info(
+                    "Creator alert immediate publish found no event guild_id=%s subscription_id=%s reason=%s",
+                    guild.id,
+                    subscription.id,
+                    reason,
+                )
+                return False
+            await self._publish_subscription_event(guild, subscription, event)
+            await self._creator_alert_service.mark_announced(subscription.id, event.event_id)
+            logger.info(
+                "Creator alert immediate publish completed guild_id=%s subscription_id=%s event_id=%s reason=%s",
+                guild.id,
+                subscription.id,
+                event.event_id,
+                reason,
+            )
+            return True
+        except Exception as exc:
+            logger.error(
+                "Creator alert immediate publish failed guild_id=%s subscription_id=%s reason=%s error=%s",
+                guild.id,
+                subscription.id,
+                reason,
+                exc,
+                exc_info=True,
+            )
+            return False
 
     async def _publish_default_event(
         self,

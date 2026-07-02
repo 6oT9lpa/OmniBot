@@ -101,6 +101,16 @@ class CreatorAlertRepository(CreatorAlertRepositoryInterface, BaseRepository):
                 color = excluded.color,
                 ping_role_id = excluded.ping_role_id,
                 active = excluded.active,
+                last_event_id = CASE
+                    WHEN COALESCE(creator_alert_subscriptions.external_channel_id, '') != COALESCE(excluded.external_channel_id, '')
+                    THEN NULL
+                    ELSE creator_alert_subscriptions.last_event_id
+                END,
+                last_checked_at = CASE
+                    WHEN COALESCE(creator_alert_subscriptions.external_channel_id, '') != COALESCE(excluded.external_channel_id, '')
+                    THEN NULL
+                    ELSE creator_alert_subscriptions.last_checked_at
+                END,
                 updated_at = CURRENT_TIMESTAMP
             """,
             (

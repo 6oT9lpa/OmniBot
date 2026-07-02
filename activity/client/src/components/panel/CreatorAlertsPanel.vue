@@ -53,12 +53,20 @@ async function previewCreator() {
 }
 
 async function deleteCreator(source: CreatorAlertSource) {
-  if (!source.id) return;
+  const sourceId = Number(source.id);
+  if (!Number.isFinite(sourceId) || sourceId <= 0) {
+    saving.message = "Source id is missing";
+    return;
+  }
+  saving.value = true;
+  saving.message = "Removing source...";
   try {
-    await activity.deleteCreatorSource(source.id);
+    await activity.deleteCreatorSource(sourceId);
     saving.message = "Source removed";
   } catch (error) {
     saving.message = error instanceof Error ? error.message : String(error);
+  } finally {
+    saving.value = false;
   }
 }
 

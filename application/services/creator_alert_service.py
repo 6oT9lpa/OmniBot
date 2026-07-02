@@ -122,6 +122,14 @@ class CreatorAlertService(CreatorAlertServiceInterface):
         )
         if not event:
             return None
+        if event.alert_kind != subscription.alert_kind:
+            logger.info(
+                "Creator alert event kind does not match subscription subscription_id=%s expected=%s actual=%s",
+                subscription.id,
+                subscription.alert_kind.value,
+                event.alert_kind.value,
+            )
+            return None
         if event.event_id == subscription.last_event_id:
             logger.info(
                 "Creator alert event already announced subscription_id=%s event_id=%s",

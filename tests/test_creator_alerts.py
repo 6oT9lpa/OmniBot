@@ -8,7 +8,7 @@ from activity.server.services.creator_alert_service import CreatorAlertService a
 from activity.server.utils.creator_alert_messages import build_creator_alert_message
 from application.dto.creator_alert_dto import CreatorAlertSubscriptionInput
 from application.services.creator_alert_service import CreatorAlertService
-from core.domain.creator_alert import CreatorAlertKind, CreatorContentEvent, CreatorPlatform
+from core.domain.creator_alert import CreatorAlertKind, CreatorAlertSubscription, CreatorContentEvent, CreatorPlatform
 from infrastructure.api.twitch_client import TwitchClient
 from infrastructure.api.url_parser import CreatorUrlParser
 from infrastructure.api.youtube_client import YouTubeClient
@@ -32,6 +32,18 @@ class _NoopClient:
 
 class _MissingCredentialsClient(_NoopClient):
     is_configured = False
+
+
+class _VideoClient(_NoopClient):
+    async def fetch_latest_event(self, channel_url, external_channel_id=None):
+        return CreatorContentEvent(
+            platform=CreatorPlatform.YOUTUBE,
+            alert_kind=CreatorAlertKind.VIDEO,
+            event_id="video-1",
+            creator_name="Creator",
+            title="New video",
+            url="https://youtube.com/watch?v=video-1",
+        )
 
 
 @pytest.fixture
@@ -73,6 +85,60 @@ def test_creator_url_parser_handles_twitch_and_youtube_urls():
     assert CreatorUrlParser.twitch_login("stepiks_") == "stepiks_"
     assert CreatorUrlParser.youtube_channel_ref("https://www.youtube.com/@omni") == "@omni"
     assert CreatorUrlParser.youtube_channel_ref("https://www.youtube.com/channel/UC123") == "UC123"
+
+
+def test_youtube_client_parses_video_urls_and_live_page():
+    client = YouTubeClient("key")
+
+    assert client._video_id("https://youtube.com/watch?v=bhu63w-yd9k") == "bhu63w-yd9k"
+    assert client._video_id("https://youtu.be/bhu63w-yd9k") == "bhu63w-yd9k"
+    assert client._video_id("https://youtube.com/live/bhu63w-yd9k?si=abc") == "bhu63w-yd9k"
+    assert client._video_id("https://youtube.com/shorts/bhu63w-yd9k") == "bhu63w-yd9k"
+    assert client._extract_video_id_from_page('{"videoId":"bhu63w-yd9k"}') == "bhu63w-yd9k"
+
+
+def test_youtube_client_builds_live_event_from_video_payload():
+    client = YouTubeClient("key")
+    event = client._event_from_video_item(
+        {
+            "id": "bhu63w-yd9k",
+            "snippet": {
+                "channelTitle": "Creator",
+                "title": "Live now",
+                "liveBroadcastContent": "live",
+                "thumbnails": {"high": {"url": "https://img.youtube.com/live.jpg"}},
+            },
+            "liveStreamingDetails": {"actualStartTime": "2026-07-03T00:00:00Z"},
+        }
+    )
+
+    assert event.alert_kind == CreatorAlertKind.STREAM
+    assert event.event_id == "bhu63w-yd9k"
+    assert event.creator_name == "Creator"
+    assert event.thumbnail_url == "https://img.youtube.com/live.jpg"
+
+
+def test_youtube_client_builds_video_event_from_feed():
+    client = YouTubeClient("key")
+    event = client._event_from_feed(
+        """<?xml version="1.0" encoding="UTF-8"?>
+        <feed xmlns="http://www.w3.org/2005/Atom"
+              xmlns:yt="http://www.youtube.com/xml/schemas/2015"
+              xmlns:media="http://search.yahoo.com/mrss/">
+          <entry>
+            <yt:videoId>video-1</yt:videoId>
+            <title>Fresh video</title>
+            <author><name>Creator</name></author>
+            <media:group><media:thumbnail url="https://img.youtube.com/video.jpg" /></media:group>
+          </entry>
+        </feed>
+        """
+    )
+
+    assert event is not None
+    assert event.alert_kind == CreatorAlertKind.VIDEO
+    assert event.event_id == "video-1"
+    assert event.creator_name == "Creator"
 
 
 def test_streaming_activity_game_uses_discord_state_not_title():
@@ -146,6 +212,62 @@ async def test_streaming_activity_scan_publishes_existing_status_once():
     assert published[0][1] == 42
     assert published[0][2].title == "Building OmniBot"
     assert published[0][2].game == "Minecraft"
+
+
+@pytest.mark.asyncio
+async def test_immediate_source_publish_marks_live_event():
+    subscription = CreatorAlertSubscriptionInput(
+        guild_id=100,
+        user_id=42,
+        platform=CreatorPlatform.TWITCH,
+        channel_url="https://twitch.tv/creator",
+        channel_name="Creator",
+    )
+    event = CreatorContentEvent(
+        platform=CreatorPlatform.TWITCH,
+        alert_kind=CreatorAlertKind.STREAM,
+        event_id="live-1",
+        creator_name="Creator",
+        title="Live now",
+        url="https://twitch.tv/creator",
+        game="Minecraft",
+    )
+
+    class Guild:
+        id = 100
+
+    class Service:
+        def __init__(self):
+            self.marked = []
+
+        async def check_subscription(self, source):
+            assert source.id == 11
+            return event
+
+        async def mark_announced(self, source_id, event_id):
+            self.marked.append((source_id, event_id))
+
+    service = Service()
+    cog = StreamsCog.__new__(StreamsCog)
+    cog._creator_alert_service = service
+    published = []
+
+    async def publish_subscription(guild, source, resolved_event):
+        published.append((guild.id, source.id, resolved_event.event_id))
+
+    cog._publish_subscription_event = publish_subscription
+    source = CreatorAlertSubscription(
+        id=11,
+        guild_id=subscription.guild_id,
+        user_id=subscription.user_id,
+        platform=subscription.platform,
+        channel_url=subscription.channel_url,
+        channel_name=subscription.channel_name,
+    )
+
+    assert await cog._publish_source_if_live(Guild(), source, "test") is True
+    assert published == [(100, 11, "live-1")]
+    assert service.marked == [(11, "live-1")]
 
 
 def test_default_creator_alert_embed_is_russian_and_visual(creator_event):
@@ -233,6 +355,27 @@ def test_creator_alert_service_reports_platform_configuration(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_creator_alert_service_filters_mismatched_event_kind(tmp_path):
+    db = DatabaseManager(f"sqlite:///{tmp_path / 'creator_alerts_kind.db'}")
+    service = CreatorAlertService(
+        CreatorAlertRepository(db),
+        ChannelConfigRepository(db),
+        _RolePurposeService(),
+        {CreatorPlatform.YOUTUBE: _VideoClient()},
+    )
+    subscription = CreatorAlertSubscription(
+        id=1,
+        guild_id=100,
+        user_id=42,
+        platform=CreatorPlatform.YOUTUBE,
+        channel_url="https://youtube.com/@creator",
+        alert_kind=CreatorAlertKind.STREAM,
+    )
+
+    assert await service.check_subscription(subscription) is None
+
+
+@pytest.mark.asyncio
 async def test_creator_alert_service_enforces_five_sources_per_user(tmp_path):
     db = DatabaseManager(f"sqlite:///{tmp_path / 'creator_alerts.db'}")
     await db.initialize()
@@ -303,6 +446,82 @@ async def test_activity_creator_alert_service_applies_default_ping_role(tmp_path
 
 
 @pytest.mark.asyncio
+async def test_activity_creator_alert_save_publishes_live_embed(tmp_path, monkeypatch):
+    db = DatabaseManager(f"sqlite:///{tmp_path / 'activity_creator_alerts_publish.db'}")
+    await db.initialize()
+    previous_db = activity_dependencies._db
+    previous_role_service = activity_dependencies._role_purpose_service
+    activity_dependencies._db = db
+    activity_dependencies._role_purpose_service = _RolePurposeService()
+    await db.execute(
+        """
+        INSERT INTO server_channel_purposes (guild_id, purpose, channel_id)
+        VALUES (?, ?, ?)
+        """,
+        (100, "stream_announce", 555),
+    )
+    await db.commit()
+    service = ActivityCreatorAlertService()
+
+    class LiveClient:
+        is_configured = True
+
+        async def fetch_latest_event(self, channel_url, external_channel_id=None):
+            return CreatorContentEvent(
+                platform=CreatorPlatform.TWITCH,
+                alert_kind=CreatorAlertKind.STREAM,
+                event_id="live-now",
+                creator_name="Creator",
+                title="Building OmniBot",
+                url=channel_url,
+                game="Minecraft",
+                thumbnail_url="https://static-cdn.jtvnw.net/previews-ttv/live_user_creator-1280x720.jpg",
+            )
+
+    class Discord:
+        def __init__(self):
+            self.requests = []
+
+        async def safe_bot_request(self, method, path, *, params=None, json_body=None):
+            self.requests.append((method, path, json_body))
+            if method == "GET":
+                return {"user": {"avatar": "avatar-hash"}}
+            return {"id": "999"}
+
+    async def ensure_access(*_):
+        return {"id": "42", "username": "creator"}, {"is_admin": False, "is_streamer": True}
+
+    discord = Discord()
+    service._publish_service._discord = discord
+    service._publish_service._platform_clients = {CreatorPlatform.TWITCH: LiveClient()}
+    monkeypatch.setattr(service._access_service, "ensure_module_access", ensure_access)
+    try:
+        saved = await service.save_source(
+            CreatorAlertSourcePayload(
+                guild_id=100,
+                platform="twitch",
+                channel_url="https://twitch.tv/creator",
+                channel_name="Creator",
+                button_label="Смотреть",
+            ),
+            "token",
+        )
+
+        message_request = discord.requests[-1]
+        assert message_request[0] == "POST"
+        assert message_request[1] == "/channels/555/messages"
+        assert message_request[2]["content"] == "||<@&777>||"
+        assert message_request[2]["embeds"][0]["url"] == "https://twitch.tv/creator"
+        assert message_request[2]["components"][0]["components"][0]["label"] == "Смотреть"
+        reloaded = await db.fetch_one("SELECT last_event_id FROM creator_alert_subscriptions WHERE id = ?", (saved["id"],))
+        assert reloaded["last_event_id"] == "live-now"
+    finally:
+        activity_dependencies._db = previous_db
+        activity_dependencies._role_purpose_service = previous_role_service
+        await db.close()
+
+
+@pytest.mark.asyncio
 async def test_activity_creator_alert_service_updates_platform_and_restricts_creator_ping_role(tmp_path, monkeypatch):
     db = DatabaseManager(f"sqlite:///{tmp_path / 'activity_creator_alerts_update.db'}")
     await db.initialize()
@@ -327,6 +546,11 @@ async def test_activity_creator_alert_service_updates_platform_and_restricts_cre
             ),
             "token",
         )
+        await db.execute(
+            "UPDATE creator_alert_subscriptions SET last_event_id = ?, last_checked_at = CURRENT_TIMESTAMP WHERE id = ?",
+            ("old-event", saved["id"]),
+        )
+        await db.commit()
         updated = await service.save_source(
             CreatorAlertSourcePayload(
                 guild_id=100,
@@ -341,6 +565,48 @@ async def test_activity_creator_alert_service_updates_platform_and_restricts_cre
 
         assert updated["platform"] == "youtube"
         assert updated["ping_role_id"] == "777"
+        assert updated["last_event_id"] is None
+        assert updated["last_checked_at"] is None
+    finally:
+        activity_dependencies._db = previous_db
+        activity_dependencies._role_purpose_service = previous_role_service
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_activity_creator_alert_delete_reports_missing_and_removes_owned_source(tmp_path, monkeypatch):
+    db = DatabaseManager(f"sqlite:///{tmp_path / 'activity_creator_alerts_delete.db'}")
+    await db.initialize()
+    previous_db = activity_dependencies._db
+    previous_role_service = activity_dependencies._role_purpose_service
+    activity_dependencies._db = db
+    activity_dependencies._role_purpose_service = _RolePurposeService()
+    service = ActivityCreatorAlertService()
+
+    async def ensure_access(*_):
+        return {"id": "42", "username": "creator"}, {"is_admin": False, "is_streamer": True}
+
+    monkeypatch.setattr(service._access_service, "ensure_module_access", ensure_access)
+    try:
+        saved = await service.save_source(
+            CreatorAlertSourcePayload(
+                guild_id=100,
+                platform="twitch",
+                channel_url="https://twitch.tv/creator",
+                channel_name="Creator",
+            ),
+            "token",
+        )
+
+        missing = saved["id"] + 100
+        with pytest.raises(HTTPException) as exc_info:
+            await service.delete_source(100, missing, "token")
+        assert exc_info.value.status_code == 404
+
+        deleted = await service.delete_source(100, saved["id"], "token")
+        assert deleted == {"deleted": True, "id": saved["id"]}
+        row = await db.fetch_one("SELECT id FROM creator_alert_subscriptions WHERE id = ?", (saved["id"],))
+        assert row is None
     finally:
         activity_dependencies._db = previous_db
         activity_dependencies._role_purpose_service = previous_role_service

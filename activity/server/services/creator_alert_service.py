@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from activity.server.dependencies import get_db, get_role_purpose_service
 from activity.server.schemas.creator_alerts import CreatorAlertSourcePayload, CreatorAlertTestPayload
 from activity.server.services.access_service import ActivityAccessService
+from activity.server.services.creator_alert_publish_service import CreatorAlertPublishService
 from activity.server.utils.creator_alert_messages import build_creator_alert_message
 from core.domain.server_role_purpose import ServerRolePurpose
 from infrastructure.logging import get_logger
@@ -18,6 +19,7 @@ class CreatorAlertService:
 
     def __init__(self) -> None:
         self._access_service = ActivityAccessService()
+        self._publish_service = CreatorAlertPublishService()
 
     async def list_sources(self, guild_id: int, access_token: str) -> list[dict[str, Any]]:
         logger.info("Listing creator alert sources guild_id=%s", guild_id)
@@ -97,15 +99,19 @@ class CreatorAlertService:
             int(payload.active),
         )
         if existing:
+            should_reset_event = self._identity_changed(existing, payload)
             await get_db().execute(
                 """
                 UPDATE creator_alert_subscriptions
                 SET platform = ?, channel_url = ?, channel_name = ?, external_channel_id = ?, alert_kind = ?,
                     title_template = ?, description_template = ?, button_label = ?, color = ?,
-                    ping_role_id = ?, active = ?, updated_at = CURRENT_TIMESTAMP
+                    ping_role_id = ?, active = ?,
+                    last_event_id = CASE WHEN ? THEN NULL ELSE last_event_id END,
+                    last_checked_at = CASE WHEN ? THEN NULL ELSE last_checked_at END,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (*values, existing["id"]),
+                (*values, should_reset_event, should_reset_event, existing["id"]),
             )
             source_id = int(existing["id"])
         else:
@@ -133,7 +139,9 @@ class CreatorAlertService:
         if not saved:
             raise HTTPException(status_code=500, detail="Saved source was not found")
         logger.info("Creator alert source saved guild_id=%s source_id=%s", payload.guild_id, source_id)
-        return self._serialize_source(saved)
+        serialized = self._serialize_source(saved)
+        await self._publish_service.publish_saved_source_if_live(serialized)
+        return serialized
 
     async def delete_source(self, guild_id: int, source_id: int, access_token: str) -> dict[str, Any]:
         logger.info("Deleting creator alert source guild_id=%s source_id=%s", guild_id, source_id)
@@ -148,8 +156,17 @@ class CreatorAlertService:
             tuple(params),
         )
         await get_db().commit()
+        if not cursor.rowcount:
+            logger.warning(
+                "Creator alert source delete missed guild_id=%s source_id=%s user_id=%s",
+                guild_id,
+                source_id,
+                user.get("id"),
+            )
+            raise HTTPException(status_code=404, detail="Creator source was not found")
+        logger.info("Creator alert source deleted guild_id=%s source_id=%s", guild_id, source_id)
         return {
-            "deleted": bool(cursor.rowcount),
+            "deleted": True,
             "id": source_id,
         }
 
@@ -178,18 +195,31 @@ class CreatorAlertService:
         if payload.id:
             return await get_db().fetch_one(
                 """
-                SELECT id FROM creator_alert_subscriptions
+                SELECT id, platform, channel_url, external_channel_id, alert_kind
+                FROM creator_alert_subscriptions
                 WHERE guild_id = ? AND user_id = ? AND id = ?
                 """,
                 (payload.guild_id, owner_id, payload.id),
             )
         return await get_db().fetch_one(
             """
-            SELECT id FROM creator_alert_subscriptions
+            SELECT id, platform, channel_url, external_channel_id, alert_kind
+            FROM creator_alert_subscriptions
             WHERE guild_id = ? AND user_id = ? AND platform = ? AND channel_url = ? AND alert_kind = ?
             LIMIT 1
             """,
             (payload.guild_id, owner_id, payload.platform, payload.channel_url, payload.alert_kind),
+        )
+
+    def _identity_changed(self, existing: dict[str, Any], payload: CreatorAlertSourcePayload) -> bool:
+        """A changed source identity must be checked as a new stream target by the bot monitor."""
+        return any(
+            (
+                existing.get("platform") != payload.platform,
+                existing.get("channel_url") != payload.channel_url,
+                (existing.get("external_channel_id") or None) != (payload.external_channel_id or None),
+                (existing.get("alert_kind") or "stream") != payload.alert_kind,
+            )
         )
 
     def _serialize_source(self, row: dict[str, Any]) -> dict[str, Any]:
