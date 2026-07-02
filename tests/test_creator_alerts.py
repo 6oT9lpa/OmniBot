@@ -24,8 +24,14 @@ class _RolePurposeService:
 
 
 class _NoopClient:
+    is_configured = True
+
     async def fetch_latest_event(self, channel_url, external_channel_id=None):
         return None
+
+
+class _MissingCredentialsClient(_NoopClient):
+    is_configured = False
 
 
 @pytest.fixture
@@ -79,6 +85,52 @@ def test_streaming_activity_game_uses_discord_state_not_title():
     assert cog._stream_title(activity) == "Building OmniBot"
     assert cog._stream_game(activity) == "Minecraft"
     assert cog._stream_url(activity) == "https://www.twitch.tv/stepiks_"
+    assert cog._stream_thumbnail_url(activity).endswith("live_user_stepiks_-1280x720.jpg")
+
+
+@pytest.mark.asyncio
+async def test_streaming_activity_scan_publishes_existing_status_once():
+    class Guild:
+        id = 100
+        members = []
+
+    class Member:
+        id = 42
+        bot = False
+        guild = Guild()
+        display_name = "Creator"
+        activities = [
+            disnake.Streaming(
+                name="Twitch",
+                details="Building OmniBot",
+                state="Minecraft",
+                url="https://www.twitch.tv/creator",
+            )
+        ]
+
+    class Service:
+        async def list_sources(self, guild_id, user_id=None):
+            return []
+
+    Guild.members = [Member()]
+    cog = StreamsCog.__new__(StreamsCog)
+    cog._creator_alert_service = Service()
+    cog._fallback_event_ids = set()
+    published = []
+
+    async def publish_default(guild, user_id, event):
+        published.append((guild.id, user_id, event))
+
+    cog._publish_default_event = publish_default
+
+    await cog._scan_discord_streaming_members(Guild())
+    await cog._scan_discord_streaming_members(Guild())
+
+    assert len(published) == 1
+    assert published[0][0] == 100
+    assert published[0][1] == 42
+    assert published[0][2].title == "Building OmniBot"
+    assert published[0][2].game == "Minecraft"
 
 
 def test_default_creator_alert_embed_is_russian_and_visual(creator_event):
@@ -119,6 +171,23 @@ async def test_platform_clients_skip_network_when_credentials_are_missing():
     assert youtube.is_configured is False
     assert await twitch.fetch_latest_event("https://www.twitch.tv/stepiks_") is None
     assert await youtube.fetch_latest_event("https://www.youtube.com/@omni") is None
+
+
+def test_creator_alert_service_reports_platform_configuration(tmp_path):
+    db = DatabaseManager(f"sqlite:///{tmp_path / 'creator_alerts_config.db'}")
+    service = CreatorAlertService(
+        CreatorAlertRepository(db),
+        ChannelConfigRepository(db),
+        _RolePurposeService(),
+        {
+            CreatorPlatform.TWITCH: _MissingCredentialsClient(),
+            CreatorPlatform.YOUTUBE: _NoopClient(),
+        },
+    )
+
+    assert service.is_platform_configured(CreatorPlatform.TWITCH) is False
+    assert service.is_platform_configured(CreatorPlatform.YOUTUBE) is True
+    assert service.is_platform_configured(CreatorPlatform.KICK) is False
 
 
 @pytest.mark.asyncio

@@ -7,9 +7,11 @@ from application.dto.creator_alert_dto import CreatorAlertSubscriptionInput
 from application.services.creator_alert_service import CreatorAlertService
 from core.domain.creator_alert import (
     CreatorAlertKind,
+    CreatorAlertSubscription,
     CreatorContentEvent,
     CreatorPlatform,
 )
+from infrastructure.api.url_parser import CreatorUrlParser
 from infrastructure.logging import get_logger
 from presentation.embeds.creator_alert_embed import CreatorAlertEmbedBuilder
 
@@ -20,6 +22,7 @@ class StreamsCog(commands.Cog):
     def __init__(self, bot: commands.Bot, creator_alert_service: CreatorAlertService):
         self._bot = bot
         self._creator_alert_service = creator_alert_service
+        self._fallback_event_ids: set[str] = set()
         logger.info("StreamsCog initialized")
 
     def cog_load(self) -> None:
@@ -50,6 +53,7 @@ class StreamsCog(commands.Cog):
                         exc,
                         exc_info=True,
                     )
+            await self._scan_discord_streaming_members(guild)
 
     @monitor_creator_sources.before_loop
     async def before_monitor_creator_sources(self) -> None:
@@ -64,41 +68,87 @@ class StreamsCog(commands.Cog):
         if before_stream or not after_stream:
             return
 
-        subscriptions = await self._creator_alert_service.list_sources(after.guild.id, after.id)
+        await self._handle_streaming_presence(after, after_stream, "presence_update")
+
+    async def _scan_discord_streaming_members(self, guild: disnake.Guild) -> None:
+        inspected = 0
+        stream_count = 0
+        for member in guild.members:
+            if member.bot:
+                continue
+            inspected += 1
+            stream = self._get_stream_activity(member)
+            if not stream:
+                continue
+            stream_count += 1
+            await self._handle_streaming_presence(member, stream, "presence_scan")
+        logger.info(
+            "Discord streaming activity scan completed guild_id=%s inspected=%s streams=%s",
+            guild.id,
+            inspected,
+            stream_count,
+        )
+
+    async def _handle_streaming_presence(
+        self,
+        member: disnake.Member,
+        stream: disnake.Streaming,
+        reason: str,
+    ) -> None:
+        if not member.guild:
+            return
+
+        subscriptions = await self._creator_alert_service.list_sources(member.guild.id, member.id)
         active_stream_sources = [
             source
             for source in subscriptions
             if source.active and source.alert_kind == CreatorAlertKind.STREAM
         ]
-        if active_stream_sources:
+        configured_sources = [
+            source
+            for source in active_stream_sources
+            if self._creator_alert_service.is_platform_configured(source.platform)
+        ]
+        if configured_sources:
             logger.info(
-                "Skipping Discord activity fallback because active source exists guild_id=%s user_id=%s sources=%s",
-                after.guild.id,
-                after.id,
-                [source.id for source in active_stream_sources],
+                "Skipping Discord activity fallback because configured source exists guild_id=%s user_id=%s sources=%s reason=%s",
+                member.guild.id,
+                member.id,
+                [source.id for source in configured_sources],
+                reason,
             )
             return
 
-        event = CreatorContentEvent(
-            platform=CreatorPlatform.TWITCH,
-            alert_kind=CreatorAlertKind.STREAM,
-            event_id=f"discord-activity:{after.id}:{self._stream_title(after_stream)}",
-            creator_name=after.display_name,
-            title=self._stream_title(after_stream),
-            url=self._stream_url(after_stream),
-            game=self._stream_game(after_stream),
-            thumbnail_url=self._stream_thumbnail_url(after_stream),
-        )
+        source = active_stream_sources[0] if active_stream_sources else None
+        platform = source.platform if source else CreatorPlatform.TWITCH
+        event = self._build_discord_stream_event(member, stream, platform)
+        if event.event_id in self._fallback_event_ids or (source and source.last_event_id == event.event_id):
+            logger.info(
+                "Discord activity fallback already announced guild_id=%s user_id=%s event_id=%s reason=%s",
+                member.guild.id,
+                member.id,
+                event.event_id,
+                reason,
+            )
+            return
+
         logger.info(
-            "Discord streaming activity resolved guild_id=%s user_id=%s title=%s game=%s url=%s raw=%s",
-            after.guild.id,
-            after.id,
+            "Discord streaming activity resolved guild_id=%s user_id=%s title=%s game=%s url=%s raw=%s reason=%s",
+            member.guild.id,
+            member.id,
             event.title,
             event.game,
             event.url,
-            self._stream_payload(after_stream),
+            self._stream_payload(stream),
+            reason,
         )
-        await self._publish_default_event(after.guild, after.id, event)
+        if source:
+            await self._publish_subscription_event(member.guild, source, event)
+            if source.id is not None:
+                await self._creator_alert_service.mark_announced(source.id, event.event_id)
+        else:
+            await self._publish_default_event(member.guild, member.id, event)
+        self._fallback_event_ids.add(event.event_id)
 
     @commands.slash_command(name="streamer", description="Manage creator alert subscriptions")
     async def streamer(self, ctx: disnake.ApplicationCommandInteraction) -> None:
@@ -212,7 +262,7 @@ class StreamsCog(commands.Cog):
     async def _publish_subscription_event(
         self,
         guild: disnake.Guild,
-        subscription,
+        subscription: CreatorAlertSubscription,
         event: CreatorContentEvent,
     ) -> None:
         channel_id = await self._creator_alert_service.get_announce_channel_id(guild.id)
@@ -265,6 +315,31 @@ class StreamsCog(commands.Cog):
         await channel.send(content=content, embed=embed, allowed_mentions=disnake.AllowedMentions(roles=True, users=False))
         logger.info("Published Discord activity fallback stream alert guild_id=%s user_id=%s", guild.id, user_id)
 
+    def _build_discord_stream_event(
+        self,
+        member: disnake.Member,
+        activity: disnake.Streaming,
+        platform: CreatorPlatform,
+    ) -> CreatorContentEvent:
+        return CreatorContentEvent(
+            platform=platform,
+            alert_kind=CreatorAlertKind.STREAM,
+            event_id=self._discord_activity_event_id(member, activity),
+            creator_name=member.display_name,
+            title=self._stream_title(activity),
+            url=self._stream_url(activity),
+            game=self._stream_game(activity),
+            thumbnail_url=self._stream_thumbnail_url(activity),
+        )
+
+    def _discord_activity_event_id(self, member: disnake.Member, activity: disnake.Streaming) -> str:
+        started_at = getattr(activity, "start", None) or getattr(activity, "created_at", None)
+        if started_at:
+            marker = int(started_at.timestamp())
+        else:
+            marker = self._stream_url(activity) or self._stream_title(activity)
+        return f"discord-activity:{member.id}:{marker}"
+
     def _get_stream_activity(self, member: disnake.Member) -> disnake.Streaming | None:
         for activity in member.activities:
             if isinstance(activity, disnake.Streaming):
@@ -284,12 +359,18 @@ class StreamsCog(commands.Cog):
         return activity.url or ""
 
     def _stream_thumbnail_url(self, activity: disnake.Streaming) -> str | None:
-        return (
+        thumbnail_url = (
             activity.large_image_link
             or activity.large_image_url
             or activity.small_image_link
             or activity.small_image_url
         )
+        if thumbnail_url:
+            return thumbnail_url
+        twitch_name = activity.twitch_name or CreatorUrlParser.twitch_login(activity.url or "")
+        if twitch_name:
+            return f"https://static-cdn.jtvnw.net/previews-ttv/live_user_{twitch_name.lower()}-1280x720.jpg"
+        return None
 
     def _stream_payload(self, activity: disnake.Streaming) -> dict:
         try:

@@ -131,6 +131,16 @@ class CreatorAlertService(CreatorAlertServiceInterface):
             return None
         return event
 
+    def is_platform_configured(self, platform: CreatorPlatform) -> bool:
+        client = self._platform_clients.get(platform)
+        is_configured = bool(client and getattr(client, "is_configured", True))
+        logger.info(
+            "Creator platform configuration checked platform=%s configured=%s",
+            platform.value,
+            is_configured,
+        )
+        return is_configured
+
     async def mark_announced(self, subscription_id: int, event_id: str) -> None:
         await self._repository.mark_event(subscription_id, event_id)
 
