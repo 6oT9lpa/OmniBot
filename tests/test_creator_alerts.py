@@ -1,4 +1,5 @@
 import pytest
+import disnake
 from fastapi import HTTPException
 
 import activity.server.dependencies as activity_dependencies
@@ -13,6 +14,7 @@ from infrastructure.api.url_parser import CreatorUrlParser
 from infrastructure.api.youtube_client import YouTubeClient
 from infrastructure.database import DatabaseManager
 from infrastructure.database.repositories import ChannelConfigRepository, CreatorAlertRepository
+from presentation.cogs.streams_cog import StreamsCog
 
 
 class _RolePurposeService:
@@ -62,6 +64,20 @@ def test_creator_url_parser_handles_twitch_and_youtube_urls():
     assert CreatorUrlParser.twitch_login("stepiks_") == "stepiks_"
     assert CreatorUrlParser.youtube_channel_ref("https://www.youtube.com/@omni") == "@omni"
     assert CreatorUrlParser.youtube_channel_ref("https://www.youtube.com/channel/UC123") == "UC123"
+
+
+def test_streaming_activity_game_uses_discord_state_not_title():
+    cog = StreamsCog.__new__(StreamsCog)
+    activity = disnake.Streaming(
+        name="Twitch",
+        details="Building OmniBot",
+        state="Minecraft",
+        url="https://www.twitch.tv/stepiks_",
+    )
+
+    assert cog._stream_title(activity) == "Building OmniBot"
+    assert cog._stream_game(activity) == "Minecraft"
+    assert cog._stream_url(activity) == "https://www.twitch.tv/stepiks_"
 
 
 @pytest.mark.asyncio

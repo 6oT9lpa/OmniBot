@@ -82,11 +82,20 @@ class StreamsCog(commands.Cog):
         event = CreatorContentEvent(
             platform=CreatorPlatform.TWITCH,
             alert_kind=CreatorAlertKind.STREAM,
-            event_id=f"discord-activity:{after.id}:{after_stream.name}",
+            event_id=f"discord-activity:{after.id}:{self._stream_title(after_stream)}",
             creator_name=after.display_name,
-            title=after_stream.name or "Live stream",
-            url=getattr(after_stream, "url", None) or "",
-            game=getattr(after_stream, "details", None) or "Just Chatting",
+            title=self._stream_title(after_stream),
+            url=self._stream_url(after_stream),
+            game=self._stream_game(after_stream),
+        )
+        logger.info(
+            "Discord streaming activity resolved guild_id=%s user_id=%s title=%s game=%s url=%s raw=%s",
+            after.guild.id,
+            after.id,
+            event.title,
+            event.game,
+            event.url,
+            self._stream_payload(after_stream),
         )
         await self._publish_default_event(after.guild, after.id, event)
 
@@ -257,6 +266,28 @@ class StreamsCog(commands.Cog):
             if isinstance(activity, disnake.Streaming):
                 return activity
         return None
+
+    def _stream_title(self, activity: disnake.Streaming) -> str:
+        return activity.name or activity.details or "Live stream"
+
+    def _stream_game(self, activity: disnake.Streaming) -> str:
+        return activity.game or "Not specified"
+
+    def _stream_url(self, activity: disnake.Streaming) -> str:
+        twitch_name = activity.twitch_name
+        if twitch_name and "twitch.tv" not in activity.url:
+            return f"https://www.twitch.tv/{twitch_name}"
+        return activity.url or ""
+
+    def _stream_payload(self, activity: disnake.Streaming) -> dict:
+        try:
+            payload = activity.to_dict()
+        except Exception:
+            payload = {}
+        payload["game"] = activity.game
+        payload["platform"] = activity.platform
+        payload["twitch_name"] = activity.twitch_name
+        return payload
 
     async def _resolve_text_channel(
         self,
