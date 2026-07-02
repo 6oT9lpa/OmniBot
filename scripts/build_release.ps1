@@ -14,6 +14,7 @@ tar --exclude='./.git' `
     --exclude='./activity/client/node_modules' `
     --exclude='./data' `
     --exclude='./logs' `
+    --exclude='./.tmp' `
     --exclude='./.env' `
     --exclude='./__pycache__' `
     --exclude='./.pytest_cache' `
