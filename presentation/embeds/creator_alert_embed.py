@@ -125,6 +125,24 @@ class CreatorAlertEmbedBuilder:
         ping_line = f"{creator_ping}\n\n" if creator_ping else ""
         if event.alert_kind == CreatorAlertKind.STREAM:
             game = event.game or "Не указана"
+            if event.platform == CreatorPlatform.YOUTUBE:
+                return (
+                    f"{ping_line}"
+                    f"**{event.creator_name} запустил прямой эфир на YouTube.**\n\n"
+                    f"**Тема трансляции:** {event.title}\n"
+                    f"**Категория:** {game}\n\n"
+                    "Открывай эфир, ставь лайк и поддержи автора в чате.\n\n"
+                    f"{event.url}"
+                )
+            if event.platform == CreatorPlatform.KICK:
+                return (
+                    f"{ping_line}"
+                    f"**{event.creator_name} вышел в эфир на Kick.**\n\n"
+                    f"**Название:** {event.title}\n"
+                    f"**Категория:** {game}\n\n"
+                    "Подключайся к эфиру и поддержи стримера.\n\n"
+                    f"{event.url}"
+                )
             return (
                 f"{ping_line}"
                 f"**{event.creator_name} уже в эфире на {platform}.**\n\n"

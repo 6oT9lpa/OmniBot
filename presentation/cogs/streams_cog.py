@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import parse_qs, urlparse
+
 import disnake
 from disnake.ext import commands, tasks
 
@@ -120,7 +122,7 @@ class StreamsCog(commands.Cog):
             return
 
         source = active_stream_sources[0] if active_stream_sources else None
-        platform = source.platform if source else CreatorPlatform.TWITCH
+        platform = source.platform if source else self._stream_platform(stream)
         event = self._build_discord_stream_event(member, stream, platform)
         if event.event_id in self._fallback_event_ids or (source and source.last_event_id == event.event_id):
             logger.info(
@@ -358,6 +360,16 @@ class StreamsCog(commands.Cog):
             return f"https://www.twitch.tv/{twitch_name}"
         return activity.url or ""
 
+    def _stream_platform(self, activity: disnake.Streaming) -> CreatorPlatform:
+        url = self._stream_url(activity).lower()
+        if "youtube.com" in url or "youtu.be" in url:
+            return CreatorPlatform.YOUTUBE
+        if "kick.com" in url:
+            return CreatorPlatform.KICK
+        if activity.twitch_name or "twitch.tv" in url:
+            return CreatorPlatform.TWITCH
+        return CreatorPlatform.TWITCH
+
     def _stream_thumbnail_url(self, activity: disnake.Streaming) -> str | None:
         thumbnail_url = (
             activity.large_image_link
@@ -367,9 +379,23 @@ class StreamsCog(commands.Cog):
         )
         if thumbnail_url:
             return thumbnail_url
-        twitch_name = activity.twitch_name or CreatorUrlParser.twitch_login(activity.url or "")
+        youtube_video_id = self._youtube_video_id(activity.url or "")
+        if youtube_video_id:
+            return f"https://img.youtube.com/vi/{youtube_video_id}/maxresdefault.jpg"
+        twitch_name = activity.twitch_name
+        if not twitch_name and "twitch.tv" in (activity.url or "").lower():
+            twitch_name = CreatorUrlParser.twitch_login(activity.url or "")
         if twitch_name:
             return f"https://static-cdn.jtvnw.net/previews-ttv/live_user_{twitch_name.lower()}-1280x720.jpg"
+        return None
+
+    def _youtube_video_id(self, url: str) -> str | None:
+        parsed = urlparse(url)
+        host = parsed.netloc.lower()
+        if "youtube.com" in host:
+            return parse_qs(parsed.query).get("v", [None])[0]
+        if "youtu.be" in host:
+            return parsed.path.strip("/") or None
         return None
 
     def _stream_payload(self, activity: disnake.Streaming) -> dict:

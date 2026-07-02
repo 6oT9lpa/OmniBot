@@ -88,6 +88,19 @@ def test_streaming_activity_game_uses_discord_state_not_title():
     assert cog._stream_thumbnail_url(activity).endswith("live_user_stepiks_-1280x720.jpg")
 
 
+def test_youtube_streaming_activity_uses_youtube_platform_and_thumbnail():
+    cog = StreamsCog.__new__(StreamsCog)
+    activity = disnake.Streaming(
+        name="YouTube",
+        details="Моя трансляция",
+        state="Not specified",
+        url="https://youtube.com/watch?v=bhu63w-yd9k",
+    )
+
+    assert cog._stream_platform(activity) == CreatorPlatform.YOUTUBE
+    assert cog._stream_thumbnail_url(activity) == "https://img.youtube.com/vi/bhu63w-yd9k/maxresdefault.jpg"
+
+
 @pytest.mark.asyncio
 async def test_streaming_activity_scan_publishes_existing_status_once():
     class Guild:
@@ -160,6 +173,33 @@ def test_default_creator_alert_embed_is_russian_and_visual(creator_event):
     assert payload["author"]["icon_url"] == "https://cdn.discordapp.com/avatars/1/avatar.png"
     assert payload["image"]["url"].endswith("live_user_gadj-1280x720.jpg")
     assert payload["footer"]["icon_url"].endswith("live_user_gadj-1280x720.jpg")
+
+
+def test_youtube_stream_embed_has_platform_specific_copy():
+    event = CreatorContentEvent(
+        platform=CreatorPlatform.YOUTUBE,
+        alert_kind=CreatorAlertKind.STREAM,
+        event_id="yt-live-1",
+        creator_name="Санчеус",
+        title="Моя трансляция",
+        url="https://youtube.com/watch?v=bhu63w-yd9k",
+        game="Just Chatting",
+        thumbnail_url="https://img.youtube.com/vi/bhu63w-yd9k/maxresdefault.jpg",
+    )
+
+    embed = CreatorAlertEmbedBuilder.build(
+        event,
+        title_template="",
+        description_template="",
+        creator_ping="@stream ping",
+    )
+    payload = embed.to_dict()
+
+    assert payload["title"] == "Санчеус начал стрим на YouTube"
+    assert "прямой эфир на YouTube" in payload["description"]
+    assert "ставь лайк" in payload["description"]
+    assert payload["fields"][0]["value"] == "YouTube"
+    assert payload["image"]["url"].endswith("bhu63w-yd9k/maxresdefault.jpg")
 
 
 @pytest.mark.asyncio
