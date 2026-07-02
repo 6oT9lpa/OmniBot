@@ -14,6 +14,7 @@ from infrastructure.api.url_parser import CreatorUrlParser
 from infrastructure.api.youtube_client import YouTubeClient
 from infrastructure.database import DatabaseManager
 from infrastructure.database.repositories import ChannelConfigRepository, CreatorAlertRepository
+from presentation.embeds.creator_alert_embed import CreatorAlertEmbedBuilder
 from presentation.cogs.streams_cog import StreamsCog
 
 
@@ -78,6 +79,35 @@ def test_streaming_activity_game_uses_discord_state_not_title():
     assert cog._stream_title(activity) == "Building OmniBot"
     assert cog._stream_game(activity) == "Minecraft"
     assert cog._stream_url(activity) == "https://www.twitch.tv/stepiks_"
+
+
+def test_default_creator_alert_embed_is_russian_and_visual(creator_event):
+    event = CreatorContentEvent(
+        platform=CreatorPlatform.TWITCH,
+        alert_kind=CreatorAlertKind.STREAM,
+        event_id="evt-2",
+        creator_name="Gadj",
+        title="я чемпион",
+        url="https://www.twitch.tv/n1gadjiga",
+        game="Minecraft",
+        thumbnail_url="https://static-cdn.jtvnw.net/previews-ttv/live_user_gadj-1280x720.jpg",
+    )
+
+    embed = CreatorAlertEmbedBuilder.build(
+        event,
+        title_template="{creator.name} is live on {platform}",
+        description_template="{creator.ping} {title}\nGame: {game}\n{url}",
+        creator_ping="@stream ping",
+        creator_icon_url="https://cdn.discordapp.com/avatars/1/avatar.png",
+    )
+    payload = embed.to_dict()
+
+    assert payload["title"] == "Gadj начал стрим на Twitch"
+    assert "уже в эфире" in payload["description"]
+    assert "Категория" in payload["fields"][1]["name"]
+    assert payload["author"]["icon_url"] == "https://cdn.discordapp.com/avatars/1/avatar.png"
+    assert payload["image"]["url"].endswith("live_user_gadj-1280x720.jpg")
+    assert payload["footer"]["icon_url"].endswith("live_user_gadj-1280x720.jpg")
 
 
 @pytest.mark.asyncio

@@ -87,6 +87,7 @@ class StreamsCog(commands.Cog):
             title=self._stream_title(after_stream),
             url=self._stream_url(after_stream),
             game=self._stream_game(after_stream),
+            thumbnail_url=self._stream_thumbnail_url(after_stream),
         )
         logger.info(
             "Discord streaming activity resolved guild_id=%s user_id=%s title=%s game=%s url=%s raw=%s",
@@ -172,9 +173,9 @@ class StreamsCog(commands.Cog):
         self,
         ctx: disnake.ApplicationCommandInteraction,
         source_id: int,
-        title_template: str = commands.Param(default="{creator.name} is live on {platform}", max_length=256),
+        title_template: str = commands.Param(default="{creator.name} начал стрим на {platform}", max_length=256),
         description_template: str = commands.Param(
-            default="{creator.ping} {creator.name} started streaming {game}\n{url}",
+            default="{creator.ping}\n\n**{creator.name} уже в эфире.**\n\n**Название:** {title}\n**Категория:** {game}\n\n{url}",
             max_length=2000,
         ),
         ping_role: disnake.Role | None = None,
@@ -222,12 +223,14 @@ class StreamsCog(commands.Cog):
 
         ping_role_id = subscription.ping_role_id or await self._creator_alert_service.get_default_ping_role_id(guild.id)
         creator_ping = f"<@&{ping_role_id}>" if ping_role_id else f"<@{subscription.user_id}>"
+        creator_icon_url = await self._member_avatar_url(guild, subscription.user_id)
         embed = CreatorAlertEmbedBuilder.build(
             event,
             title_template=subscription.title_template,
             description_template=subscription.description_template,
             color=CreatorAlertEmbedBuilder.platform_color(event.platform, subscription.color),
             creator_ping=creator_ping,
+            creator_icon_url=creator_icon_url,
         )
         content = creator_ping if ping_role_id else ""
         await channel.send(content=content, embed=embed, allowed_mentions=disnake.AllowedMentions(roles=True, users=False))
@@ -253,10 +256,11 @@ class StreamsCog(commands.Cog):
         content = f"<@&{ping_role_id}>" if ping_role_id else ""
         embed = CreatorAlertEmbedBuilder.build(
             event,
-            title_template="{creator.name} is live on {platform}",
-            description_template="{creator.ping} {title}\nGame: {game}\n{url}",
+            title_template="",
+            description_template="",
             color=CreatorAlertEmbedBuilder.platform_color(event.platform),
             creator_ping=f"<@{user_id}>",
+            creator_icon_url=await self._member_avatar_url(guild, user_id),
         )
         await channel.send(content=content, embed=embed, allowed_mentions=disnake.AllowedMentions(roles=True, users=False))
         logger.info("Published Discord activity fallback stream alert guild_id=%s user_id=%s", guild.id, user_id)
@@ -279,6 +283,14 @@ class StreamsCog(commands.Cog):
             return f"https://www.twitch.tv/{twitch_name}"
         return activity.url or ""
 
+    def _stream_thumbnail_url(self, activity: disnake.Streaming) -> str | None:
+        return (
+            activity.large_image_link
+            or activity.large_image_url
+            or activity.small_image_link
+            or activity.small_image_url
+        )
+
     def _stream_payload(self, activity: disnake.Streaming) -> dict:
         try:
             payload = activity.to_dict()
@@ -287,7 +299,23 @@ class StreamsCog(commands.Cog):
         payload["game"] = activity.game
         payload["platform"] = activity.platform
         payload["twitch_name"] = activity.twitch_name
+        payload["thumbnail_url"] = self._stream_thumbnail_url(activity)
         return payload
+
+    async def _member_avatar_url(self, guild: disnake.Guild, user_id: int) -> str | None:
+        member = guild.get_member(user_id)
+        if member is None:
+            try:
+                member = await guild.fetch_member(user_id)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to resolve creator avatar guild_id=%s user_id=%s error=%s",
+                    guild.id,
+                    user_id,
+                    exc,
+                )
+                return None
+        return member.display_avatar.url if member and member.display_avatar else None
 
     async def _resolve_text_channel(
         self,

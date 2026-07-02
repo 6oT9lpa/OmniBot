@@ -15,11 +15,11 @@ def build_creator_alert_message(payload: CreatorAlertTestPayload) -> dict[str, A
         url=payload.channel_url,
         game=payload.game,
     )
-    title_template = payload.title_template or "{creator.name} is active on {platform}"
+    title_template = payload.title_template or "{creator.name} начал стрим на {platform}"
     description_template = (
         payload.description_template
         or payload.template
-        or "{creator.ping} {creator.name} posted an update: {url}"
+        or "{creator.ping}\n\n**{creator.name} уже в эфире.**\n\n**Название:** {title}\n**Категория:** {game}\n\n{url}"
     )
     creator_ping = f"<@&{payload.ping_role_id}>" if payload.ping_role_id else ""
     description = CreatorAlertTemplateRenderer.render(
@@ -41,9 +41,10 @@ def build_creator_alert_message(payload: CreatorAlertTestPayload) -> dict[str, A
                 "url": payload.channel_url,
                 "color": payload.color,
                 "fields": [
-                    {"name": "Platform", "value": payload.platform.title(), "inline": True},
-                    {"name": "Game", "value": payload.game, "inline": True},
+                    {"name": "Платформа", "value": payload.platform.title(), "inline": True},
+                    {"name": "Категория", "value": payload.game, "inline": True},
                 ],
+                "footer": {"text": "OmniBot Creator Alerts"},
             }
         ],
         "allowed_mentions": {"roles": [str(payload.ping_role_id)] if payload.ping_role_id else []},
