@@ -88,7 +88,7 @@ class CreatorAlertService:
             payload.button_label,
             payload.color,
             payload.ping_role_id,
-            1 if payload.active else 0,
+            int(payload.active),
         )
         if existing:
             await get_db().execute(
@@ -119,8 +119,7 @@ class CreatorAlertService:
                     *values,
                 ),
             )
-            row = await get_db().fetch_one("SELECT last_insert_rowid() AS id")
-            source_id = int(row["id"])
+            source_id = await self._resolve_inserted_source_id(payload, owner_id)
         await get_db().commit()
         saved = await get_db().fetch_one(
             "SELECT * FROM creator_alert_subscriptions WHERE id = ?",
@@ -203,3 +202,19 @@ class CreatorAlertService:
             "last_checked_at": row.get("last_checked_at"),
             "created_at": row.get("created_at"),
         }
+
+    async def _resolve_inserted_source_id(
+        self,
+        payload: CreatorAlertSourcePayload,
+        owner_id: int,
+    ) -> int:
+        row = await self._find_existing(payload, owner_id)
+        if not row:
+            logger.error(
+                "Creator alert source insert could not be reloaded guild_id=%s user_id=%s platform=%s",
+                payload.guild_id,
+                owner_id,
+                payload.platform,
+            )
+            raise HTTPException(status_code=500, detail="Saved source was not found")
+        return int(row["id"])

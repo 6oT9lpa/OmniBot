@@ -69,7 +69,7 @@ class YouTubeClient(CreatorPlatformClientInterface):
                     items = payload.get("items") or []
                     if items:
                         return items[0]["id"]
-                logger.warning("YouTube channels.list handle resolve failed status=%s", response.status)
+                await self._log_api_error(response, "YouTube channels.list handle resolve failed")
 
         async with aiohttp.ClientSession() as session:
             logger.info("Resolving YouTube handle with search fallback handle=%s", channel_ref)
@@ -86,7 +86,7 @@ class YouTubeClient(CreatorPlatformClientInterface):
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as response:
                 if response.status >= 400:
-                    logger.warning("YouTube channel resolve failed status=%s", response.status)
+                    await self._log_api_error(response, "YouTube channel resolve failed")
                     return None
                 payload = await response.json()
         items = payload.get("items") or []
@@ -117,7 +117,7 @@ class YouTubeClient(CreatorPlatformClientInterface):
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as response:
                 if response.status >= 400:
-                    logger.warning("YouTube search failed status=%s", response.status)
+                    await self._log_api_error(response, "YouTube search failed")
                     return None
                 payload = await response.json()
 
@@ -139,3 +139,7 @@ class YouTubeClient(CreatorPlatformClientInterface):
             url=f"https://www.youtube.com/watch?v={video_id}",
             thumbnail_url=image.get("url"),
         )
+
+    async def _log_api_error(self, response: aiohttp.ClientResponse, message: str) -> None:
+        body = await response.text()
+        logger.warning("%s status=%s body=%s", message, response.status, body[:500])

@@ -25,20 +25,34 @@ const sourceLimitReached = computed(() => activity.creatorSources.length >= 5 &&
 async function saveCreator() {
   saving.value = true;
   saving.message = "Saving source...";
-  await activity.saveCreatorSource(creatorDraft);
-  resetDraft();
-  saving.value = false;
-  saving.message = "Source saved";
+  try {
+    await activity.saveCreatorSource(creatorDraft);
+    resetDraft();
+    saving.message = "Source saved";
+  } catch (error) {
+    saving.message = error instanceof Error ? error.message : String(error);
+  } finally {
+    saving.value = false;
+  }
 }
 
 async function previewCreator() {
-  await activity.previewCreatorSource(creatorDraft);
+  try {
+    await activity.previewCreatorSource(creatorDraft);
+    saving.message = "Preview ready";
+  } catch (error) {
+    saving.message = error instanceof Error ? error.message : String(error);
+  }
 }
 
 async function deleteCreator(source: CreatorAlertSource) {
   if (!source.id) return;
-  await activity.deleteCreatorSource(source.id);
-  saving.message = "Source removed";
+  try {
+    await activity.deleteCreatorSource(source.id);
+    saving.message = "Source removed";
+  } catch (error) {
+    saving.message = error instanceof Error ? error.message : String(error);
+  }
 }
 
 function editCreator(source: CreatorAlertSource) {

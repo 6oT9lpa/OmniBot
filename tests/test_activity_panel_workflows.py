@@ -175,6 +175,47 @@ async def test_dev_blog_publishes_ten_images_in_one_components_v2_message(activi
     assert len(media_gallery["items"]) == 10
 
 
+@pytest.mark.asyncio
+async def test_dev_blog_default_ping_stays_inside_components_v2(activity_db, monkeypatch):
+    service = DevBlogService()
+    sent_payloads = []
+
+    async def ensure_developer(*_):
+        return {"id": "42", "username": "dev"}, {"is_developer": True}
+
+    async def bot_request(method, path, *, json_body=None, **_):
+        sent_payloads.append(json_body)
+        return {"id": "901"}
+
+    monkeypatch.setattr(service._access_service, "ensure_developer_or_admin", ensure_developer)
+    monkeypatch.setattr(service._discord, "bot_request", bot_request)
+    await activity_db.execute(
+        "INSERT INTO server_channel_purposes (guild_id, purpose, channel_id) VALUES (?, ?, ?)",
+        (100, "dev_blog", 555),
+    )
+    await activity_db.execute(
+        "INSERT INTO server_role_purposes (guild_id, purpose, role_id) VALUES (?, ?, ?)",
+        (100, "ping_dev", 777),
+    )
+    await activity_db.commit()
+
+    await service.create_post(
+        DevBlogPostPayload(
+            guild_id=100,
+            title="Release",
+            embeds=[DevBlogEmbedPayload(description="body")],
+            status="published",
+        ),
+        "token",
+    )
+
+    message_payload = sent_payloads[0]
+
+    assert "content" not in message_payload
+    assert message_payload["allowed_mentions"] == {"roles": ["777"]}
+    assert message_payload["components"][0]["components"][0] == {"type": 10, "content": "<@&777>"}
+
+
 def test_dev_blog_can_render_images_between_text_blocks():
     payload = DevBlogPostPayload(
         guild_id=100,

@@ -66,7 +66,7 @@ class DevBlogService:
             )
             message_id = int(message["id"])
 
-        await get_db().execute(
+        cursor = await get_db().execute(
             """
             INSERT INTO dev_blog_posts (
                 guild_id, channel_id, message_id, author_id, title, payload_json, status
@@ -92,19 +92,22 @@ class DevBlogService:
             ),
         )
         await get_db().commit()
-        row = await get_db().fetch_one("SELECT last_insert_rowid() AS id")
-        logger.info("Dev blog post saved guild_id=%s post_id=%s message_id=%s", payload.guild_id, row["id"], message_id)
+        post_id = cursor.lastrowid
+        if post_id is None:
+            logger.error("Dev blog post insert did not return id guild_id=%s", payload.guild_id)
+            raise HTTPException(status_code=500, detail="Dev Blog post was not saved")
+        logger.info("Dev blog post saved guild_id=%s post_id=%s message_id=%s", payload.guild_id, post_id, message_id)
         await self._audit_service.log_action(
             guild_id=payload.guild_id,
             actor_id=int(user["id"]),
             actor_name=self._display_name(user),
-            target_id=int(row["id"]),
+            target_id=post_id,
             target_name=payload.title,
             event_type="activity_dev_blog_published" if payload.status == "published" else "activity_dev_blog_draft_saved",
             details=f"Dev Blog post '{payload.title}' saved as {payload.status}.",
         )
         return {
-            "id": int(row["id"]),
+            "id": post_id,
             "channel_id": channel_id,
             "message_id": message_id,
             "status": payload.status,
@@ -136,6 +139,7 @@ class DevBlogService:
             logger.info("Dev Blog default ping role is not configured guild_id=%s", guild_id)
             return
 
-        message_payload["content"] = f"<@&{role_id}>"
+        components = message_payload["components"][0]["components"]
+        components.insert(0, {"type": 10, "content": f"<@&{role_id}>"})
         message_payload["allowed_mentions"] = {"roles": [str(role_id)]}
         logger.info("Applied Dev Blog default ping role guild_id=%s role_id=%s", guild_id, role_id)
