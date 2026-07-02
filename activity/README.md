@@ -1,4 +1,4 @@
-# Omnibot Discord Activity
+# OmniBot Discord Activity
 
 This folder contains the Discord Activity control panel for OmniBot.
 
@@ -6,16 +6,32 @@ The Activity is a Vue 3 frontend loaded inside Discord and a FastAPI backend tha
 
 ## Structure
 
-- `client/` - Vue 3 + Vite + TypeScript frontend loaded inside Discord.
-- `server/` - FastAPI backend for OAuth, session building, RBAC, bot settings, logs, Dev Blog, welcome, stats, voice rooms, and Discord reference data.
+- `client/` - Vue 3 + Vite + TypeScript frontend.
+- `server/` - FastAPI backend for OAuth, session building, RBAC, bot settings, logs, Creator Alerts, Dev Blog, welcome, stats, voice rooms, and Discord reference data.
+
+## Current Panels
+
+- Dashboard - module overview and recent Activity audit events.
+- Access Control - Activity roles and module permissions.
+- Role Panels - synchronized Discord roles mapped to Activity roles.
+- Welcome Alerts - welcome embed settings, reset, and test send.
+- Creator Alerts - Twitch/YouTube/Kick sources, templates, preview, button labels, saved source cards.
+- Dev Blog - drafts, Components V2 publishing, image galleries, Dev Blog ping.
+- Logs - server logs and Activity audit changes.
+- Server Stats - statistics available from the bot API.
+- Voice Rooms - administrator/moderator room management and user-owned room controls.
+- Bot Settings - channel purposes, role purposes, sync roles, welcome toggle, and runtime settings.
+- Integrations - external service status/configuration surfaces.
+- Health Status - service status and latency.
+
+AI moderation is planned as a future module. It should not be documented as a completed Activity panel until released.
 
 ## Access Model
 
-Activity access is not the same thing as Discord server roles. Discord roles are synchronized into OmniBot, then mapped to Activity access roles.
+Activity access is not the same thing as raw Discord server roles. Discord roles are synchronized into OmniBot and then mapped to Activity access roles.
 
 Built-in Activity roles:
 
-- `user`;
 - `creator`;
 - `developer`;
 - `moderator`;
@@ -24,18 +40,17 @@ Built-in Activity roles:
 Rules:
 
 - users must open the panel from a Discord server Activity launch;
-- if Discord roles are not synchronized, users receive `403`;
 - Discord server administrators can synchronize roles with `/sync_roles` or the Activity sync action;
+- if Discord roles are not synchronized, users can receive `403`;
 - tabs are hidden when the user's Activity role has no permission for that module;
-- `administrator` Activity role permissions cannot be changed.
+- administrator access should be limited to trusted users.
 
-The frontend waits for module data before rendering each panel. Heavy panels use aggregated backend endpoints:
+Creator Alerts visibility:
 
-- `/api/activity/rbac/access-control`;
-- `/api/activity/rbac/role-panels`;
-- `/api/bot/settings`.
-
-This avoids partial tables and reduces Discord OAuth rate-limit pressure.
+- administrators see all connected sources;
+- creators see only their own sources;
+- creators use the default stream ping role;
+- administrators can override source ping role.
 
 ## Developer Portal Setup
 
@@ -45,7 +60,7 @@ This avoids partial tables and reduces Discord OAuth rate-limit pressure.
 4. Keep the application as a confidential client for this deployment. Do not enable Public Client.
 5. Use the bot invite URL scopes `bot` and `applications.commands`.
 
-The Activity SDK authorization uses these scopes in code:
+The Activity SDK authorization uses:
 
 - `identify`;
 - `guilds`;
@@ -53,7 +68,7 @@ The Activity SDK authorization uses these scopes in code:
 
 ## Local Run
 
-Create `activity/client/.env` and set:
+Create `activity/client/.env`:
 
 ```env
 VITE_DISCORD_CLIENT_ID=your_discord_application_client_id
@@ -78,37 +93,34 @@ For local UI work, Vite proxies `/api` to `http://localhost:8008`. For productio
 
 ## Required Server Env
 
-The backend reads the existing project `.env` and also needs:
-
 ```env
 DISCORD_CLIENT_ID=your_discord_application_client_id
 DISCORD_CLIENT_SECRET=your_discord_oauth_client_secret
 DISCORD_PROXY_URL=http://127.0.0.1:10809
 ```
 
-`DISCORD_PROXY_URL` is required when the host cannot reach Discord directly. The current production setup uses an HTTP proxy provided by the local VLESS/Xray client.
+Creator Alerts can also use:
+
+```env
+TWITCH_CLIENT_ID=your_twitch_client_id
+TWITCH_CLIENT_SECRET=your_twitch_client_secret
+YOUTUBE_API_KEY=your_youtube_api_key
+```
 
 ## Production Services
 
-The current systemd services are:
+The current production services are:
 
 - `omnibot-bot`;
 - `omnibot-activity`;
-- `xray-client`.
+- proxy service when Discord traffic must be routed.
 
-`omnibot-bot` and `omnibot-activity` should start after `xray-client` when Discord traffic must go through the VLESS route.
+`omnibot-bot` and `omnibot-activity` should start after the proxy when Discord access depends on it.
 
-## Current Panels
+## Frontend Safety Notes
 
-- Dashboard - module overview and recent Activity audit events.
-- Access Control - Activity roles and tab permissions.
-- Welcome Alerts - welcome embed settings, reset, and test send.
-- Role Panels - synchronized Discord roles mapped to Activity roles.
-- Dev Blog - up to 10 embeds, publish, and up to 10 drafts.
-- Logs - server logs and Activity audit changes.
-- Server Stats - statistics available from the bot API.
-- Voice Rooms - administrator/moderator room management and user-owned room controls.
-- Bot Settings - channel purposes, role purposes, sync roles, welcome toggle, and bot runtime settings.
-- Integrations and Health Status - current integration and service health surfaces.
-
-Discord snowflake IDs must be treated as strings in the frontend. Do not convert guild, channel, role, message, or user IDs to JavaScript `number`.
+- Treat Discord snowflake IDs as strings.
+- Do not convert guild, channel, role, message, or user IDs to JavaScript `number`.
+- Do not place `DISCORD_CLIENT_SECRET` in frontend code.
+- Do not compile production builds with `127.0.0.1` or `localhost` as API base URL.
+- Avoid horizontal overflow in panels; long URLs and IDs must wrap inside their cards.

@@ -7,8 +7,8 @@ import HeroText from "../components/landing/HeroText.vue";
 const features = [
   {
     index: "01",
-    title: "AI-Powered Moderation",
-    text: "Local AI moderation helps detect spam, ads, invites, bullying, violence and unsafe content while keeping server management efficient.",
+    title: "Operational Moderation",
+    text: "Moderation commands, logs, punishment history and upcoming local AI checks keep server management efficient without hiding human review.",
   },
   {
     index: "02",
@@ -44,7 +44,7 @@ const features = [
       <HeroText
         kicker="OmniBot Activity"
         title="BE A PART OF SOMETHING MARVELLOUS"
-        body="Omni is a modular Discord bot that combines AI moderation, automation, creator tools, analytics and elegant server management in one ecosystem."
+        body="Omni is a modular Discord bot that combines automation, creator tools, analytics, moderation workflows and elegant server management in one ecosystem."
       />
     </RevealOnScroll>
 
@@ -76,7 +76,7 @@ const features = [
       <div class="showcase-stack" aria-hidden="true">
         <div><ShieldCheck :size="20" /> Permission Matrix</div>
         <div><RadioTower :size="20" /> Creator Alerts</div>
-        <div><Bot :size="20" /> AI Metrics</div>
+        <div><Bot :size="20" /> Upcoming AI Checks</div>
       </div>
     </RevealOnScroll>
   </main>

@@ -52,7 +52,7 @@ export const moduleLabels: Record<ModuleKey, string> = {
   "role-panels": "Role Panels",
   "creator-alerts": "Creator Alerts",
   "dev-blog": "Dev Blog",
-  "ai-moderator": "AI Metrics",
+  "ai-moderator": "Upcoming AI",
   logs: "Logs",
   "server-stats": "Server Stats",
   "voice-rooms": "Voice Rooms",
@@ -66,14 +66,14 @@ export const moduleDescriptions: Record<ModuleKey, string> = {
   access: "Map Activity roles to tab permissions.",
   welcome: "Design welcome messages with variables, preview and publishing checks.",
   "role-panels": "Build role menus with buttons, select menus and validation states.",
-  "creator-alerts": "Manage Twitch, YouTube and future creator source notifications.",
+  "creator-alerts": "Manage Twitch, YouTube and Kick creator source notifications.",
   "dev-blog": "Compose developer updates with embeds, links, images and CTA buttons.",
-  "ai-moderator": "Analytics-first AI moderation signals without direct punishment actions.",
+  "ai-moderator": "Planned local AI moderation signals for future review workflows.",
   logs: "Filter server events, member events, punishments and AI flags.",
   "server-stats": "Track members, messages, voice activity and leaderboards.",
   "voice-rooms": "Configure dynamic voice triggers, room naming and cleanup rules.",
   "bot-settings": "Control defaults, module toggles, language and embed styling.",
-  integrations: "Monitor Discord, creator platforms, database and Ollama status.",
+  integrations: "Monitor Discord, creator platforms, database and service status.",
   health: "Operational heartbeat for bot, API, database and background workers.",
 };
 
@@ -118,7 +118,7 @@ export const mockWelcome: WelcomeConfig = {
 
 export const dashboardMetrics: DashboardMetric[] = [
   { label: "Modules ready", value: "8/13", delta: "+3 planned", tone: "success" },
-  { label: "AI checks today", value: "12.8k", delta: "2.1% flagged", tone: "neutral" },
+  { label: "Moderation actions", value: "18", delta: "history ready", tone: "neutral" },
   { label: "Creator sources", value: "14", delta: "3 waiting auth", tone: "warning" },
   { label: "Bot latency", value: "42 ms", delta: "stable", tone: "success" },
 ];
@@ -140,8 +140,8 @@ export const timelineEvents: TimelineEvent[] = [
   },
   {
     id: "3",
-    title: "AI moderation scan complete",
-    detail: "12,842 messages checked with no high-risk trend detected.",
+    title: "Moderation history updated",
+    detail: "Punishment and audit history is available for review.",
     time: "1 hour ago",
     tone: "neutral",
   },
@@ -151,7 +151,7 @@ export const healthSignals: HealthSignal[] = [
   { name: "Discord Gateway", value: "Online", status: "operational" },
   { name: "Activity API", value: "Serving", status: "operational" },
   { name: "SQLite", value: "Connected", status: "operational" },
-  { name: "Ollama", value: "Not linked", status: "degraded" },
+  { name: "Upcoming AI", value: "Planned", status: "degraded" },
   { name: "Stream Checker", value: "Mock mode", status: "degraded" },
 ];
 

@@ -1,212 +1,181 @@
 # Terms of Service for OmniBot
 
 **Effective Date:** June 18, 2026  
-**Last Updated:** June 28, 2026
+**Last Updated:** July 2, 2026
 
-These Terms of Service govern access to **OmniBot** ("the Bot", "the service", "we") and its features: roles, moderation, AI checks, logging, statistics, dynamic voice rooms, stream announcements, Dev Blog, the Discord Activity control panel, and administrative tools.
+These Terms of Service govern use of OmniBot, including the Discord bot, slash commands, Discord Activity control panel, Creator Alerts, Dev Blog, logging, statistics, voice rooms, role tools, welcome tools, and moderation commands.
 
-By using the Bot, adding it to a server, or interacting with its commands, you agree to these Terms, the Bot's [Privacy Policy](./PRIVACY_POLICY.md), the [Discord Terms of Service](https://discord.com/terms), [Discord Community Guidelines](https://discord.com/guidelines), [Discord Developer Terms](https://support-dev.discord.com/hc/en-us/articles/8562894815383-Discord-Developer-Terms-of-Service), and [Discord Developer Policy](https://support-dev.discord.com/hc/en-us/articles/8563934450327-Discord-Developer-Policy).
+By adding OmniBot to a server, using its commands, or opening the Activity panel, you agree to these Terms, the [Privacy Policy](./PRIVACY_POLICY.md), and Discord's applicable terms and policies.
 
 ## 1. Service Description
 
-OmniBot is designed to manage and automate Discord server operations:
+OmniBot currently provides:
 
-- roles and automatic role assignment;
-- interactive role panels with buttons or reactions;
-- welcome messages and channel configuration;
-- AI moderation through self-hosted Ollama;
-- warnings, mutes, kicks, bans, slowmode, and chat cleanup;
-- punishment history;
-- message and server event logging in SQLite;
-- server and member statistics;
+- Discord Activity control panel;
+- Activity RBAC and role synchronization;
+- autoroles and role panels;
+- welcome messages;
+- channel and role purpose settings;
+- moderation commands and punishment history;
+- logging and Activity audit events;
+- server statistics and leaderboards;
 - dynamic voice rooms;
-- Twitch, YouTube, Kick, TikTok/RSS monitoring and auto-publications;
+- Creator Alerts for Twitch, YouTube, and Kick;
 - Dev Blog drafts and publishing;
-- Discord Activity control panel with role-based module access;
-- bot status, configuration, and administration commands.
+- bot settings, integrations, and health surfaces.
 
-The actual feature set depends on the Bot version, server settings, and Discord permissions granted to the Bot.
+AI moderation is planned as a future module. It is not guaranteed to be available until released and configured.
 
-## 2. Who May Use the Bot
+## 2. Eligibility
 
-The Bot may be used by Discord users who are allowed to use Discord under their age, local laws, and Discord's rules.
+Users must be allowed to use Discord under Discord rules and applicable law.
 
-Only server owners or administrators with the appropriate permissions may add the Bot to a server, configure modules, and grant permissions.
-
-If you use the Bot on behalf of an organization, community, or server, you confirm that you have the authority to accept these Terms on their behalf.
+Only server owners or authorized administrators should invite OmniBot, configure modules, or grant Activity permissions.
 
 ## 3. Server Administrator Responsibilities
 
 Server administrators are responsible for:
 
-- granting the Bot only the Discord permissions required for selected features;
-- configuring log channels so that only trusted moderators can access them;
-- informing server members about enabled logging, AI moderation, and statistics collection;
-- choosing AI moderation thresholds and reviewing disputed detections;
-- complying with privacy laws when using the Bot to log messages and member actions;
-- disabling modules that the server no longer uses;
-- removing the Bot from the server if these Terms or the Privacy Policy do not fit the community.
-- synchronizing Discord roles only when they are ready to be used for Activity access control.
+- granting only the Discord permissions needed for selected features;
+- configuring log channels so only trusted staff can access them;
+- informing members when logging, statistics, moderation, Creator Alerts, or Activity audit features are enabled;
+- mapping Discord roles to Activity roles carefully;
+- keeping administrator Activity access limited to trusted users;
+- reviewing moderation actions and punishment history;
+- respecting privacy and local legal requirements;
+- removing or disabling modules that the server no longer uses.
 
 ## 4. Acceptable Use
 
-You may use the Bot only lawfully and in good faith:
+You may use OmniBot to:
 
-- to moderate and manage your own Discord server;
-- to assign roles and configure server structure;
-- to protect against spam, ads, raids, and harmful content;
-- to keep transparent punishment history;
-- to collect statistics and maintain the community;
-- to publish streams, videos, and Dev Blog content when you have the right to publish that content.
-- to manage OmniBot settings through the Discord Activity panel when you have the required server and Activity permissions.
+- manage your own Discord server;
+- assign roles and operate role panels;
+- publish welcome messages;
+- moderate users through Discord-permitted actions;
+- keep audit and moderation logs;
+- collect server statistics;
+- operate dynamic voice rooms;
+- publish Creator Alerts for channels you are allowed to promote;
+- publish Dev Blog content you are allowed to publish;
+- manage server settings through the Activity panel.
 
 ## 5. Prohibited Use
 
-You may not use the Bot:
+You may not use OmniBot to:
 
-- to violate Discord's Terms or applicable laws;
-- to monitor members without notice and a reasonable moderation purpose;
-- to collect, sell, transfer, or publish personal data without a valid basis;
-- to harass, bully, discriminate against, or stalk users;
-- to send mass spam, perform raids, phish, spread malicious links, or commit fraud;
-- to bypass Discord permissions, limits, blocks, or technical restrictions;
-- to upload, publish, or distribute illegal content;
-- to grant the Bot administrator permissions without a valid need;
-- to attempt to obtain the Bot token, API keys, database access, logs, or server infrastructure access;
-- to perform automated actions that violate the rights of other users or servers.
-- to bypass Activity role checks, Discord OAuth checks, or module-level permissions.
+- violate Discord terms, community guidelines, or law;
+- harass, stalk, threaten, or discriminate against users;
+- publish private logs or personal data without a lawful basis;
+- collect or sell personal data;
+- run spam, raids, phishing, malware, or fraud;
+- bypass Discord permissions or Activity RBAC checks;
+- attempt to access bot tokens, API keys, database credentials, logs, or server infrastructure;
+- publish illegal content through Dev Blog, Creator Alerts, embeds, or role panels;
+- impersonate creators or publish alerts for channels you do not control or have permission to promote.
 
-We may restrict, disable, or terminate access to the Bot if its use violates these Terms, Discord rules, or creates risk for users.
+We may restrict or terminate access if usage creates legal, security, privacy, or operational risk.
 
-## 6. AI Moderation
+## 6. Moderation Commands
 
-AI moderation is an assistive tool. It may classify messages as spam, advertising, invites, NSFW, bullying, threats, or safe content.
+OmniBot may help moderators warn, mute, unmute, kick, ban, unban, purge messages, configure slowmode, and review punishment history.
 
-The AI model may make mistakes: it can miss violations or incorrectly flag normal messages. Administrators and moderators should review disputed decisions, especially when the result affects a mute, ban, or other punishment.
+The user running the command and the server administration that granted permission are responsible for the action. OmniBot does not define server rules and does not replace human judgment.
 
-By using AI moderation, a server administrator agrees to:
+## 7. Logs and Audit
 
-- configure reasonable detection thresholds;
-- provide clear server rules to members;
-- provide a way to appeal punishments;
-- avoid using AI output as the only basis for serious decisions when human review is needed.
+Logs may contain Discord IDs, usernames, message content, moderation reasons, Activity changes, and other server events.
 
-## 7. Moderation and Punishments
+Server administrators must keep log channels and Activity log access restricted. Logs must not be used for harassment, doxxing, blackmail, or unrelated surveillance.
 
-The Bot may help moderators perform Discord actions: warn, mute, unmute, kick, ban, unban, purge, slowmode, and other actions.
+## 8. Discord Activity Access
 
-The user who runs a command and the server administration that granted permissions are responsible for each action. The Bot does not define community rules on its own and does not replace human moderator judgment.
+The protected Activity workspace is intended to run inside Discord.
 
-A user may be notified about a punishment through direct messages if the feature supports it and Discord settings allow it.
+Access is based on:
 
-## 8. Logs and Access
+- Discord OAuth session;
+- guild membership;
+- synchronized Discord roles;
+- Activity role mappings;
+- per-module permissions.
 
-The Bot may post logs to server channels and store data in SQLite. Logs may contain Discord IDs, usernames, message content, punishment reasons, Activity changes, and information about moderator actions.
+If roles are not synchronized or permissions are missing, OmniBot may deny access.
 
-Server administrators must restrict access to log channels. Logs may not be published outside the server or used for harassment, blackmail, doxxing, or other abuse.
+## 9. Creator Alerts
 
-## 8.1. Discord Activity Access
+Creator Alerts may publish Twitch, YouTube, and Kick announcements.
 
-The Discord Activity panel is available only inside Discord for the protected workspace. Access is based on synchronized Discord roles and OmniBot Activity roles.
+Users are responsible for:
 
-Server administrators are responsible for:
+- connecting only sources they own or have permission to promote;
+- using accurate channel URLs;
+- avoiding misleading templates;
+- respecting platform rules;
+- respecting Discord server rules;
+- not abusing ping roles.
 
-- running role synchronization before granting Activity access;
-- mapping Discord roles to the correct Activity roles;
-- reviewing the default Activity roles: `user`, `creator`, `developer`, `moderator`, and `administrator`;
-- keeping administrator-level access limited to trusted users;
-- understanding that hidden tabs are a permission boundary, not a replacement for Discord channel permissions.
+Server administrators may see all connected sources. Creators may see only their own sources.
 
-If roles are not synchronized, OmniBot may deny access with `403`. Discord server administrators may be allowed to run the synchronization flow.
+## 10. Dev Blog
 
-## 9. User Content
+Dev Blog is used to publish project or server updates.
 
-User content includes messages, punishment reasons, Dev Blog posts, Dev Blog drafts, embed templates, image URLs, tags, comments, Activity settings, and other data entered through Bot commands or the Activity panel.
+Users are responsible for Dev Blog content, image URLs, titles, and embedded material. Dev Blog must not be used to publish illegal, harmful, infringing, malicious, or deceptive content.
 
-You retain your rights to your content, but grant the Bot the technical right to process, store, display, and send that content through Discord as needed for enabled features.
+## 11. External Services
 
-You are responsible for ensuring that your content:
-
-- does not violate the law;
-- does not violate third-party rights;
-- does not contain malware, phishing, or fraud;
-- does not violate Discord rules or server rules.
-
-## 10. External Services
-
-Some features may contact external services:
+OmniBot may interact with:
 
 - Discord API;
-- Twitch API;
+- Twitch;
 - YouTube Data API;
-- Kick API or public endpoints;
-- TikTok/RSS providers;
-- Ollama on the operator's server;
-- hosting provider/VPS.
-- VLESS/Xray proxy infrastructure when Discord traffic must be routed through a proxy.
+- Kick endpoints;
+- hosting/VPS infrastructure;
+- PostgreSQL or SQLite storage;
+- proxy infrastructure when configured.
 
-We do not control external service policies. Use of external integrations may be governed by their own terms and privacy policies.
+External services have their own terms and policies.
 
-## 11. Availability and Service Changes
+## 12. Planned AI Moderation
 
-The Bot is provided "as is" and "as available". We do not guarantee:
+AI moderation is planned for a future release. When released, it may classify messages and assist moderators, but it should not be treated as a final authority.
 
-- uninterrupted operation;
-- absence of errors;
-- compatibility with every server and Discord configuration;
-- that commands, modules, or data formats will remain unchanged;
-- that AI moderation will always be accurate.
+Before AI moderation is enabled in production, administrators should review the updated documentation and privacy policy.
 
-We may update, disable, change, or remove Bot features without prior notice when needed for security, stability, Discord compliance, or project development.
+## 13. Availability and Changes
 
-The Activity panel may temporarily show loading states while it waits for server data. If the Bot cannot reach Discord, panels that depend on live Discord channels, roles, or member data may be unavailable until connectivity is restored.
+OmniBot is provided "as is" and "as available". We do not guarantee uninterrupted operation, error-free behavior, permanent availability of every module, or compatibility with every Discord configuration.
 
-## 12. Limitation of Liability
+Features may change for security, stability, Discord compliance, or project development.
+
+## 14. Limitation of Liability
 
 To the extent permitted by law, we are not responsible for:
 
-- decisions made by server moderators and administrators;
-- incorrect Discord permission settings;
-- data loss caused by Discord, VPS, database, backup, or administrator actions;
-- false positives or missed detections by AI moderation;
-- message deletions, mutes, kicks, bans, or other actions performed by users through Bot commands;
-- damages caused by use of, or inability to use, the Bot.
+- moderation decisions made by server staff;
+- incorrect Discord permissions;
+- data loss caused by Discord, hosting, database, backup, deployment, or administrator actions;
+- missed or duplicate announcements;
+- failed external API calls;
+- inability to use the bot or Activity panel.
 
-Server administrators should test critical features on a test server before enabling them on a production server.
+Test critical features on a test server before production use.
 
-## 13. Privacy
+## 15. Privacy
 
-Data processing is described in the [Privacy Policy](./PRIVACY_POLICY.md). By continuing to use the Bot, you agree that necessary data will be processed for enabled features.
+Data processing is described in the [Privacy Policy](./PRIVACY_POLICY.md). If you do not agree with required processing, stop using OmniBot, disable the relevant module, or remove the bot from the server.
 
-If you do not agree with data processing, stop using the Bot, disable the relevant modules, or remove the Bot from the server.
+## 16. Bot Removal
 
-## 14. Bot Removal and Termination
+A server administrator may remove OmniBot at any time through Discord settings. Some stored data may remain until retention cleanup, backup expiration, or manual deletion, as described in the Privacy Policy.
 
-An administrator may remove the Bot from a server at any time through Discord settings.
+## 17. Changes to These Terms
 
-We may stop serving a server or user if:
+These Terms may be updated when features, infrastructure, laws, or Discord requirements change. Continued use after an update means acceptance of the updated Terms.
 
-- these Terms are violated;
-- Discord rules are violated;
-- usage creates a security risk;
-- the Bot is used for illegal activity;
-- the server attempts to gain unauthorized access to the Bot's infrastructure.
+## 18. Contact
 
-After Bot removal, some data may remain until the retention periods described in the Privacy Policy expire, unless an administrator requests earlier deletion.
+Questions, complaints, data deletion requests, and security reports: **https://discord.gg/wUb3Js2wzt**.
 
-## 15. Changes to These Terms
-
-We may update these Terms when features, laws, Discord requirements, or project infrastructure change.
-
-The new version takes effect on the date shown at the top of the document. Continued use of the Bot after an update means acceptance of the updated Terms.
-
-## 16. Contact
-
-Questions, complaints, data deletion requests, and vulnerability reports: **[\[Discord Support Server\]](https://discord.gg/wUb3Js2wzt)**.
-
-When contacting us, include:
-
-- Discord user ID;
-- server ID if the issue relates to a specific server;
-- a short description of the issue;
-- a message or command link if it helps investigation.
+Include the server ID, user ID, and a short description of the issue where relevant.

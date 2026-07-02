@@ -14,16 +14,16 @@ const legalLinks = [
 const knowledgeBaseUrl = `${githubDocsBase}/KNOWLEDGE_BASE.md`;
 
 const productLinks = [
-  { label: "Welcome", href: `${knowledgeBaseUrl}#welcome-module` },
-  { label: "Role Panels", href: `${knowledgeBaseUrl}#role-panels` },
-  { label: "Voice Rooms", href: `${knowledgeBaseUrl}#voice-rooms` },
-  { label: "Server Stats", href: `${knowledgeBaseUrl}#server-stats` },
+  { label: "Welcome", href: `${knowledgeBaseUrl}#5-welcome-alerts` },
+  { label: "Role Panels", href: `${knowledgeBaseUrl}#4-roles-and-role-panels` },
+  { label: "Voice Rooms", href: `${knowledgeBaseUrl}#11-dynamic-voice-rooms` },
+  { label: "Server Stats", href: `${knowledgeBaseUrl}#10-statistics` },
 ];
 const communityLinks = [
-  { label: "Creator Alerts", href: `${knowledgeBaseUrl}#creator-alerts` },
-  { label: "Dev Blog", href: `${knowledgeBaseUrl}#dev-blog` },
-  { label: "AI Moderation", href: `${knowledgeBaseUrl}#ai-moderation` },
-  { label: "Logging", href: `${knowledgeBaseUrl}#logging` },
+  { label: "Creator Alerts", href: `${knowledgeBaseUrl}#6-creator-alerts` },
+  { label: "Dev Blog", href: `${knowledgeBaseUrl}#7-dev-blog` },
+  { label: "Upcoming AI", href: `${knowledgeBaseUrl}#12-upcoming-ai-moderation` },
+  { label: "Logging", href: `${knowledgeBaseUrl}#9-logs-and-audit` },
 ];
 const team = ["6oT9lpa", "Arnetik", "Jimmy"];
 </script>

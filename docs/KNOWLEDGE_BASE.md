@@ -1,636 +1,413 @@
 # OmniBot Knowledge Base
 
-**Last Updated:** June 28, 2026
+**Last Updated:** July 2, 2026
 
-This knowledge base helps server administrators, moderators, and members understand what OmniBot can do, how to configure it, and how to solve common issues.
+This knowledge base explains the current OmniBot modules, how to configure them, and how to troubleshoot common problems.
 
-> Available commands depend on the Bot version, granted Discord permissions, and modules enabled on a specific server.
+## 1. What OmniBot Does
 
-## 1. What the Bot Does
+OmniBot manages Discord server operations through slash commands and a Discord Activity control panel.
 
-OmniBot is a bot for managing Discord servers. It helps automate roles, moderation, logging, statistics, welcome messages, dynamic voice rooms, stream announcements, Dev Blog publishing, and Activity-based administration.
+Current ready modules:
 
-The core idea of the project is to provide a complete server administration toolkit with SQLite persistence and AI moderation powered by self-hosted Ollama.
+- Discord Activity dashboard and RBAC;
+- role synchronization, autoroles, and role panels;
+- welcome messages and member event logs;
+- channel and role purpose settings;
+- moderation commands and punishment history;
+- message, member, channel, moderation, and Activity audit logs;
+- server statistics and leaderboards;
+- dynamic voice rooms;
+- Creator Alerts for Twitch, YouTube, and Kick;
+- Dev Blog drafts and Components V2 publishing;
+- integrations and health surfaces.
 
-## 2. Main Modules
+Planned soon:
 
-### Roles and Autoroles
+- AI moderation with local/self-hosted checks.
 
-The roles module can:
+## 2. Discord Activity Panel
 
-- automatically assign a base role to new members;
-- create role panels with buttons;
-- use emoji/reactions for role assignment;
-- add and remove roles from a panel without rebuilding the whole server setup;
-- show a list of server roles;
-- prevent assigning roles above the Bot's role in the Discord hierarchy.
+The Activity panel is the main admin workspace. It is intended to run inside Discord.
 
-Useful commands:
-
-```text
-/role-panel setup #channel
-/role-panel add @role
-/role-autoassign set @role
-/roles-list
-```
-
-### Discord Activity Control Panel
-
-The Activity panel is the in-Discord workspace for server administration. It should be opened from Discord, not from a standalone browser tab.
-
-Core behavior:
-
-- Discord roles are synchronized into OmniBot;
-- synchronized Discord roles are mapped to Activity access roles;
-- tabs are hidden when the user has no permission for that module;
-- the workspace waits for module data before showing a panel;
-- Discord snowflake IDs are handled as strings in the frontend.
-
-Built-in Activity roles:
-
-- `user`;
-- `creator`;
-- `developer`;
-- `moderator`;
-- `administrator`.
-
-The `administrator` Activity role always has full module access and cannot be edited from the Access Control table.
-
-Default modules visible to all configured users:
+Current panels:
 
 - Dashboard;
-- Integrations;
-- Health Status;
-- Server Stats;
-- Voice Rooms.
-
-Administrator modules:
-
 - Access Control;
-- Welcome Alerts;
 - Role Panels;
+- Welcome Alerts;
+- Creator Alerts;
 - Dev Blog;
+- Bot Settings;
 - Logs;
-- Bot Settings.
+- Server Stats;
+- Voice Rooms;
+- Integrations;
+- Health Status.
+
+Access rules:
+
+- Discord server administrators can synchronize roles.
+- Synchronized Discord roles are mapped to Activity roles.
+- Activity roles decide which tabs a user can see.
+- Administrators have full access.
+- Creators can work with Creator Alerts.
+- Developers can work with Dev Blog.
+- Moderators can work with moderation-related surfaces.
 
 Setup flow:
 
 ```text
 1. Invite the bot with bot + applications.commands scopes.
 2. Open the Activity from a Discord server.
-3. Run /sync_roles or press Sync roles as a Discord server administrator.
+3. Run /sync_roles or press Sync roles.
 4. Open Access Control and configure module permissions.
-5. Open Role Panels and map synchronized Discord roles to Activity roles.
+5. Open Role Panels and map Discord roles to Activity roles.
+6. Configure Bot Settings channel and role purposes.
 ```
 
-### Welcome and Member Events
+## 3. Bot Settings
 
-The welcome module is used to greet new members and log member joins/leaves.
+Bot Settings centralizes setup values.
 
-Features:
+Channel purposes:
 
-- enable or disable welcome messages;
-- configure title, description, color, and embed images;
-- add buttons for rules and roles channels;
-- preview the welcome message;
-- reset welcome settings.
+- welcome;
+- member log;
+- moderation log;
+- message log;
+- channel log;
+- stream announcements;
+- Dev Blog.
 
-Example commands:
+Role purposes:
+
+- Activity admin;
+- Activity creator;
+- Activity developer;
+- stream ping;
+- Dev Blog ping.
+
+Useful commands:
+
+```text
+/set_channel
+/list_channels
+/set_role
+/activity_role
+/sync_roles
+```
+
+## 4. Roles and Role Panels
+
+Ready features:
+
+- synchronize Discord roles;
+- configure autorole;
+- mark roles public or hidden;
+- create role panels;
+- add or remove roles from panels;
+- use button or reaction modes;
+- map Discord roles to Activity access roles.
+
+Useful commands:
+
+```text
+/sync_roles
+/set_auto_role
+/list_roles
+/set_role_public
+/create_panel
+/panel_add
+/panel_remove
+/panel_list
+/delete_panel
+```
+
+Troubleshooting:
+
+- The bot role must be higher than managed roles.
+- Managed integration roles cannot be assigned.
+- Run `/sync_roles` after changing Discord roles.
+- Reopen the Activity if the iframe still shows old role data.
+
+## 5. Welcome Alerts
+
+Welcome Alerts can send configured embed messages when members join.
+
+Ready features:
+
+- title, description, color;
+- thumbnail/media settings;
+- rules and roles channel buttons;
+- preview;
+- enable/disable;
+- reset.
+
+Useful commands:
 
 ```text
 /welcome setup
+/welcome media
+/welcome channels
 /welcome toggle
 /welcome preview
-/welcome config
 /welcome reset
+/welcome show
 ```
 
-The Activity panel exposes this module as **Welcome Alerts**. Rules channel and roles channel dropdowns are loaded from live Discord text channels.
+## 6. Creator Alerts
 
-### Moderation
+Creator Alerts publishes stream and content announcements for creators.
 
-The moderation module helps moderators apply actions quickly and keep violation history.
+Supported platforms:
 
-Features:
+- Twitch;
+- YouTube;
+- Kick.
 
-- warnings;
-- mutes and unmutes;
-- kicks;
-- bans and unbans;
-- user history;
-- active punishment list;
-- message cleanup;
-- channel slowmode.
+Ready features:
 
-Example commands:
+- up to 5 saved sources per creator;
+- admins see all sources;
+- creators see only their own sources;
+- default stream ping role from Bot Settings;
+- creators use the default ping role;
+- admins can override ping role;
+- custom title and description templates;
+- preview test in Activity;
+- platform-specific default embed copy;
+- link button with configurable `Button label`;
+- role pings are wrapped as spoilers;
+- fallback announcements can use Discord Streaming presence if platform API credentials are missing.
+
+Useful commands:
 
 ```text
-/warn @user reason
-/mute @user 10m reason
-/unmute @user
-/kick @user reason
-/ban @user reason
-/unban user_id
-/history @user
-/punishments list
-/purge 50
-/slowmode #channel 5
+/streamer add
+/streamer remove
+/streamer list
+/stream-template set
 ```
 
-### AI Moderation
-
-AI moderation analyzes messages and helps detect spam, advertisements, invites, NSFW content, bullying, and dangerous content.
-
-The project is designed for self-hosted Ollama. This means the model runs on the Bot owner's infrastructure rather than through an external commercial AI API, unless the configuration is changed separately.
-
-Review categories:
-
-- `SPAM`
-- `ADVERTISEMENT`
-- `INVITE`
-- `VIOLENCE`
-- `BULLYING`
-- `NSFW`
-- `SAFE`
-
-Example commands:
+Activity workflow:
 
 ```text
-/ai-stats
-/ai-whitelist add #channel
-/ai-whitelist remove #channel
-/ai-threshold set 0.85
-/ai-review message_id
+Activity -> Creator Alerts -> choose platform -> set URL -> preview -> save
 ```
 
-Important: AI can make mistakes. Serious punishments should be reviewed by a human moderator.
+Template variables:
 
-### Logging
+```text
+{creator.name}
+{creator.ping}
+{platform}
+{url}
+{game}
+{title}
+```
 
-The Bot can audit server events and store data in SQLite.
+`external_channel_id`:
 
-Events that may be logged:
+- Twitch: login without `@`;
+- YouTube: channel ID like `UC...`;
+- Kick: leave empty unless a future integration requires it;
+- leave empty when the platform URL is enough.
 
-- regular messages;
-- deleted messages;
-- edited messages;
-- bulk message deletion;
+If a YouTube stream is announced as Twitch, update to the latest build and create/preview the source again. The current build detects platform from source and URL.
+
+## 7. Dev Blog
+
+Dev Blog publishes project updates from the Activity panel.
+
+Ready features:
+
+- save drafts;
+- publish directly to the configured Dev Blog channel;
+- Components V2 payloads;
+- up to 10 embeds/images;
+- gallery-bottom mode;
+- inline image-between-text mode;
+- default Dev Blog ping role from Bot Settings;
+- Dev Blog ping is sent as a spoiler component before the post body.
+
+Workflow:
+
+```text
+Activity -> Dev Blog -> compose -> Save Draft
+Activity -> Dev Blog -> compose -> Publish
+```
+
+Troubleshooting:
+
+- Configure the Dev Blog channel in Bot Settings.
+- Configure `ping_dev` if the post should ping a role.
+- Use valid image URLs.
+- If Discord rejects the message, check Activity logs for the Discord API error payload.
+
+## 8. Moderation Commands
+
+Ready commands:
+
+```text
+/moderation
+/warn
+/mute
+/unmute
+/kick
+/ban
+/unban
+/history
+/punishments
+/slowmode
+/purge
+```
+
+Moderation actions are logged and stored for history review. The bot does not define server rules; administrators and moderators are responsible for enforcement decisions.
+
+## 9. Logs and Audit
+
+OmniBot can log:
+
+- message events;
+- deleted and edited messages;
 - member joins and leaves;
-- role and nickname changes;
-- channel creation, deletion, and updates;
-- role creation, deletion, and updates;
-- voice channel joins and leaves;
-- punishments and moderator actions.
+- role and channel changes;
+- moderation actions;
+- Activity RBAC changes;
+- Dev Blog publishing;
+- Creator Alert changes;
+- service health and errors.
 
-Default message log retention is **30 days**, unless changed with `MESSAGE_LOG_RETENTION_DAYS`.
+Recommended setup:
 
-### Statistics
+- keep log channels private;
+- configure retention;
+- do not expose logs publicly;
+- use Activity Logs for admin audit review.
 
-The statistics module shows server and user activity.
+## 10. Statistics
 
-Features:
-
-- server statistics for a period;
-- statistics for a specific user;
-- top active members;
-- top active channels;
-- message activity;
-- voice channel activity.
-
-Example commands:
+Ready commands:
 
 ```text
 /stats server
-/stats user @user
+/stats user
 /stats channels
 /stats activity
 /leaderboard
 ```
 
-### Dynamic Voice Rooms
+Activity Server Stats also exposes server metrics in the Activity panel.
 
-The voice room module lets members create temporary rooms through a special trigger channel.
+## 11. Dynamic Voice Rooms
 
-Features:
+Ready features:
 
-- create a private room;
-- rename the room;
-- set a user limit;
-- lock or unlock the room;
-- invite a user;
-- kick a user from the room;
-- transfer room ownership;
-- automatically delete an empty temporary room.
+- trigger channel setup;
+- temporary room creation;
+- owner control panel;
+- rename;
+- user limit;
+- lock/unlock;
+- invite/kick;
+- transfer ownership;
+- cleanup empty temporary rooms.
 
-Example commands:
-
-```text
-/room name "My Room"
-/room limit 5
-/room lock
-/room unlock
-/room invite @user
-/room kick @user
-/room transfer @user
-```
-
-### Streams and Auto-Publications
-
-The streams module is used for automatic Twitch, YouTube, Kick, and other platform announcements when integrations are configured.
-
-Features:
-
-- add a streamer;
-- remove a streamer;
-- show the streamer list;
-- configure an announcement template;
-- set a role to ping;
-- automatically publish stream start announcements;
-- prevent duplicate announcements.
-
-Example commands:
+Useful commands:
 
 ```text
-/streamer add twitch https://twitch.tv/nick
-/streamer remove twitch nick
-/streamer list
-/stream-template set
-/subscribe youtube channel_id
+/send
+/voice set_trigger
+/voice remove_trigger
 ```
 
-### Dev Blog
+## 12. Upcoming AI Moderation
 
-Dev Blog helps publish development news and project updates in a clean embed format from the Activity panel.
+AI moderation is planned as a future module.
 
-Features:
+Planned direction:
 
-- build up to 10 embeds;
-- keep the first embed locked so at least one embed remains;
-- add title, content, image URLs, and colors;
-- publish to the configured Dev Blog channel;
-- save up to 10 drafts in SQLite;
-- load saved drafts from the bottom of the page.
+- local/self-hosted model checks;
+- categories such as spam, ads, invites, bullying, unsafe content, and safe;
+- admin thresholds;
+- moderator review workflow;
+- no commercial external AI API by default unless explicitly configured later.
 
-Example commands:
+Do not treat AI moderation as a currently enabled production module until it is released and configured.
 
-```text
-Activity -> Dev Blog -> Publish
-Activity -> Dev Blog -> Save Draft
-Activity -> Bot Settings -> Dev Blog channel
-```
+## 13. Common Issues
 
-If publishing fails, check that the Dev Blog channel purpose is configured and that the Activity is using the exact Discord guild ID. Discord IDs must not be rounded or converted to JavaScript numbers.
+### Slash Commands Do Not Appear
 
-### Bot Settings
+Check:
 
-Bot Settings visualizes command-style setup in one Activity page.
+- the bot is online;
+- `applications.commands` scope was used during invite;
+- global command sync completed;
+- bot has channel permissions;
+- the cog loaded without errors.
 
-Current surfaces:
+### Activity Shows 403
 
-- welcome toggle;
-- runtime settings such as command prefix, activity name, status, and log level;
-- List Channels dropdowns for welcome, logs, stream alerts, Dev Blog, and admin logs;
-- List Roles dropdowns for Activity admin, creator, and developer role purposes;
-- Sync roles action.
+Check:
 
-The page loads channels, roles, channel purposes, and role purposes through one aggregated backend response. If dropdowns are empty, check backend logs for Discord API errors and verify the bot can reach Discord through its proxy.
+- roles were synchronized;
+- user has a Discord role mapped to an Activity role;
+- target tab permission is not disabled;
+- the Activity was opened from the correct Discord server.
 
-### Access Control
+### Creator Alerts Do Not Publish
 
-Access Control manages Activity roles and tab permissions.
+Check:
 
-Actions:
+- `stream_announce` channel purpose is configured;
+- `ping_stream` role purpose is configured if pings are needed;
+- source is active;
+- platform credentials are configured for API monitoring, or Discord presence fallback is available;
+- Presence Intent is enabled if fallback from Discord status is required.
 
-- add a unique Activity role by entering its name and pressing Add role;
-- delete custom roles from the rightmost table column;
-- choose `access` or `deny` per module cell;
-- save changes automatically.
+### YouTube API Does Not Work
 
-The built-in roles are:
+Check:
 
-- User;
-- Creator;
-- Developer;
-- Moderator;
-- Administrator.
+- `YOUTUBE_API_KEY` is present in server `.env`;
+- YouTube Data API v3 is enabled for the Google Cloud project;
+- the key is restricted to YouTube Data API v3;
+- API quota is not exhausted.
 
-Administrator permissions are immutable.
+### Twitch API Does Not Work
 
-### Role Panels
+Check:
 
-Role Panels maps synchronized Discord roles to Activity roles.
+- `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET` are present;
+- Twitch app is created;
+- credentials are correct;
+- fallback from Discord Streaming status can still publish basic stream alerts without Twitch API.
 
-Steps:
+### Dev Blog Fails With Components V2 Error
 
-```text
-1. Run /sync_roles or use Sync roles.
-2. Open Role Panels.
-3. Find the Discord role row.
-4. Check one or more Activity roles for that Discord role.
-5. Changes save immediately.
-```
+Do not send legacy `content` with Components V2 container payloads. Current Dev Blog sends role ping as a Components V2 text component and keeps post content inside the container.
 
-If synchronized roles do not appear, confirm `activity_synced_roles` contains rows for the server and that the Activity panel has been reopened after deployment.
+### Horizontal Scroll Appears In Activity
 
-## 3. Quick Server Setup
+Use the latest Activity build. Current Creator Alerts cards and preview wrap long URLs and IDs.
 
-### Minimum Bot Permissions
+## 14. Data and Privacy
 
-For basic operation, the Bot usually needs:
-
-- View Channels;
-- Send Messages;
-- Embed Links;
-- Use Slash Commands;
-- Manage Roles;
-- Manage Messages;
-- Moderate Members;
-- Read Message History;
-- Connect;
-- Move Members, if voice rooms are used.
-
-Some features may need additional permissions. Do not grant `Administrator` if precise permissions are enough.
-
-### Bot Role
-
-The Bot's role must be above the roles it assigns or removes. If the Bot cannot assign a role, the most common cause is Discord role hierarchy.
-
-### Recommended Channels
-
-A practical server structure can include:
-
-- `#rules`
-- `#roles`
-- `#welcome`
-- `#general`
-- `#logs`
-- `#deleted-messages`
-- `#punishments`
-- `#bot-config`
-- `#stream-announcements`
-- `#dev-blog`
-- voice channel `+ Create Room`
-
-## 4. `.env` Configuration
-
-Main environment variables:
-
-```env
-DISCORD_TOKEN=your_discord_bot_token
-DISCORD_GUILD_ID=123456789012345678
-DISCORD_OWNER_ID=123456789012345678
-DATABASE_URL=sqlite:///data/nexsusguard.db
-DISCORD_PROXY_URL=http://127.0.0.1:10809
-
-AUTO_ROLE_ID=123456789012345678
-LOG_CHANNEL_ID=123456789012345678
-WELCOME_CHANNEL_ID=123456789012345678
-
-LOG_LEVEL=INFO
-MESSAGE_LOG_RETENTION_DAYS=30
-PUNISHMENT_RETENTION_DAYS=365
-RETENTION_CLEANUP_INTERVAL_HOURS=6
-DISCORD_CLIENT_ID=your_discord_application_client_id
-DISCORD_CLIENT_SECRET=your_discord_oauth_client_secret
-```
-
-If streams or external APIs are used, you may also need:
-
-```env
-TWITCH_CLIENT_ID=your_twitch_client_id
-TWITCH_CLIENT_SECRET=your_twitch_client_secret
-YOUTUBE_API_KEY=your_youtube_api_key
-OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=mistral
-```
-
-For `activity/client/.env`:
-
-```env
-VITE_DISCORD_CLIENT_ID=your_discord_application_client_id
-VITE_API_BASE_URL=
-```
-
-Leave `VITE_API_BASE_URL` empty for production builds. The Activity frontend should call `/api/...` on the same origin.
-
-## 5. Data Storage
-
-The Bot uses SQLite. The database may store:
-
-- server settings;
-- channel settings;
-- roles and role panels;
-- welcome configuration;
-- message logs;
-- server events;
-- punishment history;
-- user statistics;
-- server statistics;
-- voice rooms and voice sessions;
-- stream and publication settings.
-- Activity access roles and module permissions;
-- synchronized Discord role metadata;
-- Dev Blog drafts and publish records;
-- Activity audit events.
-
-See the [Privacy Policy](./PRIVACY_POLICY.md) for more details.
-
-## 6. FAQ
-
-### The Bot Does Not Respond to Slash Commands
-
-Check that:
-
-- the Bot is online;
-- slash commands are synced;
-- the Bot has `Use Slash Commands`;
-- the command is available in this channel;
-- the command module loaded without errors.
-- the bot can reach Discord directly or through `DISCORD_PROXY_URL`.
-
-### The Activity Shows `Session failed`
-
-Check that:
-
-- the Activity is opened inside Discord;
-- `VITE_DISCORD_CLIENT_ID` matches the Discord application;
-- `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` are configured on the server;
-- the Discord application is not configured as Public Client for this backend-exchange flow;
-- production frontend was built with empty `VITE_API_BASE_URL`;
-- `omnibot-activity` is running and listening on the configured port.
-
-### Activity Returns `403`
-
-Common causes:
-
-- Discord roles have not been synchronized;
-- the user has no mapped Activity role;
-- the target tab is denied for the user's Activity role;
-- the user is opening the Activity from the wrong server;
-- the guild ID was rounded by frontend code.
-
-Discord snowflake IDs are larger than JavaScript's safe integer range. Treat guild IDs, role IDs, channel IDs, user IDs, and message IDs as strings in frontend code.
-
-### Activity Returns `429 Too Many Requests`
-
-This usually means too many Discord OAuth/member requests were triggered at once.
-
-Check that:
-
-- the current frontend uses aggregated endpoints for Access Control, Role Panels, and Bot Settings;
-- the backend access-context cache is active;
-- users are not repeatedly refreshing the Activity during Discord rate limits;
-- Discord API traffic goes through the configured proxy when direct access is blocked.
-
-### Role Panels Do Not Show Roles
-
-Check that:
-
-- `/sync_roles` completed successfully;
-- `activity_synced_roles` has rows for the current server;
-- the user has administrator Activity access;
-- the frontend is using `/api/activity/rbac/role-panels`;
-- the Activity iframe is not using a cached old JS asset.
-
-### Access Control Does Not Show Built-In Roles
-
-Check that:
-
-- the Activity backend has initialized the database;
-- opening Access Control calls `/api/activity/rbac/access-control`;
-- the built-in roles exist: User, Creator, Developer, Moderator, Administrator;
-- the user has Activity administrator access.
-
-### Dev Blog Says `User is not a member of this guild`
-
-This usually means the request used a rounded guild ID.
-
-Fix checklist:
-
-- reopen the Activity to load the latest frontend asset;
-- ensure Dev Blog requests send the session guild ID as a string;
-- do not pass `Number(guildId)` from frontend code;
-- confirm the request guild ID matches the server ID from the Activity URL.
-
-### The Bot Cannot See Messages
-
-Check in the Discord Developer Portal:
-
-- `MESSAGE CONTENT INTENT` is enabled;
-- `SERVER MEMBERS INTENT` is enabled if member events are needed;
-- the Bot has `View Channels` and `Read Message History`;
-- the channel is not excluded from AI moderation or logging.
-
-### The Bot Does Not Assign a Role
-
-Check that:
-
-- the Bot has `Manage Roles`;
-- the Bot's role is above the target role;
-- the role is not a managed role from another application;
-- the role ID is correct;
-- the role panel is active.
-
-### The Bot Does Not Write Logs
-
-Check that:
-
-- `LOG_CHANNEL_ID` is set;
-- the Bot can see the log channel;
-- the Bot has `Send Messages` and `Embed Links`;
-- the logging module is registered;
-- the database is writable.
-
-### AI Moderation Does Not Work
-
-Check that:
-
-- Ollama is running;
-- the model is downloaded;
-- `OLLAMA_HOST` points to the correct address;
-- the server has enough RAM;
-- the channel is not whitelisted;
-- the `ai-threshold` value is not too high.
-
-Commands to check Ollama:
-
-```bash
-ollama list
-curl http://localhost:11434/api/generate -d '{"model":"mistral","prompt":"Hello"}'
-```
-
-### The Database Shows `database is locked`
-
-SQLite may lock when too many operations happen at the same time.
-
-Try:
-
-```sql
-PRAGMA journal_mode=WAL;
-```
-
-Also check that multiple Bot instances are not using the same SQLite database at the same time.
-
-### A Voice Room Is Not Deleted
-
-Check that:
-
-- the room is actually empty;
-- the Bot has permission to manage the channel;
-- the channel was created by the Bot as a temporary room;
-- the voice module is loaded;
-- there are no errors in the logs.
-
-## 7. Administrator Recommendations
-
-- Test the Bot on a separate test server first.
-- Do not grant `Administrator` if precise permissions are enough.
-- Restrict access to log channels.
-- Tell members that logging and AI moderation are enabled.
-- Configure log retention.
-- Back up the SQLite database.
-- Review disputed AI detections manually.
-- Keep `.env` out of public access.
-
-## 8. Moderator Recommendations
-
-- Provide a clear reason for each punishment.
-- Check user history before serious sanctions.
-- Do not publish log contents in public channels.
-- Use mute before ban when the violation is not critical.
-- Check Bot permissions before bulk actions.
-- If AI moderation makes a false detection, remove the punishment and adjust the threshold.
-
-## 9. Useful Project Links
+See:
 
 - [Privacy Policy](./PRIVACY_POLICY.md)
 - [Terms of Service](./TERMS_OF_SERVICE.md)
-- [Project README](../readme.md)
+
+For deletion or privacy requests, include:
+
+- Discord user ID;
+- server ID;
+- what data should be exported, corrected, deleted, or disabled.
+
+## 15. Useful Links
+
+- [Project README](../README.md)
 - [Discord Terms](https://discord.com/terms)
 - [Discord Privacy Policy](https://discord.com/privacy)
-
-## 10. Support Response Templates
-
-### Data Deletion Request
-
-```text
-Hello! To delete data, please send your Discord user ID and the server ID where the Bot was used. We will review the request and delete the data we can remove without compromising server safety or moderation history.
-```
-
-### Punishment Appeal
-
-```text
-Hello! Please provide your Discord user ID, the server, the punishment date, and the reason shown by the Bot. Moderators will review the history and logs, then make a decision.
-```
-
-### False AI Detection
-
-```text
-Thanks for reporting this. Please send the message link or message ID if available. We will review the AI category, moderation threshold, and update whitelist or settings if needed.
-```
-
-### Bot Is Not Working
-
-```text
-Please check that the Bot is online, has the required permissions, can see the channel, and that the command module is loaded. If the problem remains, send the command name, server ID, channel, and time of the error.
-```

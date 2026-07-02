@@ -35,9 +35,9 @@ const dashboardCards = computed<DashboardMetric[]>(() => {
     },
     {
       key: "ai",
-      label: "AI checks today",
+      label: "Moderation signals",
       value: String(metrics.ai_checks_today),
-      delta: `${metrics.ai_flagged_today} flagged`,
+      delta: `${metrics.ai_flagged_today} review items`,
       tone: metrics.ai_flagged_today > 0 ? "warning" : "neutral",
     },
     {
@@ -144,7 +144,7 @@ onBeforeUnmount(() => {
     <div>
       <span class="eyebrow">Overview</span>
       <h2>Server operations at a glance.</h2>
-      <p>A compact workspace for permissions, publishing, creator tools, AI signals and system health.</p>
+      <p>A compact workspace for permissions, publishing, creator tools, moderation signals and system health.</p>
     </div>
   </RevealOnScroll>
 

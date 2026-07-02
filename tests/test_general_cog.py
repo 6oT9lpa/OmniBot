@@ -36,6 +36,8 @@ def test_help_catalog_hides_moderation_and_admin_commands_from_regular_member():
     assert "/help" in commands
     assert "/ping" in commands
     assert "/stats user" in commands
+    assert "/streamer add" in commands
+    assert "Activity -> Creator Alerts" in commands
     assert "/ban" not in commands
     assert "/sync_roles" not in commands
     assert "/welcome setup" not in commands
@@ -58,4 +60,5 @@ def test_help_catalog_shows_all_admin_commands_to_administrator():
     assert "/voice set_trigger" in commands
     assert "/welcome setup" in commands
     assert "/activity_role" in commands
+    assert "/set_role" in commands
     assert "/ban" in commands

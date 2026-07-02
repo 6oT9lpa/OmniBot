@@ -15,7 +15,7 @@ const principles = [
   },
   {
     title: "Safety",
-    text: "AI moderation is designed around local Ollama checks, so communities can reduce external data exposure. Sensitive actions still pass through backend permission checks.",
+    text: "Sensitive actions pass through backend permission checks. Local AI moderation is planned as an upcoming module, not a replacement for human review.",
   },
   {
     title: "Creativity",
@@ -24,7 +24,7 @@ const principles = [
 ];
 
 const pillars = [
-  "AI Moderation: local classification, review signals and admin visibility.",
+  "Upcoming AI Moderation: planned local classification and review signals.",
   "Community Management: welcome flows, role panels, logs and clear access rules.",
   "Creator Ecosystem: Twitch, YouTube and Kick alerts shaped for stream communities.",
   "Developer Publishing: Dev Blog drafts, previews and controlled publishing paths.",
@@ -41,7 +41,7 @@ const modules = [
   "Role Panels",
   "Creator Alerts",
   "Dev Blog",
-  "AI Metrics",
+  "Upcoming AI",
   "Logs",
   "Server Stats",
   "Voice Rooms",
@@ -91,7 +91,7 @@ const modulePanels = [
       <AboutPanel
         eyebrow="Who we are"
         title="A practical toolkit for communities that outgrow command-only bots."
-        text="OmniBot combines moderation, automation, creator tools and admin workflows in one Discord Activity. The public layer explains the product, while the panel gives each role a focused workspace."
+        text="OmniBot combines moderation commands, automation, creator tools and admin workflows in one Discord Activity. The public layer explains the product, while the panel gives each role a focused workspace."
       />
       <AboutPanel
         eyebrow="Architecture"
