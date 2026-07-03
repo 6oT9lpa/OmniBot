@@ -278,8 +278,8 @@ class VoiceService(VoiceServiceInterface):
         schema = VoiceInviteSchema(user_id=target.id)
         try:
             await channel.set_permissions(target, connect=True)
-            await channel.send(f"{target.mention}, вас пригласил {user.mention}!")
             await self._try_dm_invite(target, user, channel)
+            await self._try_channel_invite_notice(target, user, channel)
             logger.debug("Invited user_id=%s to channel_id=%s by user_id=%s", schema.user_id, channel.id, user.id)
         except Exception as exc:
             logger.error("Failed to invite target_id=%s channel_id=%s: %s", target.id, channel.id, exc)
@@ -447,6 +447,26 @@ class VoiceService(VoiceServiceInterface):
             logger.debug("DM closed for target_id=%s", target.id)
         except Exception as exc:
             logger.debug("Failed to DM invite target_id=%s: %s", target.id, exc)
+
+    async def _try_channel_invite_notice(
+        self,
+        target: disnake.Member,
+        inviter: disnake.Member,
+        channel: disnake.VoiceChannel,
+    ) -> None:
+        sender = getattr(channel, "send", None)
+        if not sender:
+            logger.debug("Voice invite channel notice skipped because channel has no send method channel_id=%s", channel.id)
+            return
+        try:
+            await sender(f"{target.mention}, вас пригласил {inviter.mention}!")
+        except Exception as exc:
+            logger.warning(
+                "Voice invite channel notice failed target_id=%s channel_id=%s: %s",
+                target.id,
+                channel.id,
+                exc,
+            )
 
     async def _require_room(self, channel: disnake.VoiceChannel) -> dict:
         room = await self._repo.get(channel.id)

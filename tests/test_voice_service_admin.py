@@ -34,6 +34,7 @@ class FakeMember:
         self.display_name = f"user-{member_id}"
         self.mention = f"<@{member_id}>"
         self.voice = None
+        self.dm_messages = []
         guild.members[member_id] = self
 
     async def move_to(self, channel):
@@ -47,17 +48,29 @@ class FakeMember:
         else:
             self.voice = None
 
+    async def send(self, content):
+        self.dm_messages.append(content)
+
 
 class FakeChannel:
     def __init__(self, channel_id, guild):
         self.id = channel_id
         self.guild = guild
+        self.name = f"voice-{channel_id}"
+        self.mention = f"<#{channel_id}>"
         self.permission_calls = []
         self.banned_ids = set()
         self.members = []
+        self.messages = []
+        self.fail_send = False
 
     async def set_permissions(self, target, **kwargs):
         self.permission_calls.append((getattr(target, "id", target), kwargs))
+
+    async def send(self, content):
+        if self.fail_send:
+            raise RuntimeError("channel send failed")
+        self.messages.append(content)
 
     def permissions_for(self, user):
         return FakePermissions(manage_permissions=user.manage_permissions)
@@ -218,6 +231,24 @@ async def test_banned_member_is_removed_on_join_without_tracking():
     assert tracked is False
     assert member.voice is None
     assert repo.added_members == []
+
+
+@pytest.mark.asyncio
+async def test_invite_sends_dm_even_when_channel_notice_fails():
+    repo = FakeVoiceRepository()
+    service = VoiceService(repo)
+    guild = FakeGuild()
+    owner = FakeMember(42, guild)
+    target = FakeMember(77, guild)
+    channel = FakeChannel(10, guild)
+    channel.fail_send = True
+
+    await service.invite(channel, target, owner)
+
+    assert channel.permission_calls == [(77, {"connect": True})]
+    assert target.dm_messages
+    assert "voice-10" in target.dm_messages[0]
+    assert channel.messages == []
 
 
 @pytest.mark.asyncio
