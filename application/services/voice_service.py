@@ -440,9 +440,7 @@ class VoiceService(VoiceServiceInterface):
         channel: disnake.VoiceChannel,
     ) -> None:
         try:
-            await target.send(
-                f"**{inviter.display_name}** приглашает вас в **{channel.name}**!\n{channel.mention}"
-            )
+            await target.send(embed=self._build_voice_invite_embed(target, inviter, channel, direct_message=True))
         except disnake.Forbidden:
             logger.debug("DM closed for target_id=%s", target.id)
         except Exception as exc:
@@ -459,7 +457,11 @@ class VoiceService(VoiceServiceInterface):
             logger.debug("Voice invite channel notice skipped because channel has no send method channel_id=%s", channel.id)
             return
         try:
-            await sender(f"{target.mention}, вас пригласил {inviter.mention}!")
+            await sender(
+                target.mention,
+                embed=self._build_voice_invite_embed(target, inviter, channel, direct_message=False),
+                allowed_mentions=disnake.AllowedMentions(users=True),
+            )
         except Exception as exc:
             logger.warning(
                 "Voice invite channel notice failed target_id=%s channel_id=%s: %s",
@@ -467,6 +469,58 @@ class VoiceService(VoiceServiceInterface):
                 channel.id,
                 exc,
             )
+
+    def _build_voice_invite_embed(
+        self,
+        target: disnake.Member,
+        inviter: disnake.Member,
+        channel: disnake.VoiceChannel,
+        *,
+        direct_message: bool,
+    ) -> disnake.Embed:
+        channel_url = self._voice_channel_url(channel)
+        title = "Приглашение в голосовую комнату" if direct_message else "Голосовое приглашение"
+        description = (
+            f"{inviter.mention} приглашает вас присоединиться к **{channel.name}**."
+            if direct_message
+            else f"{inviter.mention} приглашает {target.mention} присоединиться к **{channel.name}**."
+        )
+        if channel_url:
+            description = f"{description}\n\n[Перейти в комнату]({channel_url})"
+
+        embed = disnake.Embed(
+            title=title,
+            description=description,
+            color=disnake.Color.blurple(),
+            timestamp=datetime.now(_MSK),
+        )
+        embed.add_field(name="Комната", value=channel.mention, inline=True)
+        embed.add_field(name="Пригласил", value=inviter.mention, inline=True)
+        embed.add_field(name="Доступ", value="Разрешение на вход уже выдано.", inline=False)
+        embed.set_footer(text="OmniBot Voice Rooms")
+
+        inviter_avatar_url = self._avatar_url(inviter)
+        if inviter_avatar_url:
+            embed.set_author(name=inviter.display_name, icon_url=inviter_avatar_url)
+            embed.set_thumbnail(url=inviter_avatar_url)
+        else:
+            embed.set_author(name=inviter.display_name)
+        return embed
+
+    def _voice_channel_url(self, channel: disnake.VoiceChannel) -> Optional[str]:
+        jump_url = getattr(channel, "jump_url", None)
+        if jump_url:
+            return str(jump_url)
+        guild = getattr(channel, "guild", None)
+        guild_id = getattr(guild, "id", None)
+        if guild_id:
+            return f"https://discord.com/channels/{guild_id}/{channel.id}"
+        return None
+
+    def _avatar_url(self, member: disnake.Member) -> Optional[str]:
+        avatar = getattr(member, "display_avatar", None) or getattr(member, "avatar", None)
+        url = getattr(avatar, "url", None)
+        return str(url) if url else None
 
     async def _require_room(self, channel: disnake.VoiceChannel) -> dict:
         room = await self._repo.get(channel.id)

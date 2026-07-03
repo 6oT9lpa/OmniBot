@@ -5,6 +5,11 @@ import pytest
 from application.services.voice_service import VoiceService
 
 
+class FakeAvatar:
+    def __init__(self, url):
+        self.url = url
+
+
 class FakePermissions:
     def __init__(self, *, manage_permissions=False):
         self.manage_permissions = manage_permissions
@@ -33,6 +38,7 @@ class FakeMember:
         self.manage_permissions = manage_permissions
         self.display_name = f"user-{member_id}"
         self.mention = f"<@{member_id}>"
+        self.display_avatar = FakeAvatar(f"https://cdn.example.test/{member_id}.png")
         self.voice = None
         self.dm_messages = []
         guild.members[member_id] = self
@@ -48,8 +54,8 @@ class FakeMember:
         else:
             self.voice = None
 
-    async def send(self, content):
-        self.dm_messages.append(content)
+    async def send(self, content=None, **kwargs):
+        self.dm_messages.append({"content": content, **kwargs})
 
 
 class FakeChannel:
@@ -58,6 +64,7 @@ class FakeChannel:
         self.guild = guild
         self.name = f"voice-{channel_id}"
         self.mention = f"<#{channel_id}>"
+        self.jump_url = f"https://discord.com/channels/{guild.id}/{channel_id}"
         self.permission_calls = []
         self.banned_ids = set()
         self.members = []
@@ -67,10 +74,10 @@ class FakeChannel:
     async def set_permissions(self, target, **kwargs):
         self.permission_calls.append((getattr(target, "id", target), kwargs))
 
-    async def send(self, content):
+    async def send(self, content=None, **kwargs):
         if self.fail_send:
             raise RuntimeError("channel send failed")
-        self.messages.append(content)
+        self.messages.append({"content": content, **kwargs})
 
     def permissions_for(self, user):
         return FakePermissions(manage_permissions=user.manage_permissions)
@@ -247,8 +254,29 @@ async def test_invite_sends_dm_even_when_channel_notice_fails():
 
     assert channel.permission_calls == [(77, {"connect": True})]
     assert target.dm_messages
-    assert "voice-10" in target.dm_messages[0]
+    assert target.dm_messages[0]["content"] is None
+    assert target.dm_messages[0]["embed"].title == "Приглашение в голосовую комнату"
+    assert "voice-10" in target.dm_messages[0]["embed"].description
+    assert target.dm_messages[0]["embed"].thumbnail.url == "https://cdn.example.test/42.png"
     assert channel.messages == []
+
+
+@pytest.mark.asyncio
+async def test_invite_sends_embed_channel_notice():
+    repo = FakeVoiceRepository()
+    service = VoiceService(repo)
+    guild = FakeGuild()
+    owner = FakeMember(42, guild)
+    target = FakeMember(77, guild)
+    channel = FakeChannel(10, guild)
+
+    await service.invite(channel, target, owner)
+
+    assert channel.messages
+    assert channel.messages[0]["content"] == "<@77>"
+    assert channel.messages[0]["embed"].title == "Голосовое приглашение"
+    assert "Перейти в комнату" in channel.messages[0]["embed"].description
+    assert channel.messages[0]["allowed_mentions"].users is True
 
 
 @pytest.mark.asyncio
