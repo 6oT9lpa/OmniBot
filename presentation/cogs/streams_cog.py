@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
 
 import disnake
@@ -19,12 +20,15 @@ from presentation.embeds.creator_alert_embed import CreatorAlertEmbedBuilder
 
 logger = get_logger(__name__)
 
+STREAM_ANNOUNCE_REPEAT_INTERVAL = timedelta(hours=2)
+
 
 class StreamsCog(commands.Cog):
     def __init__(self, bot: commands.Bot, creator_alert_service: CreatorAlertService):
         self._bot = bot
         self._creator_alert_service = creator_alert_service
         self._fallback_event_ids: set[str] = set()
+        self._published_stream_keys: dict[tuple[str, str, str, str], datetime] = {}
         logger.info("StreamsCog initialized")
 
     def cog_load(self) -> None:
@@ -45,8 +49,12 @@ class StreamsCog(commands.Cog):
                     event = await self._creator_alert_service.check_subscription(subscription)
                     if not event or subscription.id is None:
                         continue
+                    if self._is_recent_stream_publication(guild, event, "subscription_monitor"):
+                        await self._creator_alert_service.mark_announced(subscription.id, event.event_id)
+                        continue
                     await self._publish_subscription_event(guild, subscription, event)
                     await self._creator_alert_service.mark_announced(subscription.id, event.event_id)
+                    self._remember_stream_publication(guild, event)
                 except Exception as exc:
                     logger.error(
                         "Creator alert monitor failed guild_id=%s subscription_id=%s error=%s",
@@ -100,30 +108,45 @@ class StreamsCog(commands.Cog):
         if not member.guild:
             return
 
-        subscriptions = await self._creator_alert_service.list_sources(member.guild.id, member.id)
+        guild_sources = await self._creator_alert_service.list_sources(member.guild.id)
+        subscriptions = [source for source in guild_sources if source.user_id == member.id]
         active_stream_sources = [
             source
             for source in subscriptions
             if source.active and source.alert_kind == CreatorAlertKind.STREAM
         ]
-        configured_sources = [
+        configured_user_sources = [
             source
             for source in active_stream_sources
             if self._creator_alert_service.is_platform_configured(source.platform)
         ]
-        if configured_sources:
+        event_platform = self._stream_platform(stream)
+        configured_matching_sources = [
+            source
+            for source in guild_sources
+            if source.active
+            and source.alert_kind == CreatorAlertKind.STREAM
+            and source.platform == event_platform
+            and self._creator_alert_service.is_platform_configured(source.platform)
+            and self._source_matches_stream(source, stream)
+        ]
+        if configured_user_sources or configured_matching_sources:
             logger.info(
                 "Skipping Discord activity fallback because configured source exists guild_id=%s user_id=%s sources=%s reason=%s",
                 member.guild.id,
                 member.id,
-                [source.id for source in configured_sources],
+                [source.id for source in configured_user_sources or configured_matching_sources],
                 reason,
             )
             return
 
         source = active_stream_sources[0] if active_stream_sources else None
-        platform = source.platform if source else self._stream_platform(stream)
+        platform = source.platform if source else event_platform
         event = self._build_discord_stream_event(member, stream, platform)
+        if self._is_recent_stream_publication(member.guild, event, reason):
+            if source and source.id is not None:
+                await self._creator_alert_service.mark_announced(source.id, event.event_id)
+            return
         if event.event_id in self._fallback_event_ids or (source and source.last_event_id == event.event_id):
             logger.info(
                 "Discord activity fallback already announced guild_id=%s user_id=%s event_id=%s reason=%s",
@@ -151,6 +174,7 @@ class StreamsCog(commands.Cog):
         else:
             await self._publish_default_event(member.guild, member.id, event)
         self._fallback_event_ids.add(event.event_id)
+        self._remember_stream_publication(member.guild, event)
 
     @commands.slash_command(name="streamer", description="Manage creator alert subscriptions")
     async def streamer(self, ctx: disnake.ApplicationCommandInteraction) -> None:
@@ -320,8 +344,12 @@ class StreamsCog(commands.Cog):
                     reason,
                 )
                 return False
+            if self._is_recent_stream_publication(guild, event, reason):
+                await self._creator_alert_service.mark_announced(subscription.id, event.event_id)
+                return False
             await self._publish_subscription_event(guild, subscription, event)
             await self._creator_alert_service.mark_announced(subscription.id, event.event_id)
+            self._remember_stream_publication(guild, event)
             logger.info(
                 "Creator alert immediate publish completed guild_id=%s subscription_id=%s event_id=%s reason=%s",
                 guild.id,
@@ -374,6 +402,83 @@ class StreamsCog(commands.Cog):
         if not url.startswith(("http://", "https://")):
             return []
         return [disnake.ui.Button(label=(label or "Watch")[:80], url=url)]
+
+    def _is_recent_stream_publication(
+        self,
+        guild: disnake.Guild,
+        event: CreatorContentEvent,
+        reason: str,
+    ) -> bool:
+        key = self._stream_publication_key(guild, event)
+        published_at = self._stream_publication_cache().get(key)
+        if not published_at:
+            return False
+        if datetime.now(timezone.utc) - published_at >= STREAM_ANNOUNCE_REPEAT_INTERVAL:
+            return False
+        logger.info(
+            "Creator alert stream publication skipped by cooldown guild_id=%s key=%s event_id=%s reason=%s",
+            guild.id,
+            key,
+            event.event_id,
+            reason,
+        )
+        return True
+
+    def _remember_stream_publication(self, guild: disnake.Guild, event: CreatorContentEvent) -> None:
+        now = datetime.now(timezone.utc)
+        cache = self._stream_publication_cache()
+        cache[self._stream_publication_key(guild, event)] = now
+        stale_keys = [
+            key
+            for key, published_at in cache.items()
+            if now - published_at >= STREAM_ANNOUNCE_REPEAT_INTERVAL * 2
+        ]
+        for key in stale_keys:
+            cache.pop(key, None)
+
+    def _stream_publication_cache(self) -> dict[tuple[str, str, str, str], datetime]:
+        if not hasattr(self, "_published_stream_keys"):
+            self._published_stream_keys = {}
+        return self._published_stream_keys
+
+    def _stream_publication_key(
+        self,
+        guild: disnake.Guild,
+        event: CreatorContentEvent,
+    ) -> tuple[str, str, str, str]:
+        return (
+            str(guild.id),
+            event.alert_kind.value,
+            event.platform.value,
+            self._stream_identity(event.platform, event.url) or event.event_id,
+        )
+
+    def _source_matches_stream(
+        self,
+        source: CreatorAlertSubscription,
+        activity: disnake.Streaming,
+    ) -> bool:
+        stream_identity = self._stream_identity(source.platform, self._stream_url(activity))
+        source_identity = self._source_identity(source)
+        return bool(stream_identity and source_identity and stream_identity == source_identity)
+
+    def _source_identity(self, source: CreatorAlertSubscription) -> str | None:
+        if source.platform == CreatorPlatform.TWITCH:
+            return (source.external_channel_id or CreatorUrlParser.twitch_login(source.channel_url) or "").lower() or None
+        if source.platform == CreatorPlatform.YOUTUBE:
+            return CreatorUrlParser.youtube_channel_ref(source.external_channel_id or source.channel_url)
+        if source.platform == CreatorPlatform.KICK:
+            return (source.external_channel_id or source.channel_url).strip().lower() or None
+        return None
+
+    def _stream_identity(self, platform: CreatorPlatform, url: str) -> str | None:
+        if platform == CreatorPlatform.TWITCH:
+            return (CreatorUrlParser.twitch_login(url) or "").lower() or None
+        if platform == CreatorPlatform.YOUTUBE:
+            return self._youtube_video_id(url) or CreatorUrlParser.youtube_channel_ref(url)
+        if platform == CreatorPlatform.KICK:
+            return url.strip().lower() or None
+        return url.strip().lower() or None
 
     def _build_discord_stream_event(
         self,

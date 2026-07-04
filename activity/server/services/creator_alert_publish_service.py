@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from activity.server.dependencies import get_db, get_role_purpose_service
@@ -14,6 +15,8 @@ from presentation.embeds.creator_alert_embed import CreatorAlertEmbedBuilder
 
 
 logger = get_logger(__name__)
+
+STREAM_ANNOUNCE_REPEAT_INTERVAL = timedelta(hours=2)
 
 
 class CreatorAlertPublishService:
@@ -70,7 +73,15 @@ class CreatorAlertPublishService:
         if not event:
             logger.info("Creator alert immediate publish found no live event source_id=%s", source["id"])
             return
-        if source.get("last_event_id") == event.event_id:
+        if self._announced_recently(source.get("last_checked_at")):
+            logger.info(
+                "Creator alert immediate publish skipped by repeat cooldown source_id=%s event_id=%s last_checked_at=%s",
+                source["id"],
+                event.event_id,
+                source.get("last_checked_at"),
+            )
+            return
+        if source.get("last_event_id") == event.event_id and not source.get("last_checked_at"):
             logger.info(
                 "Creator alert immediate publish skipped duplicate source_id=%s event_id=%s",
                 source["id"],
@@ -157,3 +168,24 @@ class CreatorAlertPublishService:
             "label": label[:80] or "Watch",
             "url": url,
         }
+
+    def _announced_recently(self, value: Any) -> bool:
+        announced_at = self._parse_datetime(value)
+        if not announced_at:
+            return False
+        if announced_at.tzinfo is None:
+            announced_at = announced_at.replace(tzinfo=timezone.utc)
+        else:
+            announced_at = announced_at.astimezone(timezone.utc)
+        return datetime.now(timezone.utc) - announced_at < STREAM_ANNOUNCE_REPEAT_INTERVAL
+
+    def _parse_datetime(self, value: Any) -> datetime | None:
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return value
+        try:
+            return datetime.fromisoformat(str(value))
+        except ValueError:
+            logger.warning("Creator alert publish datetime parse failed value=%s", value)
+            return None

@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 import disnake
 from fastapi import HTTPException
@@ -44,6 +46,14 @@ class _VideoClient(_NoopClient):
             title="New video",
             url="https://youtube.com/watch?v=video-1",
         )
+
+
+class _LiveClient(_NoopClient):
+    def __init__(self, event):
+        self._event = event
+
+    async def fetch_latest_event(self, channel_url, external_channel_id=None):
+        return self._event
 
 
 @pytest.fixture
@@ -215,6 +225,58 @@ async def test_streaming_activity_scan_publishes_existing_status_once():
 
 
 @pytest.mark.asyncio
+async def test_streaming_activity_fallback_skips_configured_matching_twitch_source():
+    class Guild:
+        id = 100
+
+    class Member:
+        id = 42
+        bot = False
+        guild = Guild()
+        display_name = "Creator"
+
+    class Service:
+        async def list_sources(self, guild_id, user_id=None):
+            return [
+                CreatorAlertSubscription(
+                    id=11,
+                    guild_id=guild_id,
+                    user_id=99,
+                    platform=CreatorPlatform.TWITCH,
+                    channel_url="https://www.twitch.tv/creator",
+                    alert_kind=CreatorAlertKind.STREAM,
+                )
+            ]
+
+        def is_platform_configured(self, platform):
+            return True
+
+    cog = StreamsCog.__new__(StreamsCog)
+    cog._creator_alert_service = Service()
+    cog._fallback_event_ids = set()
+    cog._published_stream_keys = {}
+    published = []
+
+    async def publish_default(guild, user_id, event):
+        published.append((guild.id, user_id, event.event_id))
+
+    cog._publish_default_event = publish_default
+
+    await cog._handle_streaming_presence(
+        Member(),
+        disnake.Streaming(
+            name="Twitch",
+            details="Building OmniBot",
+            state="Minecraft",
+            url="https://www.twitch.tv/creator",
+        ),
+        "presence_update",
+    )
+
+    assert published == []
+
+
+@pytest.mark.asyncio
 async def test_immediate_source_publish_marks_live_event():
     subscription = CreatorAlertSubscriptionInput(
         guild_id=100,
@@ -268,6 +330,37 @@ async def test_immediate_source_publish_marks_live_event():
     assert await cog._publish_source_if_live(Guild(), source, "test") is True
     assert published == [(100, 11, "live-1")]
     assert service.marked == [(11, "live-1")]
+
+
+@pytest.mark.asyncio
+async def test_creator_alert_service_respects_two_hour_repeat_cooldown(creator_event):
+    service = CreatorAlertService(
+        None,
+        None,
+        None,
+        {CreatorPlatform.TWITCH: _LiveClient(creator_event)},
+    )
+    recent_subscription = CreatorAlertSubscription(
+        id=1,
+        guild_id=100,
+        user_id=42,
+        platform=CreatorPlatform.TWITCH,
+        channel_url=creator_event.url,
+        last_event_id="different-live-id",
+        last_checked_at=datetime.now(timezone.utc) - timedelta(minutes=30),
+    )
+    due_subscription = CreatorAlertSubscription(
+        id=2,
+        guild_id=100,
+        user_id=42,
+        platform=CreatorPlatform.TWITCH,
+        channel_url=creator_event.url,
+        last_event_id=creator_event.event_id,
+        last_checked_at=datetime.now(timezone.utc) - timedelta(hours=2, minutes=1),
+    )
+
+    assert await service.check_subscription(recent_subscription) is None
+    assert await service.check_subscription(due_subscription) == creator_event
 
 
 def test_default_creator_alert_embed_is_russian_and_visual(creator_event):

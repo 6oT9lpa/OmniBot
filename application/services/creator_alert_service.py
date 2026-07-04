@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from application.dto.creator_alert_dto import CreatorAlertSubscriptionInput
@@ -22,6 +23,8 @@ from core.domain.channel_purpose import ChannelPurpose
 from infrastructure.logging import get_logger
 
 logger = get_logger(__name__)
+
+STREAM_ANNOUNCE_REPEAT_INTERVAL = timedelta(hours=2)
 
 
 class CreatorAlertService(CreatorAlertServiceInterface):
@@ -130,7 +133,15 @@ class CreatorAlertService(CreatorAlertServiceInterface):
                 event.alert_kind.value,
             )
             return None
-        if event.event_id == subscription.last_event_id:
+        if subscription.last_checked_at and not self._is_repeat_due(subscription.last_checked_at):
+            logger.info(
+                "Creator alert event is inside repeat cooldown subscription_id=%s event_id=%s last_checked_at=%s",
+                subscription.id,
+                event.event_id,
+                subscription.last_checked_at,
+            )
+            return None
+        if event.event_id == subscription.last_event_id and not subscription.last_checked_at:
             logger.info(
                 "Creator alert event already announced subscription_id=%s event_id=%s",
                 subscription.id,
@@ -138,6 +149,13 @@ class CreatorAlertService(CreatorAlertServiceInterface):
             )
             return None
         return event
+
+    def _is_repeat_due(self, announced_at: datetime) -> bool:
+        if announced_at.tzinfo is None:
+            announced_at = announced_at.replace(tzinfo=timezone.utc)
+        else:
+            announced_at = announced_at.astimezone(timezone.utc)
+        return datetime.now(timezone.utc) - announced_at >= STREAM_ANNOUNCE_REPEAT_INTERVAL
 
     def is_platform_configured(self, platform: CreatorPlatform) -> bool:
         client = self._platform_clients.get(platform)
