@@ -13,18 +13,10 @@ class BotConfig(BaseSettings):
 
     # Discord
     discord_token: SecretStr
-    discord_guild_id: Optional[int] = None
-    discord_owner_id: int
     discord_proxy_url: Optional[str] = None
 
     # Database
     database_url: str
-
-    # Optional IDs for channels and roles
-    auto_role_id: Optional[int] = None
-
-    log_channel_id: Optional[int] = None
-    welcome_channel_id: Optional[int] = None
 
     # Logging
     log_level: str = "INFO"
@@ -35,35 +27,12 @@ class BotConfig(BaseSettings):
     retention_cleanup_interval_hours: int = 6
 
     command_prefix: str = "!"
-    activity_name: str = "Omnibot | центр управления"
-    bot_status: str = "online"
     activity_rotation_enabled: bool = True
     activity_rotation_interval_seconds: int = 600
-    presence_activities: str = ""
 
     twitch_client_id: Optional[str] = None
     twitch_client_secret: Optional[SecretStr] = None
     youtube_api_key: Optional[SecretStr] = None
-
-    # Validators
-    @field_validator('discord_guild_id', 'discord_owner_id')
-    @classmethod
-    def validate_positive(cls, v: Optional[int]) -> Optional[int]:
-        if v is None:
-            return v
-        if v <= 0:
-            raise ValueError(f'ID must be positive: {v}')
-        return v
-    
-    @field_validator('discord_guild_id', 'auto_role_id', 'log_channel_id', 'welcome_channel_id', mode='before')
-    @classmethod
-    def parse_id(cls, v):
-        if isinstance(v, str):
-            stripped = v.strip()
-            if not stripped:
-                return None
-            return int(stripped)
-        return v
 
     @field_validator('activity_rotation_interval_seconds')
     @classmethod

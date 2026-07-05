@@ -16,13 +16,12 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
         "created_at", "updated_at"
     }
 
-    def __init__(self, db_manager: DatabaseManager, default_guild_id: Optional[int] = None):
+    def __init__(self, db_manager: DatabaseManager):
         super().__init__(db_manager)
-        self._default_guild_id = default_guild_id
 
     def _resolve_guild_id(self, guild_id: Optional[int]) -> int:
         # Role state is isolated per guild because one global bot instance can serve many servers.
-        resolved_guild_id = guild_id or self._default_guild_id
+        resolved_guild_id = guild_id
         if not resolved_guild_id:
             logger.error("Role repository operation requires guild_id")
             raise ValueError("guild_id is required for role operations")

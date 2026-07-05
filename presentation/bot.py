@@ -214,17 +214,7 @@ class DiscordBot(commands.Bot):
         )
 
     def _load_presence_items(self) -> list[PresenceItem]:
-        configured_items = self._parse_presence_activities(
-            self._config.presence_activities
-        )
-        if configured_items:
-            return configured_items
-
-        default_status = self._parse_status(self._config.bot_status)
-        activity_name = self._config.activity_name.strip() or "Omnibot | центр управления"
-
         return [
-            PresenceItem("playing", activity_name, default_status),
             PresenceItem("watching", "щит OmniBot над {members} участниками", disnake.Status.online),
             PresenceItem("listening", "/help | роли, логи, войсы", disnake.Status.idle),
             PresenceItem("competing", "с хаосом в логах и побеждаю", disnake.Status.dnd),
@@ -235,44 +225,6 @@ class DiscordBot(commands.Bot):
             PresenceItem("watching", "dynamic voice rooms как диспетчер", disnake.Status.online),
             PresenceItem("playing", "панель управления без паники", disnake.Status.online),
         ]
-
-    def _parse_presence_activities(self, raw_activities: str) -> list[PresenceItem]:
-        if not raw_activities.strip():
-            return []
-
-        items = []
-        default_status = self._parse_status(self._config.bot_status)
-
-        for raw_item in raw_activities.replace("\n", ";").split(";"):
-            raw_item = raw_item.strip()
-            if not raw_item:
-                continue
-
-            status = default_status
-            activity_type = "playing"
-            name = raw_item
-            parts = [part.strip() for part in raw_item.split(":", 2)]
-
-            if len(parts) == 3 and self._is_status(parts[0]):
-                status = self._parse_status(parts[0])
-                activity_type = parts[1]
-                name = parts[2]
-            elif len(parts) >= 2:
-                activity_type = parts[0]
-                name = parts[1]
-
-            if not name:
-                continue
-
-            items.append(
-                PresenceItem(
-                    self._normalize_activity_type(activity_type),
-                    name,
-                    status,
-                )
-            )
-
-        return items
 
     def _build_activity(self, item: PresenceItem):
         name = self._format_presence_text(item.name)

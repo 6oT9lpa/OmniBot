@@ -27,11 +27,3 @@ class AuditLogServiceInterface(ABC):
     ) -> Optional[disnake.TextChannel]:
         pass
 
-    @abstractmethod
-    async def setup_log_channels(
-        self,
-        guild: disnake.Guild,
-        logs_channel_id: int,
-        deleted_messages_channel_id: Optional[int] = None,
-    ) -> bool:
-        pass

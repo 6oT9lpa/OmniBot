@@ -88,30 +88,3 @@ class AuditLogService(AuditLogServiceInterface):
             return ChannelPurpose.MOD_LOG
         
         return ChannelPurpose.MOD_LOG
-
-    async def setup_log_channels(
-        self,
-        guild: disnake.Guild,
-        logs_channel_id: int,
-        deleted_messages_channel_id: Optional[int] = None,
-    ) -> bool:
-        channel = guild.get_channel(logs_channel_id)
-        if not isinstance(channel, disnake.TextChannel):
-            return False
-
-        self._config.log_channel_id = logs_channel_id
-        logger.info("Configured log channel id=%s for guild id=%s", logs_channel_id, guild.id)
-
-        if deleted_messages_channel_id is not None:
-            deleted_channel = guild.get_channel(deleted_messages_channel_id)
-            if not isinstance(deleted_channel, disnake.TextChannel):
-                return False
-
-            self._config.deleted_messages_channel_id = deleted_messages_channel_id
-            logger.info(
-                "Configured deleted-message log channel id=%s for guild id=%s",
-                deleted_messages_channel_id,
-                guild.id,
-            )
-
-        return True
