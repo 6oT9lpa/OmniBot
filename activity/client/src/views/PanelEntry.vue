@@ -2,6 +2,7 @@
 import { computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AccessControlPanel from "../components/panel/AccessControlPanel.vue";
+import AiModeratorPanel from "../components/panel/AiModeratorPanel.vue";
 import BotSettingsPanel from "../components/panel/BotSettingsPanel.vue";
 import CreatorAlertsPanel from "../components/panel/CreatorAlertsPanel.vue";
 import DashboardPanel from "../components/panel/DashboardPanel.vue";
@@ -136,6 +137,7 @@ watch(
         <WelcomeModulePanel v-else-if="activeModule === 'welcome'" />
         <RolePanelsPanel v-else-if="activeModule === 'role-panels'" />
         <CreatorAlertsPanel v-else-if="activeModule === 'creator-alerts'" />
+        <AiModeratorPanel v-else-if="activeModule === 'ai-moderator'" />
         <DevBlogPanel v-else-if="activeModule === 'dev-blog'" />
         <VoiceRoomsPanel v-else-if="activeModule === 'voice-rooms'" />
         <ServerStatsPanel v-else-if="activeModule === 'server-stats'" />

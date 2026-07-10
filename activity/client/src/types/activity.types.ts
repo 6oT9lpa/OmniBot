@@ -170,6 +170,14 @@ export type BotSettingsPayload = {
   activity_roles: Partial<Record<ActivityRolePurpose, string>>;
 };
 
+export type AiModeratorSettings = {
+  guild_id: string;
+  channels: string[];
+  log_channel_id: string | null;
+  policy: Record<string, unknown>;
+  available_channels: DiscordChannel[];
+};
+
 export type DevBlogEmbed = {
   title?: string | null;
   description: string;

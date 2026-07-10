@@ -9,6 +9,7 @@ import {
   deleteCreatorAlertSource,
   deleteVoiceRoom,
   getActivityAudit,
+  getAiModeratorSettings,
   getActivityDashboard,
   getActivityHealth,
   getActivityRoles,
@@ -31,6 +32,8 @@ import {
   previewCreatorAlert,
   resetWelcomeConfig,
   saveActivityRole,
+  saveAiModeratorChannels,
+  saveAiModeratorPolicy,
   saveActivityAccessRoleModules,
   saveActivitySyncedRoleAssignments,
   saveChannelPurpose,
@@ -49,6 +52,7 @@ import {
 } from "./mock-data";
 import type {
   ActivityHealth,
+  AiModeratorSettings,
   ActivityAccessRole,
   ActivityAuditPage,
   ActivityDashboardResponse,
@@ -116,6 +120,7 @@ type State = {
   syncedRoles: ActivitySyncedRole[];
   botSettings: BotSettingsPayload | null;
   integrations: Record<string, unknown> | null;
+  aiModerator: AiModeratorSettings | null;
   discordSdk: DiscordSDK | null;
   auth: Auth | null;
 };
@@ -159,6 +164,7 @@ export const useActivityStore = defineStore("activity", {
     syncedRoles: [],
     botSettings: null,
     integrations: null,
+    aiModerator: null,
     discordSdk: null,
     auth: null,
   }),
@@ -416,6 +422,8 @@ export const useActivityStore = defineStore("activity", {
           this.roles = settings.roles;
           this.activityRoles = settings.activity_roles;
           this.channelPurposes = settings.channel_purposes;
+        } else if (module === "ai-moderator") {
+          this.aiModerator = await getAiModeratorSettings(guildId, this.token);
         } else if (module === "integrations") {
           this.integrations = await getIntegrations(guildId, this.token);
         } else if (module === "health") {
@@ -450,6 +458,16 @@ export const useActivityStore = defineStore("activity", {
         this.moduleError = error instanceof Error ? error.message : String(error);
         throw error;
       }
+    },
+
+    async saveAiModeratorChannelValues(channelIds: string[]) {
+      if (!this.session || !this.token || this.mode === "local") return;
+      this.aiModerator = await saveAiModeratorChannels(this.session.guild_id, this.token, channelIds);
+    },
+
+    async saveAiModeratorPolicyValue(policy: Record<string, unknown>) {
+      if (!this.session || !this.token || this.mode === "local") return;
+      this.aiModerator = await saveAiModeratorPolicy(this.session.guild_id, this.token, policy);
     },
 
     async createDevBlog(draft: Omit<DevBlogDraft, "guild_id">) {

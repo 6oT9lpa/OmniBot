@@ -17,6 +17,7 @@ from activity.server.routers import (
     stats,
     voice_rooms,
     welcome,
+    ai_moderation,
 )
 
 
@@ -26,6 +27,7 @@ def include_activity_routers(app: FastAPI) -> None:
     app.include_router(rbac.router)
     app.include_router(dashboard.router)
     app.include_router(welcome.router)
+    app.include_router(ai_moderation.router)
     app.include_router(activity_roles.router)
     app.include_router(discord.router)
     app.include_router(channel_purposes.router)

@@ -1,6 +1,7 @@
 import { apiRequest } from "./client";
 import type {
   ActivityHealth,
+  AiModeratorSettings,
   ActivityAccessRole,
   ActivityAuditPage,
   ActivityDashboardResponse,
@@ -22,6 +23,18 @@ import type {
   VoiceRoom,
   WelcomeConfig,
 } from "../types/activity.types";
+
+export function getAiModeratorSettings(guildId: string, token: string) {
+  return apiRequest<AiModeratorSettings>(`/api/ai-moderator/settings?guild_id=${guildId}`, {}, token);
+}
+
+export function saveAiModeratorChannels(guildId: string, token: string, channelIds: string[]) {
+  return apiRequest<AiModeratorSettings>("/api/ai-moderator/channels", { method: "PUT", body: JSON.stringify({ guild_id: guildId, channel_ids: channelIds.map(Number) }) }, token);
+}
+
+export function saveAiModeratorPolicy(guildId: string, token: string, policy: Record<string, unknown>) {
+  return apiRequest<AiModeratorSettings>("/api/ai-moderator/policy", { method: "PUT", body: JSON.stringify({ guild_id: guildId, policy }) }, token);
+}
 
 export function exchangeDiscordCode(code: string) {
   return apiRequest<TokenResponse>("/api/auth/token", {
