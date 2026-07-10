@@ -16,7 +16,7 @@ class ChannelPurposeService:
 
     async def get_channel_purposes(self, guild_id: int, access_token: str) -> dict[str, str]:
         logger.info("Loading channel purposes guild_id=%s", guild_id)
-        await self._access_service.ensure_panel_access(access_token, str(guild_id))
+        await self._access_service.ensure_module_access(access_token, str(guild_id), "bot-settings")
         rows = await get_db().fetch_all(
             "SELECT purpose, channel_id FROM server_channel_purposes WHERE guild_id = ?",
             (guild_id,),

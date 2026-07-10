@@ -1,4 +1,5 @@
 import asyncio
+from collections import OrderedDict
 import hashlib
 import time
 from typing import Any
@@ -17,9 +18,11 @@ logger = get_logger(__name__)
 
 
 class ActivityAccessService:
-    _context_cache: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+    _context_cache: OrderedDict[tuple[str, str], tuple[float, dict[str, Any]]] = OrderedDict()
     _context_inflight: dict[tuple[str, str], asyncio.Task[dict[str, Any]]] = {}
     _context_ttl_seconds = 20.0
+    _context_cache_max_entries = 1024
+    _context_fetch_semaphore = asyncio.Semaphore(64)
 
     def __init__(self) -> None:
         self._discord = DiscordService()
@@ -27,8 +30,10 @@ class ActivityAccessService:
     async def fetch_user_context(self, access_token: str, guild_id: str) -> dict[str, Any]:
         cache_key = (self._token_cache_key(access_token), guild_id)
         now = time.monotonic()
+        self._prune_context_cache(now)
         cached = self._context_cache.get(cache_key)
         if cached and cached[0] > now:
+            self._context_cache.move_to_end(cache_key)
             logger.debug("Using cached Discord user context guild_id=%s", guild_id)
             return self._clone_context(cached[1])
 
@@ -37,14 +42,28 @@ class ActivityAccessService:
             logger.debug("Waiting for in-flight Discord user context guild_id=%s", guild_id)
             return self._clone_context(await inflight)
 
-        task = asyncio.create_task(self._fetch_user_context_uncached(access_token, guild_id))
+        task = asyncio.create_task(self._fetch_user_context_limited(access_token, guild_id))
         self._context_inflight[cache_key] = task
         try:
             context = await task
             self._context_cache[cache_key] = (time.monotonic() + self._context_ttl_seconds, context)
+            self._context_cache.move_to_end(cache_key)
+            self._prune_context_cache(time.monotonic())
             return self._clone_context(context)
         finally:
             self._context_inflight.pop(cache_key, None)
+
+    async def _fetch_user_context_limited(self, access_token: str, guild_id: str) -> dict[str, Any]:
+        async with self._context_fetch_semaphore:
+            return await self._fetch_user_context_uncached(access_token, guild_id)
+
+    @classmethod
+    def _prune_context_cache(cls, now: float) -> None:
+        expired = [key for key, (expires_at, _) in cls._context_cache.items() if expires_at <= now]
+        for key in expired:
+            cls._context_cache.pop(key, None)
+        while len(cls._context_cache) > cls._context_cache_max_entries:
+            cls._context_cache.popitem(last=False)
 
     async def _fetch_user_context_uncached(self, access_token: str, guild_id: str) -> dict[str, Any]:
         logger.info("Fetching Discord user context guild_id=%s", guild_id)
@@ -55,10 +74,16 @@ class ActivityAccessService:
 
         if user_response.status_code >= 400:
             logger.warning("Discord user lookup failed guild_id=%s status=%s", guild_id, user_response.status_code)
-            raise HTTPException(status_code=user_response.status_code, detail=user_response.text)
+            raise HTTPException(
+                status_code=401 if user_response.status_code in {401, 403} else 503,
+                detail="Discord user authorization could not be verified",
+            )
         if guilds_response.status_code >= 400:
             logger.warning("Discord guild lookup failed guild_id=%s status=%s", guild_id, guilds_response.status_code)
-            raise HTTPException(status_code=guilds_response.status_code, detail=guilds_response.text)
+            raise HTTPException(
+                status_code=401 if guilds_response.status_code in {401, 403} else 503,
+                detail="Discord guild membership could not be verified",
+            )
 
         user = user_response.json()
         current_guild = next((guild for guild in guilds_response.json() if guild.get("id") == guild_id), None)

@@ -1,16 +1,26 @@
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from activity.server.schemas.validators import validate_public_https_url
 
 
 class DevBlogEmbedPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = Field(default=None, max_length=256)
     description: str = Field(min_length=1, max_length=4096)
     image_url: Optional[str] = Field(default=None, max_length=2048)
     color: int = Field(default=0x5865F2, ge=0, le=0xFFFFFF)
 
+    @field_validator("image_url")
+    @classmethod
+    def validate_image_url(cls, value: Optional[str]) -> Optional[str]:
+        return validate_public_https_url(value) if value else None
+
 
 class DevBlogPostPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     guild_id: int = Field(gt=0)
     title: str = Field(min_length=1, max_length=256)
     content: Optional[str] = Field(default=None, max_length=2000)

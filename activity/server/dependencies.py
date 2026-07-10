@@ -19,7 +19,7 @@ _role_purpose_service: Optional[ServerRolePurposeService] = None
 async def initialize_activity_dependencies() -> None:
     global _db, _role_purpose_service
     config = get_config()
-    logger.info("Initializing Activity database dependencies database_url=%s", config.database_url)
+    logger.info("Initializing Activity PostgreSQL dependencies")
     _db = DatabaseManager(config.database_url)
     await _db.initialize()
     _role_purpose_service = ServerRolePurposeService(ServerRolePurposeRepository(_db))
@@ -52,4 +52,8 @@ def require_bearer_token(authorization: str = Header(default="")) -> str:
     if not authorization.startswith(prefix):
         logger.warning("Activity request rejected because bearer token is missing")
         raise HTTPException(status_code=401, detail="Bearer token is required")
-    return authorization[len(prefix):].strip()
+    token = authorization[len(prefix):].strip()
+    if not token or len(token) > 4096 or any(character.isspace() for character in token):
+        logger.warning("Activity request rejected because bearer token is malformed")
+        raise HTTPException(status_code=401, detail="Bearer token is invalid")
+    return token

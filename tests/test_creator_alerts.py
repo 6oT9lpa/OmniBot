@@ -430,8 +430,8 @@ async def test_platform_clients_skip_network_when_credentials_are_missing():
     assert await youtube.fetch_latest_event("https://www.youtube.com/@omni") is None
 
 
-def test_creator_alert_service_reports_platform_configuration(tmp_path):
-    db = DatabaseManager(f"sqlite:///{tmp_path / 'creator_alerts_config.db'}")
+def test_creator_alert_service_reports_platform_configuration():
+    db = DatabaseManager("postgresql://test:test@localhost:5432/test")
     service = CreatorAlertService(
         CreatorAlertRepository(db),
         ChannelConfigRepository(db),
@@ -448,8 +448,8 @@ def test_creator_alert_service_reports_platform_configuration(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_creator_alert_service_filters_mismatched_event_kind(tmp_path):
-    db = DatabaseManager(f"sqlite:///{tmp_path / 'creator_alerts_kind.db'}")
+async def test_creator_alert_service_filters_mismatched_event_kind():
+    db = DatabaseManager("postgresql://test:test@localhost:5432/test")
     service = CreatorAlertService(
         CreatorAlertRepository(db),
         ChannelConfigRepository(db),
@@ -469,9 +469,8 @@ async def test_creator_alert_service_filters_mismatched_event_kind(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_creator_alert_service_enforces_five_sources_per_user(tmp_path):
-    db = DatabaseManager(f"sqlite:///{tmp_path / 'creator_alerts.db'}")
-    await db.initialize()
+async def test_creator_alert_service_enforces_five_sources_per_user(postgres_test_db):
+    db = postgres_test_db
     try:
         repo = CreatorAlertRepository(db)
         channels = ChannelConfigRepository(db)
@@ -502,13 +501,12 @@ async def test_creator_alert_service_enforces_five_sources_per_user(tmp_path):
                 )
             )
     finally:
-        await db.close()
+        pass
 
 
 @pytest.mark.asyncio
-async def test_activity_creator_alert_service_applies_default_ping_role(tmp_path, monkeypatch):
-    db = DatabaseManager(f"sqlite:///{tmp_path / 'activity_creator_alerts.db'}")
-    await db.initialize()
+async def test_activity_creator_alert_service_applies_default_ping_role(postgres_test_db, monkeypatch):
+    db = postgres_test_db
     previous_db = activity_dependencies._db
     previous_role_service = activity_dependencies._role_purpose_service
     activity_dependencies._db = db
@@ -535,13 +533,11 @@ async def test_activity_creator_alert_service_applies_default_ping_role(tmp_path
     finally:
         activity_dependencies._db = previous_db
         activity_dependencies._role_purpose_service = previous_role_service
-        await db.close()
 
 
 @pytest.mark.asyncio
-async def test_activity_creator_alert_save_publishes_live_embed(tmp_path, monkeypatch):
-    db = DatabaseManager(f"sqlite:///{tmp_path / 'activity_creator_alerts_publish.db'}")
-    await db.initialize()
+async def test_activity_creator_alert_save_publishes_live_embed(postgres_test_db, monkeypatch):
+    db = postgres_test_db
     previous_db = activity_dependencies._db
     previous_role_service = activity_dependencies._role_purpose_service
     activity_dependencies._db = db
@@ -611,13 +607,11 @@ async def test_activity_creator_alert_save_publishes_live_embed(tmp_path, monkey
     finally:
         activity_dependencies._db = previous_db
         activity_dependencies._role_purpose_service = previous_role_service
-        await db.close()
 
 
 @pytest.mark.asyncio
-async def test_activity_creator_alert_service_updates_platform_and_restricts_creator_ping_role(tmp_path, monkeypatch):
-    db = DatabaseManager(f"sqlite:///{tmp_path / 'activity_creator_alerts_update.db'}")
-    await db.initialize()
+async def test_activity_creator_alert_service_updates_platform_and_restricts_creator_ping_role(postgres_test_db, monkeypatch):
+    db = postgres_test_db
     previous_db = activity_dependencies._db
     previous_role_service = activity_dependencies._role_purpose_service
     activity_dependencies._db = db
@@ -633,7 +627,7 @@ async def test_activity_creator_alert_service_updates_platform_and_restricts_cre
             CreatorAlertSourcePayload(
                 guild_id=100,
                 platform="twitch",
-                channel_url="https://example.com/creator",
+                channel_url="https://twitch.tv/creator",
                 channel_name="Creator",
                 ping_role_id=999,
             ),
@@ -663,13 +657,11 @@ async def test_activity_creator_alert_service_updates_platform_and_restricts_cre
     finally:
         activity_dependencies._db = previous_db
         activity_dependencies._role_purpose_service = previous_role_service
-        await db.close()
 
 
 @pytest.mark.asyncio
-async def test_activity_creator_alert_delete_reports_missing_and_removes_owned_source(tmp_path, monkeypatch):
-    db = DatabaseManager(f"sqlite:///{tmp_path / 'activity_creator_alerts_delete.db'}")
-    await db.initialize()
+async def test_activity_creator_alert_delete_reports_missing_and_removes_owned_source(postgres_test_db, monkeypatch):
+    db = postgres_test_db
     previous_db = activity_dependencies._db
     previous_role_service = activity_dependencies._role_purpose_service
     activity_dependencies._db = db
@@ -703,7 +695,6 @@ async def test_activity_creator_alert_delete_reports_missing_and_removes_owned_s
     finally:
         activity_dependencies._db = previous_db
         activity_dependencies._role_purpose_service = previous_role_service
-        await db.close()
 
 
 def test_activity_creator_alert_preview_uses_styled_embed_button_and_spoiler_ping():
@@ -726,9 +717,8 @@ def test_activity_creator_alert_preview_uses_styled_embed_button_and_spoiler_pin
 
 
 @pytest.mark.asyncio
-async def test_activity_creator_alert_service_rejects_sixth_source(tmp_path, monkeypatch):
-    db = DatabaseManager(f"sqlite:///{tmp_path / 'activity_creator_alerts_limit.db'}")
-    await db.initialize()
+async def test_activity_creator_alert_service_rejects_sixth_source(postgres_test_db, monkeypatch):
+    db = postgres_test_db
     previous_db = activity_dependencies._db
     previous_role_service = activity_dependencies._role_purpose_service
     activity_dependencies._db = db
@@ -763,4 +753,3 @@ async def test_activity_creator_alert_service_rejects_sixth_source(tmp_path, mon
     finally:
         activity_dependencies._db = previous_db
         activity_dependencies._role_purpose_service = previous_role_service
-        await db.close()

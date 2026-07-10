@@ -19,10 +19,7 @@ DISCORD_ADMINISTRATOR_PERMISSION = 0x0000000000000008
 # Synced guild members always see these tabs; unsynced guilds still fail with 403.
 DEFAULT_VISIBLE_MODULES = (
     "dashboard",
-    "integrations",
     "health",
-    "server-stats",
-    "voice-rooms",
 )
 
 # Access Roles edits only these tabs. Administrator keeps full immutable access.

@@ -18,9 +18,15 @@ FROM node:22-alpine AS runtime
 
 WORKDIR /app
 
-COPY --from=builder /app/dist ./dist
-COPY server.mjs ./server.mjs
+RUN addgroup -S activity && adduser -S activity -G activity
 
-EXPOSE 80
+COPY --chown=activity:activity --from=builder /app/dist ./dist
+COPY --chown=activity:activity server.mjs ./server.mjs
+
+ENV PORT=8080
+
+EXPOSE 8080
+
+USER activity
 
 CMD ["node", "server.mjs"]

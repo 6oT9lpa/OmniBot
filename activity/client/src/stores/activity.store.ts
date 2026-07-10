@@ -352,6 +352,9 @@ export const useActivityStore = defineStore("activity", {
 
     async loadReferenceData() {
       if (!this.session || !this.token || this.mode === "local") return;
+      // Channel and member directories are administrative/statistical data.
+      // Do not fetch them merely because a user can open the Activity.
+      if (!this.isAdmin) return;
       const guildId = this.session.guild_id;
       const [textChannels, voiceChannels, members, channelPurposes] = await Promise.all([
         getDiscordChannels(guildId, this.token, "text"),

@@ -61,7 +61,7 @@ class ActivityRbacService:
                     mentionable,
                     synced_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(guild_id, role_id)
                 DO UPDATE SET
                     name = excluded.name,
@@ -240,7 +240,7 @@ class ActivityRbacService:
                 (role_id, module_key, normalize_permission(permission)),
             )
         await get_db().execute(
-            "UPDATE activity_access_roles SET updated_at = datetime('now', 'localtime') WHERE id = ?",
+            "UPDATE activity_access_roles SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (role_id,),
         )
         await get_db().commit()

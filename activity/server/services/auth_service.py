@@ -40,13 +40,21 @@ class ActivityAuthService:
             )
 
         if response.status_code >= 400:
-            logger.warning("Discord OAuth token exchange failed status=%s body=%s", response.status_code, response.text)
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+            logger.warning("Discord OAuth token exchange failed status=%s", response.status_code)
+            raise HTTPException(status_code=401, detail="Discord authorization code was rejected")
 
-        token = response.json()
+        try:
+            token = response.json()
+            access_token = token["access_token"]
+        except (KeyError, TypeError, ValueError):
+            logger.error("Discord OAuth exchange returned an invalid response")
+            raise HTTPException(status_code=502, detail="Discord OAuth returned an invalid response")
+        if not isinstance(access_token, str) or not access_token:
+            logger.error("Discord OAuth exchange returned an empty access token")
+            raise HTTPException(status_code=502, detail="Discord OAuth returned an invalid response")
         logger.info("Discord OAuth token exchange completed scope=%s expires_in=%s", token.get("scope", ""), token.get("expires_in", 0))
         return {
-            "access_token": token["access_token"],
+            "access_token": access_token,
             "token_type": token.get("token_type", "Bearer"),
             "expires_in": token.get("expires_in", 0),
             "scope": token.get("scope", ""),

@@ -1,4 +1,5 @@
 import asyncio
+from collections import OrderedDict
 import time
 from typing import Any, Literal, Optional
 
@@ -17,7 +18,8 @@ logger = get_logger(__name__)
 
 class DiscordService:
     _CACHE_TTL_SECONDS = 15
-    _bot_resource_cache: dict[tuple[str, str], tuple[float, Any]] = {}
+    _CACHE_MAX_ENTRIES = 512
+    _bot_resource_cache: OrderedDict[tuple[str, str], tuple[float, Any]] = OrderedDict()
 
     async def bot_request(
         self,
@@ -72,8 +74,8 @@ class DiscordService:
         if response.status_code == 204:
             return None
         if response.status_code >= 400:
-            logger.warning("Discord bot request failed method=%s path=%s status=%s body=%s", method, path, response.status_code, response.text)
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+            logger.warning("Discord bot request failed method=%s path=%s status=%s", method, path, response.status_code)
+            raise HTTPException(status_code=response.status_code, detail="Discord API request failed")
         return response.json()
 
     async def safe_bot_request(
@@ -128,7 +130,7 @@ class DiscordService:
         if not query:
             logger.info("Skipping empty Discord member search guild_id=%s", guild_id)
             return []
-        logger.info("Searching Discord members guild_id=%s query=%s limit=%s", guild_id, query, limit)
+        logger.info("Searching Discord members guild_id=%s limit=%s", guild_id, limit)
         members = await self.bot_request(
             "GET",
             f"/guilds/{guild_id}/members/search",
@@ -192,14 +194,27 @@ class DiscordService:
         return latency
 
     async def _cached_bot_resource(self, resource: str, guild_id: str, path: str) -> Any:
+        now = time.monotonic()
+        expired = [
+            key
+            for key, (cached_at, _) in self._bot_resource_cache.items()
+            if now - cached_at > self._CACHE_TTL_SECONDS
+        ]
+        for key in expired:
+            self._bot_resource_cache.pop(key, None)
+
         cache_key = (resource, guild_id)
         cached = self._bot_resource_cache.get(cache_key)
-        if cached and time.monotonic() - cached[0] <= self._CACHE_TTL_SECONDS:
+        if cached:
+            self._bot_resource_cache.move_to_end(cache_key)
             logger.info("Discord bot resource cache hit resource=%s guild_id=%s", resource, guild_id)
             return cached[1]
 
         payload = await self.bot_request("GET", path)
         self._bot_resource_cache[cache_key] = (time.monotonic(), payload)
+        self._bot_resource_cache.move_to_end(cache_key)
+        while len(self._bot_resource_cache) > self._CACHE_MAX_ENTRIES:
+            self._bot_resource_cache.popitem(last=False)
         logger.info("Discord bot resource cached resource=%s guild_id=%s", resource, guild_id)
         return payload
 

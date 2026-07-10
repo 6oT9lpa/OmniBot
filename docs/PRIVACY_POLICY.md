@@ -156,7 +156,7 @@ Data may be processed by or visible to:
 
 - Discord, because OmniBot operates through Discord APIs;
 - the hosting provider or VPS where OmniBot runs;
-- PostgreSQL or SQLite storage configured by the operator;
+- PostgreSQL storage configured by the operator;
 - Twitch, YouTube, and Kick when Creator Alerts are configured;
 - proxy infrastructure such as VLESS/Xray when Discord traffic is routed through it;
 - server administrators and moderators with access to logs or Activity panels;
@@ -164,7 +164,7 @@ Data may be processed by or visible to:
 
 ## 7. Storage and Retention
 
-Production deployments may use PostgreSQL. Local deployments may use SQLite.
+Production and local deployments use PostgreSQL.
 
 Default retention:
 

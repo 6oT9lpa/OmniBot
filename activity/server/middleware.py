@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 
+from infrastructure.config import get_config
 from infrastructure.logging import get_logger
 
 
@@ -28,6 +29,10 @@ def configure_activity_middleware(app: FastAPI) -> None:
             raise
 
         elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        if request.url.path == "/api/auth/token":
+            response.headers["Cache-Control"] = "no-store"
         logger.info(
             "Activity request completed method=%s path=%s status=%s elapsed_ms=%s",
             request.method,
@@ -37,10 +42,16 @@ def configure_activity_middleware(app: FastAPI) -> None:
         )
         return response
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    allowed_origins = [
+        origin.strip()
+        for origin in get_config().activity_allowed_origins.split(",")
+        if origin.strip()
+    ]
+    if allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allowed_origins,
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+            allow_headers=["Authorization", "Content-Type"],
+        )

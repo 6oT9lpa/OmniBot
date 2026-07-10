@@ -26,7 +26,13 @@ class ActivityDashboardService:
         logger.info("Loading Activity dashboard guild_id=%s", guild_id)
         _, access = await self._access_service.ensure_module_access(access_token, str(guild_id), "dashboard")
         metrics = await self._build_metrics(guild_id, access)
-        audit = await self._query_audit_events(guild_id, limit=5, offset=0)
+        # Audit details often contain moderation reasons and member identifiers.
+        # They belong to the Logs permission, not to the public dashboard tab.
+        audit = (
+            await self._query_audit_events(guild_id, limit=5, offset=0)
+            if self._access_service._permission_allows(access.get("permissions", {}).get("logs", "disabled"), "view")
+            else ActivityAuditPage(items=[], total=0, limit=5, offset=0)
+        )
         return ActivityDashboardResponse(metrics=metrics, audit=audit.items)
 
     async def list_audit_events(
@@ -56,9 +62,16 @@ class ActivityDashboardService:
     async def _build_metrics(self, guild_id: int, access: dict[str, Any]) -> ActivityDashboardMetric:
         modules_ready = len(access.get("available_modules", []))
         modules_total = len(MODULE_ORDER)
-        ai_checks_today = await self._count_messages_today(guild_id)
-        ai_flagged_today = await self._count_messages_today(guild_id, flagged=True)
-        creator_sources = await self._count_creator_sources(guild_id)
+        permissions = access.get("permissions", {})
+        can_view_stats = self._access_service._permission_allows(
+            permissions.get("server-stats", "disabled"), "view"
+        )
+        can_view_creator_sources = self._access_service._permission_allows(
+            permissions.get("creator-alerts", "disabled"), "view"
+        )
+        ai_checks_today = await self._count_messages_today(guild_id) if can_view_stats else 0
+        ai_flagged_today = await self._count_messages_today(guild_id, flagged=True) if can_view_stats else 0
+        creator_sources = await self._count_creator_sources(guild_id) if can_view_creator_sources else 0
         return ActivityDashboardMetric(
             modules_ready=modules_ready,
             modules_total=modules_total,
@@ -70,7 +83,7 @@ class ActivityDashboardService:
 
     async def _count_messages_today(self, guild_id: int, flagged: Optional[bool] = None) -> int:
         # Dashboard must stay available even while optional analytics tables are absent.
-        clauses = ["guild_id = ?", "date(timestamp) = date('now', 'localtime')"]
+        clauses = ["guild_id = ?", "DATE(timestamp) = CURRENT_DATE"]
         params: list[Any] = [guild_id]
         if flagged is not None:
             clauses.append("ai_flagged = ?")

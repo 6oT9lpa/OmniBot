@@ -52,10 +52,27 @@ async def serve_activity(path: str) -> FileResponse:
         logger.warning("Activity static handler rejected API path=%s", path)
         raise HTTPException(status_code=404)
 
-    client_dist = activity_server_config.client_dist
-    requested = client_dist / path
+    client_dist = activity_server_config.client_dist.resolve()
+    requested = (client_dist / path).resolve()
+    if not _is_path_inside(requested, client_dist):
+        logger.warning("Activity static handler rejected path traversal")
+        raise HTTPException(status_code=404)
+
     if requested.is_file():
-        logger.info("Serving Activity static file path=%s", requested)
+        logger.info("Serving Activity static file path=%s", requested.relative_to(client_dist))
         return FileResponse(requested)
-    logger.info("Serving Activity SPA fallback for path=%s", path)
-    return FileResponse(client_dist / "index.html")
+
+    index_file = (client_dist / "index.html").resolve()
+    if not index_file.is_file():
+        logger.warning("Activity client index is unavailable")
+        raise HTTPException(status_code=404)
+    logger.info("Serving Activity SPA fallback")
+    return FileResponse(index_file)
+
+
+def _is_path_inside(candidate, root) -> bool:
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return False
+    return True

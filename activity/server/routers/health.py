@@ -10,7 +10,7 @@ service = ActivityHealthService()
 
 @router.get("/api/activity/health", response_model=ActivityHealthResponse)
 async def get_activity_health(
-    guild_id: str = Query(min_length=1),
+    guild_id: int = Query(gt=0),
     access_token: str = Depends(require_bearer_token),
 ) -> ActivityHealthResponse:
-    return await service.get_health(guild_id, access_token)
+    return await service.get_health(str(guild_id), access_token)

@@ -132,7 +132,7 @@ OmniBot may interact with:
 - YouTube Data API;
 - Kick endpoints;
 - hosting/VPS infrastructure;
-- PostgreSQL or SQLite storage;
+- PostgreSQL storage;
 - proxy infrastructure when configured.
 
 External services have their own terms and policies.

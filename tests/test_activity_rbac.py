@@ -12,20 +12,17 @@ from activity.server.services.dev_blog_service import DevBlogService
 from activity.server.services.rbac_service import ActivityRbacService
 from activity.server.services.voice_room_service import VoiceRoomService
 from activity.server.services.welcome_service import ActivityWelcomeService
-from infrastructure.database import DatabaseManager
 
 
 @pytest_asyncio.fixture
-async def activity_db(tmp_path):
-    manager = DatabaseManager(f"sqlite:///{tmp_path / 'activity.db'}")
-    await manager.initialize()
+async def activity_db(postgres_test_db):
+    manager = postgres_test_db
     previous_db = activity_dependencies._db
     activity_dependencies._db = manager
     try:
         yield manager
     finally:
         activity_dependencies._db = previous_db
-        await manager.close()
 
 
 def _context(*, roles: set[int] | None = None, discord_admin: bool = False):

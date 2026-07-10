@@ -26,8 +26,8 @@ class BotSettingsService:
         return {
             "guild_id": str(guild_id),
             "command_prefix": config.command_prefix,
-            "activity_name": config.activity_name,
-            "bot_status": config.bot_status,
+            "activity_name": "",
+            "bot_status": "",
             "activity_rotation_enabled": config.activity_rotation_enabled,
             "activity_rotation_interval_seconds": config.activity_rotation_interval_seconds,
             "log_level": config.log_level,
