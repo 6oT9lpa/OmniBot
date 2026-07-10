@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, reactive } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { RefreshCcw } from "@lucide/vue";
 import RevealOnScroll from "../common/RevealOnScroll.vue";
 import { useActivityStore } from "../../stores/activity.store";
-import type { ActivityRolePurpose, ChannelPurpose } from "../../types/activity.types";
+import type { ActivityRolePurpose, ChannelPurpose, DiscordChannel, DiscordRole } from "../../types/activity.types";
 
 const activity = useActivityStore();
 const status = reactive({ message: "" });
+const channelOptions = ref<DiscordChannel[]>([]);
+const roleOptions = ref<DiscordRole[]>([]);
 const channelPurposes: Array<{ key: ChannelPurpose; label: string }> = [
   { key: "welcome", label: "Welcome" },
   { key: "member_log", label: "Log welcome" },
@@ -32,6 +34,14 @@ const runtimeRows = computed(() => {
     ["log_level", activity.botSettings?.log_level],
   ];
 });
+
+watch(() => activity.textChannels, (channels) => {
+  if (channels.length) channelOptions.value = channels;
+}, { immediate: true });
+
+watch(() => activity.roles, (roles) => {
+  if (roles.length) roleOptions.value = roles;
+}, { immediate: true });
 
 async function saveChannel(purpose: ChannelPurpose, value: string) {
   if (!value) return;
@@ -100,10 +110,10 @@ async function toggleWelcome(value: boolean) {
           @change="saveChannel(purpose.key, ($event.target as HTMLSelectElement).value)"
         >
           <option value="">Select channel</option>
-          <option v-for="channel in activity.textChannels" :key="channel.id" :value="channel.id">#{{ channel.name }}</option>
+          <option v-for="channel in channelOptions" :key="channel.id" :value="channel.id">#{{ channel.name }}</option>
         </select>
       </article>
-      <article v-if="activity.textChannels.length === 0">
+      <article v-if="channelOptions.length === 0">
         <strong>No channels loaded</strong>
         <span>Discord did not return text channels for this server.</span>
       </article>
@@ -126,10 +136,10 @@ async function toggleWelcome(value: boolean) {
           @change="saveRole(purpose.key, ($event.target as HTMLSelectElement).value)"
         >
           <option value="">Select role</option>
-          <option v-for="role in activity.roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+          <option v-for="role in roleOptions" :key="role.id" :value="role.id">{{ role.name }}</option>
         </select>
       </article>
-      <article v-if="activity.roles.length === 0">
+      <article v-if="roleOptions.length === 0">
         <strong>No roles loaded</strong>
         <span>Discord did not return roles for this server.</span>
       </article>
