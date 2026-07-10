@@ -41,7 +41,7 @@ class AiModerationService:
         await self._access_service.ensure_module_access(access_token, str(payload.guild_id), "ai-moderator", "manage")
         await get_db().execute(
             "INSERT INTO ai_moderation_settings (guild_id, policy_json) VALUES (?, ?) ON CONFLICT(guild_id) DO UPDATE SET policy_json = excluded.policy_json, updated_at = CURRENT_TIMESTAMP",
-            (payload.guild_id, Jsonb(payload.policy)),
+            (payload.guild_id, Jsonb(payload.policy.model_dump(mode="json"))),
         )
         await get_db().commit()
         return await self.get_settings(payload.guild_id, access_token)

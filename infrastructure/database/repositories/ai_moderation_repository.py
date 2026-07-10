@@ -2,10 +2,11 @@ from typing import Mapping
 
 from psycopg.types.json import Jsonb
 
+from core.interfaces.repositories.ai_moderation_repository_interface import AiModerationRepositoryInterface
 from infrastructure.database.repositories.base import BaseRepository
 
 
-class AiModerationRepository(BaseRepository):
+class AiModerationRepository(BaseRepository, AiModerationRepositoryInterface):
     async def add_channel(self, guild_id: int, channel_id: int) -> None:
         await self.execute(
             "INSERT INTO ai_moderation_channels (guild_id, channel_id) VALUES (?, ?) ON CONFLICT DO NOTHING",

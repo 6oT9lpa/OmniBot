@@ -8,6 +8,7 @@ from disnake.ext import commands
 from application.dto.ai_moderation_decision import AiModerationDecision
 from application.dto.ai_moderation_request import AiModerationRequest
 from application.services.ai_moderation_queue import AiModerationQueue
+from application.services.ai_moderation_policy_enforcer import AiModerationPolicyEnforcer
 from application.services.ai_moderation_settings_service import AiModerationSettingsService
 from application.services.channel_service import ChannelService
 from core.domain.channel_purpose import ChannelPurpose
@@ -22,6 +23,7 @@ class AiModerationCog(commands.Cog):
         self._settings_service = settings_service
         self._channel_service = channel_service
         self._queue = queue
+        self._policy_enforcer = AiModerationPolicyEnforcer()
 
     async def cog_load(self) -> None:
         await self._queue.start()
@@ -85,24 +87,26 @@ class AiModerationCog(commands.Cog):
         labels = dict(policy.get("labels", {}))
         labels[label.upper()] = {"min_action": min_action.upper(), "max_action": max_action.upper(), "risk_threshold": max(0.0, min(100.0, risk_threshold))}
         policy["labels"] = labels
-        await self._settings_service.save_policy(ctx.guild_id, policy)
-        await ctx.response.send_message(f"Policy saved for {label.upper()}.", ephemeral=True)
+        await self._save_policy(ctx, policy, f"Policy saved for {label.upper()}.")
 
     @ai_policy.sub_command(name="blacklist", description="Set comma-separated blacklist words")
     async def set_blacklist(self, ctx: disnake.ApplicationCommandInteraction, words: str) -> None:
         policy = await self._settings_service.get_policy(ctx.guild_id)
         policy["blacklist_words"] = tuple(item.strip().lower() for item in words.split(",") if item.strip())[:200]
-        await self._settings_service.save_policy(ctx.guild_id, policy)
-        await ctx.response.send_message("Blacklist preferences saved.", ephemeral=True)
+        await self._save_policy(ctx, policy, "Blacklist preferences saved.")
 
     @ai_policy.sub_command(name="domains", description="Set comma-separated allowed domains")
     async def set_domains(self, ctx: disnake.ApplicationCommandInteraction, domains: str) -> None:
         policy = await self._settings_service.get_policy(ctx.guild_id)
         policy["allowed_domains"] = tuple(item.strip().lower() for item in domains.split(",") if item.strip())[:200]
-        await self._settings_service.save_policy(ctx.guild_id, policy)
-        await ctx.response.send_message("Domain preferences saved.", ephemeral=True)
+        await self._save_policy(ctx, policy, "Domain preferences saved.")
 
     async def handle_decision(self, request: AiModerationRequest, decision: AiModerationDecision) -> None:
+        policy = await self._settings_service.get_policy(request.guild_id)
+        try:
+            decision = self._policy_enforcer.apply(request, decision, policy)
+        except ValueError:
+            logger.exception("Invalid guild AI moderation policy guild_id=%s", request.guild_id)
         guild = self._bot.get_guild(request.guild_id)
         if guild is None:
             return
@@ -120,6 +124,15 @@ class AiModerationCog(commands.Cog):
         await self._settings_service.record_event(request.guild_id, request.channel_id, request.message_id, request.user_id, decision.risk_score, decision.action, decision.primary_label, decision.labels, status)
         await self._send_log(guild, decision, status)
 
+    async def _save_policy(self, ctx: disnake.ApplicationCommandInteraction, policy: dict[str, object], success_message: str) -> None:
+        try:
+            validated_policy = self._policy_enforcer.validate(policy)
+        except ValueError as exc:
+            await ctx.response.send_message(f"Invalid policy: {exc}", ephemeral=True)
+            return
+        await self._settings_service.save_policy(ctx.guild_id, validated_policy)
+        await ctx.response.send_message(success_message, ephemeral=True)
+
     async def _execute_action(self, guild: disnake.Guild, member: disnake.Member | None, message: disnake.PartialMessage | None, action: str, dry_run: bool) -> None:
         if dry_run or action in {"IGNORE", "LOG", "REVIEW"}:
             return
@@ -129,6 +142,8 @@ class AiModerationCog(commands.Cog):
             await member.send("Your message was flagged by this server's moderation policy.")
         elif action == "TIMEOUT" and member is not None:
             await member.timeout(duration=timedelta(minutes=10), reason="AI moderation policy")
+        elif action == "KICK" and member is not None:
+            await member.kick(reason="AI moderation policy")
         elif action == "BAN" and member is not None:
             await guild.ban(member, reason="AI moderation policy")
 
