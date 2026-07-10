@@ -34,9 +34,11 @@ class GlobalApplicationCommandSyncService:
             command_key = self._command_key(command)
             matching_commands = existing_by_key.pop(command_key, [])
             if matching_commands:
-                primary_command_id, *duplicate_command_ids = matching_commands
-                await bot.edit_global_command(primary_command_id, command)
-                for duplicate_command_id in duplicate_command_ids:
+                primary_command, *duplicate_commands = matching_commands
+                if not self._matches_existing_command(command, primary_command):
+                    await bot.edit_global_command(int(primary_command["id"]), command)
+                for duplicate_command in duplicate_commands:
+                    duplicate_command_id = int(duplicate_command["id"])
                     await bot.delete_global_command(duplicate_command_id)
                 continue
             await bot.create_global_command(command)
@@ -62,12 +64,20 @@ class GlobalApplicationCommandSyncService:
             if int(command.get("type", 0)) in {1, 2, 3}
         ]
 
-    def _group_existing_commands(self, commands: list[dict[str, Any]]) -> dict[tuple[str, int], list[int]]:
-        grouped: dict[tuple[str, int], list[int]] = {}
+    def _group_existing_commands(self, commands: list[dict[str, Any]]) -> dict[tuple[str, int], list[dict[str, Any]]]:
+        grouped: dict[tuple[str, int], list[dict[str, Any]]] = {}
         for command in commands:
             command_key = (str(command["name"]), int(command["type"]))
-            grouped.setdefault(command_key, []).append(int(command["id"]))
+            grouped.setdefault(command_key, []).append(command)
         return grouped
+
+    def _matches_existing_command(self, command: Any, existing_command: dict[str, Any]) -> bool:
+        from disnake.app_commands import application_command_factory
+
+        try:
+            return command == application_command_factory(existing_command)
+        except (KeyError, TypeError, ValueError):
+            return False
 
     def _command_key(self, command: Any) -> tuple[str, int]:
         command_type = getattr(command.type, "value", command.type)
