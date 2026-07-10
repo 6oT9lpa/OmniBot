@@ -174,8 +174,25 @@ export type AiModeratorSettings = {
   guild_id: string;
   channels: string[];
   log_channel_id: string | null;
-  policy: Record<string, unknown>;
+  policy: AiModerationPolicy;
+  is_default_policy: boolean;
   available_channels: DiscordChannel[];
+};
+
+export type AiModerationAction = "IGNORE" | "LOG" | "REVIEW" | "WARN" | "DELETE" | "DELETE_WARN" | "TIMEOUT" | "KICK" | "BAN";
+
+export type AiModerationLabelPolicy = {
+  risk_threshold: number;
+  min_action: AiModerationAction;
+  max_action: AiModerationAction;
+};
+
+export type AiModerationPolicy = {
+  blacklist_words: string[];
+  allowed_domains: string[];
+  labels: Record<string, AiModerationLabelPolicy>;
+  blacklist_action: AiModerationAction;
+  unapproved_domain_action: AiModerationAction;
 };
 
 export type DevBlogEmbed = {

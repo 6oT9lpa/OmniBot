@@ -5,6 +5,7 @@ from activity.server.services.access_service import ActivityAccessService
 from activity.server.services.discord_service import DiscordService
 from activity.server.schemas.ai_moderation_channels import AiModerationChannelsPayload
 from activity.server.schemas.ai_moderation_policy import AiModerationPolicyPayload
+from core.domain.default_ai_moderation_policy import default_ai_moderation_policy
 from infrastructure.logging import get_logger
 from psycopg.types.json import Jsonb
 
@@ -21,11 +22,14 @@ class AiModerationService:
         channels = await get_db().fetch_all("SELECT channel_id FROM ai_moderation_channels WHERE guild_id = ? ORDER BY channel_id", (guild_id,))
         policy_row = await get_db().fetch_one("SELECT policy_json FROM ai_moderation_settings WHERE guild_id = ?", (guild_id,))
         log_row = await get_db().fetch_one("SELECT channel_id FROM server_channel_purposes WHERE guild_id = ? AND purpose = ?", (guild_id, "ai_moderation_log"))
+        stored_policy = dict(policy_row["policy_json"]) if policy_row and isinstance(policy_row["policy_json"], dict) else None
+        effective_policy = stored_policy or default_ai_moderation_policy().model_dump(mode="json")
         return {
             "guild_id": str(guild_id),
             "channels": [str(row["channel_id"]) for row in channels],
             "log_channel_id": str(log_row["channel_id"]) if log_row else None,
-            "policy": dict(policy_row["policy_json"]) if policy_row and isinstance(policy_row["policy_json"], dict) else {},
+            "policy": effective_policy,
+            "is_default_policy": stored_policy is None,
             "available_channels": await self._discord_service.list_channels(str(guild_id), "text"),
         }
 

@@ -1,6 +1,7 @@
 from typing import Mapping
 
 from core.interfaces.repositories.ai_moderation_repository_interface import AiModerationRepositoryInterface
+from core.domain.default_ai_moderation_policy import default_ai_moderation_policy
 
 
 class AiModerationSettingsService:
@@ -17,7 +18,8 @@ class AiModerationSettingsService:
         return await self._repository.list_channels(guild_id)
 
     async def get_policy(self, guild_id: int) -> dict[str, object]:
-        return await self._repository.get_policy(guild_id)
+        policy = await self._repository.get_policy(guild_id)
+        return policy or default_ai_moderation_policy().model_dump(mode="json")
 
     async def save_policy(self, guild_id: int, policy: Mapping[str, object]) -> None:
         await self._repository.save_policy(guild_id, policy)
