@@ -26,10 +26,44 @@ class GlobalApplicationCommandSyncService:
             ",".join(command_names),
         )
 
-        await bot.bulk_overwrite_global_commands(global_commands)
+        existing_commands = await self._fetch_managed_global_commands(bot)
+        existing_by_key = self._group_existing_commands(existing_commands)
+
+        for command in global_commands:
+            command_key = self._command_key(command)
+            matching_commands = existing_by_key.pop(command_key, [])
+            if matching_commands:
+                primary_command_id, *duplicate_command_ids = matching_commands
+                await bot.edit_global_command(primary_command_id, command)
+                for duplicate_command_id in duplicate_command_ids:
+                    await bot.delete_global_command(duplicate_command_id)
+                continue
+            await bot.create_global_command(command)
 
         logger.info("Global application command sync completed count=%s", len(global_commands))
         return global_commands
+
+    async def _fetch_managed_global_commands(self, bot: Any) -> list[dict[str, Any]]:
+        payload = await bot._connection.http.get_global_commands(  # noqa: SLF001
+            bot.application_id,
+            with_localizations=True,
+        )
+        return [
+            command
+            for command in payload
+            if int(command.get("type", 0)) in {1, 2, 3}
+        ]
+
+    def _group_existing_commands(self, commands: list[dict[str, Any]]) -> dict[tuple[str, int], list[int]]:
+        grouped: dict[tuple[str, int], list[int]] = {}
+        for command in commands:
+            command_key = (str(command["name"]), int(command["type"]))
+            grouped.setdefault(command_key, []).append(int(command["id"]))
+        return grouped
+
+    def _command_key(self, command: Any) -> tuple[str, int]:
+        command_type = getattr(command.type, "value", command.type)
+        return str(command.name), int(command_type)
 
     def _collect_global_commands(self, bot: Any) -> list[Any]:
         commands = []
