@@ -31,6 +31,17 @@ function integrationDetails(value: unknown) {
       .join(", ");
   }
   if (value && typeof value === "object") {
+    const item = value as Record<string, unknown>;
+    if (Array.isArray(item.sources)) {
+      const sourceDetails = item.sources
+        .map((source) => {
+          const row = source as Record<string, unknown>;
+          return `${row.platform}: ${row.active_count || 0}/${row.count || 0} active`;
+        })
+        .join(", ");
+      const interval = item.poll_interval_seconds ? `Polls every ${item.poll_interval_seconds} seconds.` : "";
+      return [interval, sourceDetails || "No creator sources are connected yet."].filter(Boolean).join(" ");
+    }
     return Object.entries(value as Record<string, unknown>)
       .map(([key, item]) => `${key}: ${formatRecordValue(item)}`)
       .join(", ");

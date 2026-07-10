@@ -2518,6 +2518,21 @@ input[type="color"] {
   width: max-content;
 }
 
+.subscription-tier {
+  width: max-content;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.subscription-tier.free { color: var(--muted); }
+.subscription-tier.plus { color: #a5b4fc; border-color: rgba(129, 140, 248, 0.45); }
+.subscription-tier.pro { color: #fbbf24; border-color: rgba(251, 191, 36, 0.48); }
+
 .voice-room-head {
   display: flex;
   gap: 12px;

@@ -2,6 +2,7 @@ from typing import Any
 
 from activity.server.dependencies import get_db
 from activity.server.services.access_service import ActivityAccessService
+from infrastructure.config import get_config
 from infrastructure.logging import get_logger
 
 
@@ -24,9 +25,14 @@ class IntegrationsService:
             """,
             (guild_id,),
         )
+        config = get_config()
         return {
-            "discord": {"status": "connected"},
-            "creator_platforms": sources,
-            "ollama": {"status": "configured_by_bot_service"},
-            "database": {"status": "connected"},
+            "discord_bot": {"status": "configured", "detail": "Discord Bot API is used by the running bot."},
+            "creator_platforms": {
+                "status": "configured",
+                "poll_interval_seconds": config.creator_alert_poll_interval_seconds,
+                "sources": sources,
+            },
+            "ai_moderator": {"status": "configured", "endpoint": config.ai_moderator_api_url},
+            "database": {"status": "configured", "detail": "PostgreSQL stores bot state and activity data."},
         }

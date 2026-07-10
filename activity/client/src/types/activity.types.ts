@@ -158,9 +158,7 @@ export type ChannelPurpose =
 
 export type BotSettingsPayload = {
   guild_id: string | number;
-  command_prefix?: string | null;
-  activity_name?: string | null;
-  bot_status?: string | null;
+  subscription_tier?: "free" | "plus" | "pro";
   activity_rotation_enabled?: boolean;
   activity_rotation_interval_seconds?: number;
   log_level?: string | null;
