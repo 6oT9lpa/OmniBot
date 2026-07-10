@@ -1,6 +1,6 @@
 # OmniBot Knowledge Base
 
-**Last Updated:** July 2, 2026
+**Last Updated:** July 10, 2026
 
 This knowledge base explains the current OmniBot modules, how to configure them, and how to troubleshoot common problems.
 
@@ -20,11 +20,8 @@ Current ready modules:
 - dynamic voice rooms;
 - Creator Alerts for Twitch, YouTube, and Kick;
 - Dev Blog drafts and Components V2 publishing;
+- AI moderation through the local AI Moderator API;
 - integrations and health surfaces.
-
-Planned soon:
-
-- AI moderation with local/self-hosted checks.
 
 ## 2. Discord Activity Panel
 
@@ -42,6 +39,7 @@ Current panels:
 - Logs;
 - Server Stats;
 - Voice Rooms;
+- AI Moderator;
 - Integrations;
 - Health Status.
 
@@ -322,19 +320,32 @@ Useful commands:
 /voice remove_trigger
 ```
 
-## 12. Upcoming AI Moderation
+## 12. AI Moderation
 
-AI moderation is planned as a future module.
+AI Moderation is available through the Activity panel and the local AI Moderator API.
 
-Planned direction:
+Current behavior:
 
-- local/self-hosted model checks;
-- categories such as spam, ads, invites, bullying, unsafe content, and safe;
-- admin thresholds;
-- moderator review workflow;
-- no commercial external AI API by default unless explicitly configured later.
+- admins choose which Discord text/news channels are covered;
+- channel IDs are validated and non-message channels are ignored;
+- messages from covered channels are sent to the local AI Moderator endpoint;
+- the AI service returns labels, risk score, explanation, and recommended action;
+- server policy controls thresholds, blacklist words, allowed domains, and maximum action levels;
+- Activity Health shows whether the AI Moderator API is reachable;
+- local ruBERT can run on CUDA when NVIDIA drivers and CUDA-ready PyTorch are available.
 
-Do not treat AI moderation as a currently enabled production module until it is released and configured.
+Recommended setup:
+
+```text
+1. Start ai-moder on the server.
+2. Configure AI_MODERATOR_API_URL and AI_MODERATOR_API_KEY in OmniBot .env.
+3. Open Activity -> AI Moderator.
+4. Select moderated channels.
+5. Review blacklist words, allowed domains, label thresholds, and action limits.
+6. Check Activity -> Health Status.
+```
+
+The AI Moderator should assist staff, not replace human review. Use stricter automatic actions only after testing on your server.
 
 ## 13. Common Issues
 
@@ -399,6 +410,7 @@ See:
 
 - [Privacy Policy](./PRIVACY_POLICY.md)
 - [Terms of Service](./TERMS_OF_SERVICE.md)
+- [Commercial License](../COMMERCIAL_LICENSE.md)
 
 For deletion or privacy requests, include:
 

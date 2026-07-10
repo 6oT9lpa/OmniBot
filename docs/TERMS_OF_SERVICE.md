@@ -1,9 +1,9 @@
 # Terms of Service for OmniBot
 
 **Effective Date:** June 18, 2026  
-**Last Updated:** July 2, 2026
+**Last Updated:** July 10, 2026
 
-These Terms of Service govern use of OmniBot, including the Discord bot, slash commands, Discord Activity control panel, Creator Alerts, Dev Blog, logging, statistics, voice rooms, role tools, welcome tools, and moderation commands.
+These Terms of Service govern use of OmniBot, including the Discord bot, slash commands, Discord Activity control panel, Creator Alerts, Dev Blog, logging, statistics, voice rooms, role tools, welcome tools, moderation commands, and AI moderation features.
 
 By adding OmniBot to a server, using its commands, or opening the Activity panel, you agree to these Terms, the [Privacy Policy](./PRIVACY_POLICY.md), and Discord's applicable terms and policies.
 
@@ -22,9 +22,8 @@ OmniBot currently provides:
 - dynamic voice rooms;
 - Creator Alerts for Twitch, YouTube, and Kick;
 - Dev Blog drafts and publishing;
+- AI moderation channel coverage, policy settings, and local AI Moderator API integration;
 - bot settings, integrations, and health surfaces.
-
-AI moderation is planned as a future module. It is not guaranteed to be available until released and configured.
 
 ## 2. Eligibility
 
@@ -59,6 +58,7 @@ You may use OmniBot to:
 - publish Creator Alerts for channels you are allowed to promote;
 - publish Dev Blog content you are allowed to publish;
 - manage server settings through the Activity panel.
+- configure AI moderation for channels where you have authority to moderate.
 
 ## 5. Prohibited Use
 
@@ -73,6 +73,7 @@ You may not use OmniBot to:
 - attempt to access bot tokens, API keys, database credentials, logs, or server infrastructure;
 - publish illegal content through Dev Blog, Creator Alerts, embeds, or role panels;
 - impersonate creators or publish alerts for channels you do not control or have permission to promote.
+- use AI moderation outputs as a pretext for harassment, discrimination, or abusive enforcement.
 
 We may restrict or terminate access if usage creates legal, security, privacy, or operational risk.
 
@@ -137,11 +138,19 @@ OmniBot may interact with:
 
 External services have their own terms and policies.
 
-## 12. Planned AI Moderation
+## 12. AI Moderation
 
-AI moderation is planned for a future release. When released, it may classify messages and assist moderators, but it should not be treated as a final authority.
+AI moderation may classify selected-channel messages, return labels and risk scores, and assist moderators or configured policy flows.
 
-Before AI moderation is enabled in production, administrators should review the updated documentation and privacy policy.
+Server administrators are responsible for:
+
+- selecting only channels that should be moderated by the AI module;
+- reviewing thresholds and maximum action limits before enabling strict behavior;
+- informing members when AI moderation is active;
+- handling appeals, false positives, and false negatives;
+- keeping human staff responsible for final server policy.
+
+AI moderation should not be treated as a final authority. It is an assistive system and may make mistakes.
 
 ## 13. Availability and Changes
 

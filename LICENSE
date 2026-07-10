@@ -1,21 +1,48 @@
-MIT License
+OmniBot Commercial Proprietary License
 
-Copyright (c) 2026 Alexandr Spivak
+Copyright (c) 2026 Alexandr Spivak.
+All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software, source code, documentation, configuration files, tests, built
+assets, and related materials (the "Software") are proprietary and owned by
+Alexandr Spivak unless a separate written agreement states otherwise.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+No Permission Granted
+
+Except for rights expressly granted in a separate written commercial license,
+contract, invoice, order form, or other written permission from the copyright
+holder, no permission is granted to use, copy, modify, publish, distribute,
+sublicense, sell, rent, host, white-label, reverse engineer, or create
+derivative works from the Software.
+
+Repository Access
+
+If this repository is visible to you, that visibility does not grant a license
+to run the bot, host the Activity, use the source code in production, copy the
+Software, redistribute it, or commercialize it. Viewing is allowed only to the
+extent permitted by the hosting platform and applicable law.
+
+Commercial Licensing
+
+Commercial use, private modification, internal deployment, hosted deployment,
+SaaS use, resale, white-label use, source-code redistribution, or integration
+into another paid product requires a separate written commercial license or
+contract approved by the copyright holder.
+
+Attribution
+
+Any permitted use must preserve the following notice in source copies,
+documentation, and other reasonable attribution locations:
+
+Copyright (c) 2026 Alexandr Spivak. All rights reserved.
+
+No Warranty
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, SECURITY, RELIABILITY, OR
+AVAILABILITY. THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR CLAIMS, DAMAGES,
+LOSSES, OR OTHER LIABILITY ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
+
+To obtain permission, contact the copyright holder and receive written approval
+before using the Software.

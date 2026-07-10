@@ -1,7 +1,7 @@
 # Privacy Policy for OmniBot
 
 **Effective Date:** June 18, 2026  
-**Last Updated:** July 2, 2026
+**Last Updated:** July 10, 2026
 
 This Privacy Policy explains what data OmniBot processes, why it is processed, how it is stored, and how deletion or access requests can be made.
 
@@ -112,13 +112,22 @@ OmniBot writes technical logs to diagnose errors and keep services stable. Logs 
 - Discord IDs involved in the event;
 - request path and status for Activity API requests.
 
-## 3. Planned AI Moderation
+### 2.8 AI Moderation Data
 
-AI moderation is planned as a future module. It is not described here as a currently enabled production feature.
+When AI moderation is enabled and channels are selected in Activity, OmniBot may process and store:
 
-When released, it is expected to use local/self-hosted checks by default. The Privacy Policy should be updated again before or when AI moderation is enabled in production.
+- selected moderated channel IDs;
+- guild AI moderation policy settings;
+- blacklist words and allowed domains configured by administrators;
+- Discord message ID, guild ID, channel ID, author ID, timestamp, and message text for covered channels;
+- AI Moderator request and response metadata such as labels, confidence, risk score, reason code, decision action, and latency;
+- moderation queue errors and health check results.
 
-## 4. Data We Do Not Intentionally Collect
+The current production design uses a local/self-hosted AI Moderator API. Messages are not sent to a commercial third-party AI API by default. The AI Moderator may use local rules, local ruBERT model inference, policy resolution, and optional fallback components configured by the operator.
+
+Only channels selected by administrators in Activity are covered by AI moderation. Server administrators are responsible for informing members when AI moderation is enabled.
+
+## 3. Data We Do Not Intentionally Collect
 
 OmniBot does not intentionally collect:
 
@@ -131,7 +140,7 @@ OmniBot does not intentionally collect:
 - browser fingerprints for tracking;
 - Discord client secrets in frontend code.
 
-## 5. How Data Is Used
+## 4. How Data Is Used
 
 Data is used to:
 
@@ -145,10 +154,12 @@ Data is used to:
 - operate voice rooms;
 - publish Creator Alerts and Dev Blog posts;
 - prevent duplicate stream announcements;
+- send selected-channel messages to the local AI Moderator API;
+- apply configured AI moderation policy and staff review workflows;
 - maintain audit trails;
 - diagnose errors and improve service stability.
 
-## 6. Data Sharing and Third Parties
+## 5. Data Sharing and Third Parties
 
 We do not sell or rent user data.
 
@@ -158,11 +169,12 @@ Data may be processed by or visible to:
 - the hosting provider or VPS where OmniBot runs;
 - PostgreSQL storage configured by the operator;
 - Twitch, YouTube, and Kick when Creator Alerts are configured;
+- the local/self-hosted AI Moderator service when AI moderation is enabled;
 - proxy infrastructure such as VLESS/Xray when Discord traffic is routed through it;
 - server administrators and moderators with access to logs or Activity panels;
 - authorities when legally required.
 
-## 7. Storage and Retention
+## 6. Storage and Retention
 
 Production and local deployments use PostgreSQL.
 
@@ -172,11 +184,12 @@ Default retention:
 - expired punishment history: 365 days unless changed by configuration;
 - cleanup interval: approximately every 6 hours unless changed by configuration;
 - server settings, Activity RBAC, role panels, welcome settings, Creator Alerts, and Dev Blog drafts: kept while the server uses the bot or until changed/deleted;
+- AI moderation settings: kept while the server uses the module or until changed/deleted;
 - technical logs: kept until log rotation or manual cleanup.
 
 Some data may be retained longer where needed for security, abuse investigation, backups, legal compliance, or recovery.
 
-## 8. Access, Correction, and Deletion
+## 7. Access, Correction, and Deletion
 
 Users and server administrators may request:
 
@@ -194,7 +207,7 @@ To request this, contact the project support channel and include:
 
 We may verify that the requester is the relevant user or a server administrator. Requests are usually reviewed within 30 days.
 
-## 9. Security
+## 8. Security
 
 Security measures include:
 
@@ -206,18 +219,20 @@ Security measures include:
 - log rotation;
 - avoiding frontend storage of secrets;
 - optional proxy configuration via server environment.
+- local AI Moderator API keys stored in server `.env`;
+- AI Moderator access restricted to backend services.
 
 No system is perfectly secure. Report suspected leaks or vulnerabilities through the contact channel.
 
-## 10. Children and Minimum Age
+## 9. Children and Minimum Age
 
 OmniBot is not intended for users below the minimum age required by Discord and local law.
 
-## 11. Changes
+## 10. Changes
 
 This policy may be updated when features, infrastructure, laws, or Discord requirements change. Material updates will be reflected by the Last Updated date.
 
-## 12. Contact
+## 11. Contact
 
 Privacy, deletion, and security questions: **https://discord.gg/wUb3Js2wzt**.
 

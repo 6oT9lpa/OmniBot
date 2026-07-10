@@ -142,9 +142,9 @@ onBeforeUnmount(() => {
 <template>
   <RevealOnScroll tag="section" class="dashboard-hero">
     <div>
-      <span class="eyebrow">Overview</span>
-      <h2>Server operations at a glance.</h2>
-      <p>A compact workspace for permissions, publishing, creator tools, moderation signals and system health.</p>
+      <span class="eyebrow">OmniBot control center</span>
+      <h2>Live server operations in one Activity.</h2>
+      <p>Manage permissions, Creator Alerts, Dev Blog posts, AI moderation signals, voice rooms, logs and service health from the same protected workspace.</p>
     </div>
   </RevealOnScroll>
 

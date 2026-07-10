@@ -15,7 +15,7 @@ const principles = [
   },
   {
     title: "Safety",
-    text: "Sensitive actions pass through backend permission checks. Local AI moderation is planned as an upcoming module, not a replacement for human review.",
+    text: "Sensitive actions pass through backend permission checks. Local AI moderation produces review signals and policy decisions without becoming a replacement for server staff.",
   },
   {
     title: "Creativity",
@@ -24,7 +24,7 @@ const principles = [
 ];
 
 const pillars = [
-  "Upcoming AI Moderation: planned local classification and review signals.",
+  "AI Moderation: local ruBERT-backed classification, rules, review signals and policy-controlled actions.",
   "Community Management: welcome flows, role panels, logs and clear access rules.",
   "Creator Ecosystem: Twitch, YouTube and Kick alerts shaped for stream communities.",
   "Developer Publishing: Dev Blog drafts, previews and controlled publishing paths.",
@@ -41,7 +41,7 @@ const modules = [
   "Role Panels",
   "Creator Alerts",
   "Dev Blog",
-  "Upcoming AI",
+  "AI Moderator",
   "Logs",
   "Server Stats",
   "Voice Rooms",
@@ -82,8 +82,8 @@ const modulePanels = [
       </div>
       <p>
         OmniBot began as a self-hosted alternative to paid, fragmented Discord bots.
-        It is built for growing communities that need automation without losing control
-        over data, roles and server decisions.
+        It is built for growing communities that need automation, creator publishing,
+        local AI moderation and clear control over data, roles and server decisions.
       </p>
     </RevealOnScroll>
 
@@ -91,7 +91,7 @@ const modulePanels = [
       <AboutPanel
         eyebrow="Who we are"
         title="A practical toolkit for communities that outgrow command-only bots."
-        text="OmniBot combines moderation commands, automation, creator tools and admin workflows in one Discord Activity. The public layer explains the product, while the panel gives each role a focused workspace."
+        text="OmniBot combines moderation commands, local AI checks, automation, creator tools and admin workflows in one Discord Activity. The public layer explains the product, while the panel gives each role a focused workspace."
       />
       <AboutPanel
         eyebrow="Architecture"

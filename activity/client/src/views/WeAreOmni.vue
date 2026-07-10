@@ -7,8 +7,8 @@ import HeroText from "../components/landing/HeroText.vue";
 const features = [
   {
     index: "01",
-    title: "Operational Moderation",
-    text: "Moderation commands, logs, punishment history and upcoming local AI checks keep server management efficient without hiding human review.",
+    title: "Moderation With AI Signals",
+    text: "Classic moderation commands, logs, punishment history and local AI Moderator checks help staff react faster while keeping humans in control.",
   },
   {
     index: "02",
@@ -17,8 +17,8 @@ const features = [
   },
   {
     index: "03",
-    title: "Operational Control",
-    text: "Role panels, welcome flows, status checks, statistics and access rules live in one focused control surface.",
+    title: "Activity Control Surface",
+    text: "Dashboard, bot settings, integrations, health checks, statistics and access rules live in one focused Discord Activity.",
   },
   {
     index: "04",
@@ -44,7 +44,7 @@ const features = [
       <HeroText
         kicker="OmniBot Activity"
         title="BE A PART OF SOMETHING MARVELLOUS"
-        body="Omni is a modular Discord bot that combines automation, creator tools, analytics, moderation workflows and elegant server management in one ecosystem."
+        body="OmniBot is a modular Discord bot with a protected Activity panel, Creator Alerts, Dev Blog publishing, dynamic voice rooms, analytics and a local AI Moderator connected to the current production stack."
       />
     </RevealOnScroll>
 
@@ -64,19 +64,19 @@ const features = [
 
     <RevealOnScroll tag="section" class="showcase-band">
       <div class="showcase-copy">
-        <span class="eyebrow">Control without clutter</span>
-        <h2>One Activity. Many workspaces. Zero token leaks.</h2>
+        <span class="eyebrow">Current production stack</span>
+        <h2>One Activity. Many workspaces. Local AI checks.</h2>
         <p>
-          Control without clutter. Every module, from roles and logs to moderation and
-          stats, lives in one clean dashboard instead of scattered commands. Admins see
-          what changed, who has access and what needs attention without digging through
-          channel history.
+          Every module, from roles and logs to stream alerts, Dev Blog posts and AI
+          moderation, lives in one dashboard instead of scattered commands. Admins see
+          what changed, who has access, which services are healthy and what needs review
+          without digging through channel history.
         </p>
       </div>
       <div class="showcase-stack" aria-hidden="true">
         <div><ShieldCheck :size="20" /> Permission Matrix</div>
         <div><RadioTower :size="20" /> Creator Alerts</div>
-        <div><Bot :size="20" /> Upcoming AI Checks</div>
+        <div><Bot :size="20" /> Local AI Moderator</div>
       </div>
     </RevealOnScroll>
   </main>

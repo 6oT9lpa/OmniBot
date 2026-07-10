@@ -20,12 +20,7 @@ Ready modules:
 | Creator Alerts | Ready | Twitch, YouTube, Kick sources; templates; preview; role ping; stream fallback from Discord status |
 | Dev Blog | Ready | Components V2 posts, drafts, image galleries, dev ping role |
 | Bot Settings | Ready | Channel purposes, role purposes, runtime settings, role sync |
-
-Upcoming:
-
-| Module | Status | Notes |
-| --- | --- | --- |
-| AI Moderation | Planned soon | Local/self-hosted moderation checks are planned as a future module. README, policies, and the Activity UI mention it as upcoming, not as a currently enabled production feature. |
+| AI Moderation | Ready | Activity channel coverage, policy thresholds, blacklist/domain rules, local AI Moderator API health and Discord moderation queue integration |
 
 ## Quick Start
 
@@ -99,11 +94,13 @@ VITE_DISCORD_CLIENT_ID=your_discord_application_client_id
 VITE_API_BASE_URL=
 ```
 
-Planned AI moderation values, for future use:
+AI Moderator integration values:
 
 ```env
-OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=mistral
+AI_MODERATOR_ENABLED=true
+AI_MODERATOR_API_URL=http://127.0.0.1:8000
+AI_MODERATOR_API_KEY=change_me
+AI_MODERATOR_REQUEST_TIMEOUT_SECONDS=10
 ```
 
 ## Discord Activity
@@ -122,6 +119,7 @@ Current panels:
 - Logs: message/server/audit log surfaces.
 - Server Stats: activity metrics.
 - Voice Rooms: room management.
+- AI Moderator: channel coverage, blacklist/domain policy, label thresholds, and action limits.
 - Integrations: configured external systems.
 - Health Status: service status and latency.
 
@@ -261,6 +259,23 @@ Features:
 - default `ping_dev` role from Bot Settings;
 - dev ping is sent as a spoiler component before the Dev Blog content.
 
+## AI Moderation
+
+OmniBot can send messages from selected Discord channels to the local AI Moderator API. The AI service performs rule checks, local ruBERT classification, risk scoring, policy resolution, and returns a decision payload for the bot.
+
+Current features:
+
+- Activity tab for moderated channel coverage;
+- blacklist words and allowed domain policy;
+- per-label thresholds and action limits;
+- AI Moderator health signal in Activity Health;
+- selected channel filtering to avoid invalid Discord channel IDs;
+- Discord snowflakes are preserved as strings in Activity requests;
+- local/self-hosted API support, including GPU-backed model loading when the server has NVIDIA drivers and CUDA-ready PyTorch;
+- human-admin configuration remains the source of truth for destructive actions.
+
+The AI Moderator does not receive every server message by default. Only channels selected in Activity are covered.
+
 ## Data and Storage
 
 Production and local development use PostgreSQL. The legacy SQLite import script is
@@ -274,6 +289,7 @@ Stored data may include:
 - Activity RBAC settings;
 - Creator Alert sources and templates;
 - Dev Blog drafts and publish records;
+- AI moderation channel coverage and guild policy settings;
 - logs, audit events, moderation history, statistics, voice room state.
 
 Default retention:
@@ -320,6 +336,7 @@ npm run build
 - [Knowledge Base](./docs/KNOWLEDGE_BASE.md)
 - [Privacy Policy](./docs/PRIVACY_POLICY.md)
 - [Terms of Service](./docs/TERMS_OF_SERVICE.md)
+- [Commercial License](./COMMERCIAL_LICENSE.md)
 
 ## Support
 
