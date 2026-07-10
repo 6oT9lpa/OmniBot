@@ -9,11 +9,18 @@ if (Test-Path $Archive) {
 }
 
 tar --exclude='./.git' `
+    --exclude='./.agents' `
+    --exclude='./.codex' `
+    --exclude='./.idea' `
+    --exclude='./.vscode' `
     --exclude='./venv' `
     --exclude='./.venv' `
     --exclude='./activity/client/node_modules' `
+    --exclude='./activity/client/src' `
     --exclude='./data' `
+    --exclude='./docs' `
     --exclude='./logs' `
+    --exclude='./tests' `
     --exclude='./.tmp' `
     --exclude='./.env' `
     --exclude='./__pycache__' `
