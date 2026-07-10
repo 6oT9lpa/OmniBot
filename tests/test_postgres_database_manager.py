@@ -36,7 +36,9 @@ async def postgres_db():
 
 @pytest.mark.asyncio
 async def test_postgres_database_manager_creates_runtime_schema(postgres_db):
-    tables = await postgres_db.fetch_all("SELECT name FROM sqlite_master WHERE type='table'")
+    tables = await postgres_db.fetch_all(
+        "SELECT tablename AS name FROM pg_catalog.pg_tables WHERE schemaname = 'public'"
+    )
     names = {row["name"] for row in tables}
 
     assert "messages" in names
@@ -74,7 +76,7 @@ async def test_postgres_database_manager_supports_voice_room_upserts(postgres_db
         INSERT INTO voice_room_members (channel_id, guild_id, user_id)
         VALUES (?, ?, ?)
         ON CONFLICT(channel_id, user_id)
-        DO UPDATE SET joined_at = datetime('now', 'localtime')
+        DO UPDATE SET joined_at = CURRENT_TIMESTAMP
         """,
         (700, 115, 42),
     )
@@ -83,7 +85,7 @@ async def test_postgres_database_manager_supports_voice_room_upserts(postgres_db
         INSERT INTO voice_room_members (channel_id, guild_id, user_id)
         VALUES (?, ?, ?)
         ON CONFLICT(channel_id, user_id)
-        DO UPDATE SET joined_at = datetime('now', 'localtime')
+        DO UPDATE SET joined_at = CURRENT_TIMESTAMP
         """,
         (700, 115, 42),
     )

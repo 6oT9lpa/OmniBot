@@ -121,6 +121,30 @@ async def test_mute_admin_removes_admin_role_before_timeout():
 
 
 @pytest.mark.asyncio
+async def test_mute_rejects_a_higher_administrator_role():
+    guild = FakeGuild()
+    bot_role = FakeRole(1, 100, administrator=True)
+    guild.me = FakeMember(10, guild, bot_role, administrator=True, roles=[bot_role], name="bot")
+    moderator_role = FakeRole(2, 50, administrator=True)
+    target_role = FakeRole(3, 90, administrator=True)
+    moderator = FakeMember(20, guild, moderator_role, administrator=True, roles=[moderator_role])
+    target = FakeMember(30, guild, target_role, administrator=True, roles=[target_role])
+    service = ModeratorService(FakePunishmentRepository(), FakeLoggingService(), FakeHistoryService())
+
+    result = await service.mute_user(
+        moderator=moderator,
+        target=target,
+        reason="test mute",
+        duration_seconds=120,
+        send_dm=False,
+    )
+
+    assert result["success"] is False
+    assert target.removed_roles == []
+    assert target.timeout_duration is None
+
+
+@pytest.mark.asyncio
 async def test_duplicate_dm_notification_is_suppressed():
     guild = FakeGuild()
     target_role = FakeRole(3, 50)

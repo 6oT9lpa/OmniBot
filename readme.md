@@ -2,7 +2,7 @@
 
 OmniBot is a modular Discord bot with a Discord Activity control panel. It combines server setup, role automation, welcome messages, role panels, logs, statistics, dynamic voice rooms, Creator Alerts for Twitch/YouTube/Kick, Dev Blog publishing, and Activity-based administration.
 
-Built with Python 3.12, disnake, FastAPI, Vue 3, PostgreSQL/SQLite support, repository/service layers, dependency injection, and structured logging.
+Built with Python 3.12, disnake, FastAPI, Vue 3, PostgreSQL, repository/service layers, dependency injection, and structured logging.
 
 ## Current Status
 
@@ -35,7 +35,7 @@ Upcoming:
 | --- | --- |
 | Python | 3.12+ |
 | Node.js | 20+ for Activity client builds |
-| Database | PostgreSQL in production, SQLite for local fallback |
+| Database | PostgreSQL 16+ |
 | OS | Linux server for production |
 | Discord intents | Server Members, Message Content, Presence if stream fallback is used |
 
@@ -50,6 +50,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env
+python scripts/postgres_migrate.py
 python main.py
 ```
 
@@ -262,7 +263,8 @@ Features:
 
 ## Data and Storage
 
-Production uses PostgreSQL. SQLite remains supported for local development and migrations.
+Production and local development use PostgreSQL. The legacy SQLite import script is
+only for a one-time transfer of existing data.
 
 Stored data may include:
 

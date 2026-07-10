@@ -44,7 +44,7 @@ class FakeAuditLogService:
 
 
 @pytest.mark.asyncio
-async def test_log_message_writes_sqlite_dto_and_discord_embed():
+async def test_log_message_writes_database_dto_and_discord_embed():
     message_repo = FakeMessageLogRepository()
     guild_repo = FakeGuildEventLogRepository()
     audit = FakeAuditLogService()
