@@ -51,7 +51,12 @@ class BaseRepository:
             result = await self.execute_write(query, tuple(data.values()))
             return result["lastrowid"]
         except Exception as e:
-            logger.error(f"Insert error in {self._TABLE_NAME}: {e}\nQuery: {query}\nData: {data}")
+            logger.error(
+                "Insert failed table=%s columns=%s error=%s",
+                self._TABLE_NAME,
+                sorted(data),
+                type(e).__name__,
+            )
             return None
 
     async def upsert(self, data: Dict[str, Any], conflict_column: str = "id") -> bool:

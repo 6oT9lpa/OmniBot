@@ -23,7 +23,9 @@ from infrastructure.config import get_config
 async def main():
     manager = DatabaseManager(get_config().database_url)
     await manager.initialize()
-    tables = await manager.fetch_all("SELECT name FROM sqlite_master WHERE type='table'")
+    tables = await manager.fetch_all(
+        "SELECT tablename AS name FROM pg_catalog.pg_tables WHERE schemaname = 'public'"
+    )
     print(f"postgres_tables={len(tables)}")
     await manager.close()
 

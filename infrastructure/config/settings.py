@@ -29,6 +29,8 @@ class BotConfig(BaseSettings):
     command_prefix: str = "!"
     activity_rotation_enabled: bool = True
     activity_rotation_interval_seconds: int = 600
+    activity_allowed_origins: str = ""
+    activity_token_exchange_limit_per_minute: int = 120
 
     twitch_client_id: Optional[str] = None
     twitch_client_secret: Optional[SecretStr] = None
@@ -40,4 +42,11 @@ class BotConfig(BaseSettings):
         if v < 15:
             raise ValueError('Activity rotation interval must be at least 15 seconds')
         return v
+
+    @field_validator('database_url')
+    @classmethod
+    def validate_database_url(cls, value: str) -> str:
+        if not value.startswith(("postgresql://", "postgres://")):
+            raise ValueError("DATABASE_URL must use PostgreSQL")
+        return value
     

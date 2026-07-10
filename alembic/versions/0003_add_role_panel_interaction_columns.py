@@ -10,8 +10,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
-revision: str = "0003_add_role_panel_interaction_columns"
-down_revision: Union[str, None] = "0002_add_logging_moderation_schema"
+revision: str = "0003_panel_interactions"
+down_revision: Union[str, None] = "0002_log_moderation"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

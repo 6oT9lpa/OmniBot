@@ -1,12 +1,19 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: omnibot-postgres
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-omnibot}
       POSTGRES_USER: ${POSTGRES_USER:-omnibot}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-omnibot_change_me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -15,20 +22,42 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: omnibot-migrate
+    restart: "no"
+    logging: *default-logging
+    environment:
+      OMNIBOT_SERVICE_NAME: migrate
+      DATABASE_URL: postgresql://${POSTGRES_USER:-omnibot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/${POSTGRES_DB:-omnibot}
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "scripts/postgres_migrate.py"]
+
   bot:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: omnibot-bot
     restart: unless-stopped
+    logging: *default-logging
+    environment:
+      OMNIBOT_SERVICE_NAME: bot
+      DATABASE_URL: postgresql://${POSTGRES_USER:-omnibot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/${POSTGRES_DB:-omnibot}
+      DISCORD_PROXY_URL: ${DISCORD_PROXY_URL_DOCKER:-}
     env_file:
       - .env
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     command: ["python", "main.py"]
 
   activity-api:
@@ -37,16 +66,18 @@ services:
       dockerfile: Dockerfile
     container_name: omnibot-activity-api
     restart: unless-stopped
+    logging: *default-logging
+    environment:
+      OMNIBOT_SERVICE_NAME: activity_api
+      DATABASE_URL: postgresql://${POSTGRES_USER:-omnibot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/${POSTGRES_DB:-omnibot}
     env_file:
       - .env
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-    ports:
-      - "8008:8008"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     command:
       [
         "python",
@@ -57,6 +88,10 @@ services:
         "0.0.0.0",
         "--port",
         "8008",
+        "--limit-concurrency",
+        "200",
+        "--timeout-keep-alive",
+        "5",
       ]
 
   activity-client:
@@ -67,8 +102,9 @@ services:
         VITE_DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
     container_name: omnibot-activity-client
     restart: unless-stopped
+    logging: *default-logging
     ports:
-      - "5173:80"
+      - "127.0.0.1:5173:8080"
     depends_on:
       - activity-api
 
@@ -76,15 +112,15 @@ services:
     image: ngrok/ngrok:latest
     container_name: omnibot-ngrok
     restart: unless-stopped
+    logging: *default-logging
     command:
       - http
-      - activity-client:80
+      - activity-client:8080
       - --log
       - stdout
+      - --inspect=false
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
-    ports:
-      - "4040:4040"
     depends_on:
       - activity-client
 

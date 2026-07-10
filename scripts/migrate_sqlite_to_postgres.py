@@ -51,6 +51,7 @@ async def main() -> None:
         raise FileNotFoundError(f"SQLite database not found: {sqlite_path}")
 
     postgres = DatabaseManager(args.postgres)
+    await postgres.run_migrations()
     await postgres.initialize()
     try:
         if args.truncate:

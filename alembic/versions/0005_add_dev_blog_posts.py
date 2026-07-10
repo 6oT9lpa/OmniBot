@@ -10,8 +10,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
-revision: str = "0005_add_dev_blog_posts"
-down_revision: Union[str, None] = "0004_add_server_role_purposes"
+revision: str = "0005_dev_blog_posts"
+down_revision: Union[str, None] = "0004_role_purposes"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -34,16 +34,16 @@ def create_index_if_missing(name: str, table_name: str, columns: list[str]) -> N
 def upgrade() -> None:
     create_table_if_missing(
         "dev_blog_posts",
-        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("guild_id", sa.Integer(), nullable=False),
-        sa.Column("channel_id", sa.Integer(), nullable=False),
-        sa.Column("message_id", sa.Integer(), nullable=True),
-        sa.Column("author_id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
+        sa.Column("guild_id", sa.BigInteger(), nullable=False),
+        sa.Column("channel_id", sa.BigInteger(), nullable=False),
+        sa.Column("message_id", sa.BigInteger(), nullable=True),
+        sa.Column("author_id", sa.BigInteger(), nullable=False),
         sa.Column("title", sa.Text(), nullable=False),
         sa.Column("payload_json", sa.Text(), nullable=False),
         sa.Column("status", sa.Text(), nullable=False, server_default="published"),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.datetime("now", "localtime")),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.datetime("now", "localtime")),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP")),
+        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP")),
     )
     create_index_if_missing("idx_dev_blog_posts_guild", "dev_blog_posts", ["guild_id"])
     create_index_if_missing("idx_dev_blog_posts_author", "dev_blog_posts", ["author_id"])

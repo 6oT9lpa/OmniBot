@@ -114,7 +114,7 @@ class GuildEventLogRepository(GuildEventLogRepositoryInterface, BaseRepository):
                 SUM(CASE WHEN event_type = 'member_leave' THEN 1 ELSE 0 END) as leaves
             FROM guild_event_logs
             WHERE guild_id = ?
-              AND created_at >= datetime('now', 'localtime', ?)
+              AND created_at >= CURRENT_TIMESTAMP + (?::interval)
             """,
             (guild_id, f"-{days} days"),
         )

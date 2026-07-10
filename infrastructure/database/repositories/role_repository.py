@@ -64,7 +64,7 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
                 await self.execute(
                     f"""
                     UPDATE roles
-                    SET {set_parts}, updated_at = datetime('now', 'localtime')
+                    SET {set_parts}, updated_at = CURRENT_TIMESTAMP
                     WHERE role_id = ? AND guild_id = ?
                     """,
                     (*update_data.values(), role_id, resolved_guild_id),
@@ -107,7 +107,7 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
         await self.execute(
             """
             UPDATE roles
-            SET is_auto_assign = ?, updated_at = datetime('now', 'localtime')
+            SET is_auto_assign = ?, updated_at = CURRENT_TIMESTAMP
             WHERE role_id = ? AND guild_id = ?
             """,
             (1 if is_auto_assign else 0, role_id, resolved_guild_id),
@@ -121,7 +121,7 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
         await self.execute(
             """
             UPDATE roles
-            SET is_public = ?, updated_at = datetime('now', 'localtime')
+            SET is_public = ?, updated_at = CURRENT_TIMESTAMP
             WHERE role_id = ? AND guild_id = ?
             """,
             (1 if is_public else 0, role_id, resolved_guild_id),
@@ -173,7 +173,7 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
                 color=role.get("color"),
                 position=role.get("position"),
                 is_auto_assign=False,
-                is_public=True,
+                is_public=False,
                 display_emoji=None,
                 guild_id=guild_id,
             )
@@ -207,7 +207,7 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
                     mentionable,
                     synced_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(guild_id, role_id)
                 DO UPDATE SET
                     name = excluded.name,

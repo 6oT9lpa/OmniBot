@@ -172,7 +172,7 @@ class PunishmentRepository(PunishmentRepositoryInterface, BaseRepository):
         clauses = ["user_id = ?"]
         params: List[Any] = [user_id]
         if not include_expired:
-            clauses.append("(expires_at IS NULL OR expires_at >= datetime('now', 'localtime'))")
+            clauses.append("(expires_at IS NULL OR expires_at >= CURRENT_TIMESTAMP)")
         params.append(limit)
         return await self.fetch_all(
             f"""
@@ -217,7 +217,7 @@ class PunishmentRepository(PunishmentRepositoryInterface, BaseRepository):
             SELECT * FROM punishments
             WHERE is_active = 1
               AND expires_at IS NOT NULL
-              AND expires_at < datetime('now', 'localtime')
+              AND expires_at < CURRENT_TIMESTAMP
             ORDER BY expires_at ASC, id ASC
             """
         )

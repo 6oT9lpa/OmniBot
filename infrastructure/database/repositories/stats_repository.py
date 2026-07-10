@@ -111,8 +111,9 @@ class StatsRepository(StatsRepositoryInterface, BaseRepository):
         try:
             await self.execute(
                 """
-                INSERT OR IGNORE INTO messages (id, user_id, guild_id, channel_id, timestamp)
+                INSERT INTO messages (id, user_id, guild_id, channel_id, timestamp)
                 VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (id) DO NOTHING
                 """,
                 (message_id, user_id, guild_id, channel_id, _msk_now()),
             )
@@ -194,7 +195,7 @@ class StatsRepository(StatsRepositoryInterface, BaseRepository):
 
         top_hour = await self.fetch_one(
             """
-            SELECT CAST(substr(timestamp, 12, 2) AS INTEGER) as hour, COUNT(*) as count
+            SELECT EXTRACT(HOUR FROM timestamp)::integer AS hour, COUNT(*) AS count
             FROM messages
             WHERE guild_id = ? AND timestamp >= ? AND deleted = 0
             GROUP BY hour
@@ -209,7 +210,7 @@ class StatsRepository(StatsRepositoryInterface, BaseRepository):
         daily = await self.fetch_all(
             """
             SELECT 
-                CASE cast(strftime('%w', timestamp) as integer)
+                CASE EXTRACT(DOW FROM timestamp)::integer
                     WHEN 0 THEN 'Вс'
                     WHEN 1 THEN 'Пн'
                     WHEN 2 THEN 'Вт'
@@ -221,8 +222,8 @@ class StatsRepository(StatsRepositoryInterface, BaseRepository):
                 COUNT(*) as count
             FROM messages
             WHERE guild_id = ? AND timestamp >= ? AND deleted = 0
-            GROUP BY day
-            ORDER BY strftime('%w', timestamp)
+            GROUP BY EXTRACT(DOW FROM timestamp)::integer
+            ORDER BY EXTRACT(DOW FROM timestamp)::integer
             """,
             (guild_id, cutoff),
         )
@@ -295,8 +296,8 @@ class StatsRepository(StatsRepositoryInterface, BaseRepository):
         """Активность по часам (МСК)."""
         return await self.fetch_all(
             """
-            SELECT CAST(substr(timestamp, 12, 2) AS INTEGER) as hour,
-                   COUNT(*) as count
+            SELECT EXTRACT(HOUR FROM timestamp)::integer AS hour,
+                   COUNT(*) AS count
             FROM messages
             WHERE guild_id = ? AND timestamp >= ? AND deleted = 0
             GROUP BY hour

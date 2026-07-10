@@ -39,7 +39,7 @@ class ActivityHealthService:
                     status="operational",
                 ),
                 ActivityHealthSignal(
-                    name="SQLite",
+                    name="PostgreSQL",
                     value=f"{database_latency} ms" if database_latency is not None else "Unavailable",
                     status="operational" if database_latency is not None else "degraded",
                     latency_ms=database_latency,

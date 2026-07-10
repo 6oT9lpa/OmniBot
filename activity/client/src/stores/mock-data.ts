@@ -150,7 +150,7 @@ export const timelineEvents: TimelineEvent[] = [
 export const healthSignals: HealthSignal[] = [
   { name: "Discord Gateway", value: "Online", status: "operational" },
   { name: "Activity API", value: "Serving", status: "operational" },
-  { name: "SQLite", value: "Connected", status: "operational" },
+  { name: "PostgreSQL", value: "Connected", status: "operational" },
   { name: "Upcoming AI", value: "Planned", status: "degraded" },
   { name: "Stream Checker", value: "Mock mode", status: "degraded" },
 ];

@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0006_add_streamer_guild_id"
-down_revision = "0005_add_dev_blog_posts"
+revision = "0006_streamer_guild"
+down_revision = "0005_dev_blog_posts"
 branch_labels = None
 depends_on = None
 
@@ -23,7 +23,7 @@ def upgrade() -> None:
     if "guild_id" not in columns:
         op.add_column(
             "streamers",
-            sa.Column("guild_id", sa.Integer(), nullable=False, server_default="0"),
+            sa.Column("guild_id", sa.BigInteger(), nullable=False, server_default="0"),
         )
 
     op.create_index("idx_streamers_guild", "streamers", ["guild_id"], if_not_exists=True)

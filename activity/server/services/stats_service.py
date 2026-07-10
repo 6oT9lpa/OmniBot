@@ -56,7 +56,7 @@ class ActivityStatsService:
                    COUNT(DISTINCT user_id) AS active_users,
                    COUNT(DISTINCT channel_id) AS active_channels
             FROM messages
-            WHERE guild_id = ? AND timestamp >= datetime('now', 'localtime', ?) AND deleted = 0
+            WHERE guild_id = ? AND timestamp >= CURRENT_TIMESTAMP + (?::interval) AND deleted = 0
             """,
             (guild_id, cutoff),
             "server message stats",
@@ -76,7 +76,7 @@ class ActivityStatsService:
             SELECT SUM(CASE WHEN event_type = 'member_join' THEN 1 ELSE 0 END) AS joins,
                    SUM(CASE WHEN event_type = 'member_leave' THEN 1 ELSE 0 END) AS leaves
             FROM guild_event_logs
-            WHERE guild_id = ? AND created_at >= datetime('now', 'localtime', ?)
+            WHERE guild_id = ? AND created_at >= CURRENT_TIMESTAMP + (?::interval)
             """,
             (guild_id, cutoff),
             "server join stats",
@@ -93,7 +93,7 @@ class ActivityStatsService:
             """
             SELECT channel_id, COUNT(*) AS messages
             FROM messages
-            WHERE guild_id = ? AND timestamp >= datetime('now', 'localtime', ?) AND deleted = 0
+            WHERE guild_id = ? AND timestamp >= CURRENT_TIMESTAMP + (?::interval) AND deleted = 0
             GROUP BY channel_id
             ORDER BY messages DESC
             LIMIT 100
@@ -116,9 +116,9 @@ class ActivityStatsService:
     async def _query_hourly_stats(self, guild_id: int, period: int) -> list[dict[str, int]]:
         rows = await self._fetch_all_or_empty(
             """
-            SELECT CAST(substr(timestamp, 12, 2) AS INTEGER) AS hour, COUNT(*) AS count
+            SELECT EXTRACT(HOUR FROM timestamp)::integer AS hour, COUNT(*) AS count
             FROM messages
-            WHERE guild_id = ? AND timestamp >= datetime('now', 'localtime', ?) AND deleted = 0
+            WHERE guild_id = ? AND timestamp >= CURRENT_TIMESTAMP + (?::interval) AND deleted = 0
             GROUP BY hour
             ORDER BY hour
             """,
@@ -133,9 +133,9 @@ class ActivityStatsService:
     async def _query_daily_stats(self, guild_id: int, days: int) -> list[dict[str, Any]]:
         rows = await self._fetch_all_or_empty(
             """
-            SELECT date(timestamp) AS day, COUNT(*) AS count
+            SELECT timestamp::date AS day, COUNT(*) AS count
             FROM messages
-            WHERE guild_id = ? AND timestamp >= datetime('now', 'localtime', ?) AND deleted = 0
+            WHERE guild_id = ? AND timestamp >= CURRENT_TIMESTAMP + (?::interval) AND deleted = 0
             GROUP BY day
             ORDER BY day
             """,
@@ -145,7 +145,7 @@ class ActivityStatsService:
         counts = {str(row["day"]): int(row["count"]) for row in rows}
         series = []
         for index in range(days - 1, -1, -1):
-            day_row = await get_db().fetch_one("SELECT date('now', 'localtime', ?) AS day", (f"-{index} days",))
+            day_row = await get_db().fetch_one("SELECT (CURRENT_DATE + (?::interval))::date AS day", (f"-{index} days",))
             day = str(day_row["day"])
             series.append({"date": day, "count": counts.get(day, 0)})
         return series

@@ -120,6 +120,20 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
             )
             raise
 
+    async def claim_admin(self, channel_id: int, admin_id: int) -> bool:
+        result = await self.execute_write(
+            "UPDATE voice_rooms SET admin_id = ? WHERE channel_id = ? AND admin_id IS NULL",
+            (admin_id, channel_id),
+        )
+        return (result["rowcount"] or 0) == 1
+
+    async def clear_admin_if(self, channel_id: int, admin_id: int) -> bool:
+        result = await self.execute_write(
+            "UPDATE voice_rooms SET admin_id = NULL WHERE channel_id = ? AND admin_id = ?",
+            (channel_id, admin_id),
+        )
+        return (result["rowcount"] or 0) == 1
+
     async def add_member(self, channel_id: int, guild_id: int, user_id: int) -> None:
         try:
             await self.execute_write(
@@ -127,7 +141,7 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
                 INSERT INTO voice_room_members (channel_id, guild_id, user_id)
                 VALUES (?, ?, ?)
                 ON CONFLICT(channel_id, user_id)
-                DO UPDATE SET joined_at = datetime('now', 'localtime')
+                DO UPDATE SET joined_at = CURRENT_TIMESTAMP
                 """,
                 (channel_id, guild_id, user_id),
             )
@@ -184,7 +198,10 @@ class VoiceRepository(VoiceRepositoryInterface, BaseRepository):
         """Сохранить конфигурацию."""
         try:
             await self.execute_write(
-                "INSERT OR REPLACE INTO voice_config (key, value) VALUES (?, ?)",
+                """
+                INSERT INTO voice_config (key, value) VALUES (?, ?)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+                """,
                 (key, value),
             )
             logger.debug("Voice config set: key=%s", key)

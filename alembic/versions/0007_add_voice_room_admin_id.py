@@ -10,8 +10,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
-revision: str = "0007_add_voice_room_admin_id"
-down_revision: Union[str, None] = "0006_add_streamer_guild_id"
+revision: str = "0007_voice_admin"
+down_revision: Union[str, None] = "0006_streamer_guild"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -23,7 +23,7 @@ def upgrade() -> None:
 
     columns = {column["name"] for column in inspector.get_columns("voice_rooms")}
     if "admin_id" not in columns:
-        op.add_column("voice_rooms", sa.Column("admin_id", sa.Integer(), nullable=True))
+        op.add_column("voice_rooms", sa.Column("admin_id", sa.BigInteger(), nullable=True))
 
     indexes = {index["name"] for index in inspector.get_indexes("voice_rooms")}
     if "idx_voice_rooms_admin" not in indexes:

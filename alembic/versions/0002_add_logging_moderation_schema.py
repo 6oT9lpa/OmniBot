@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import inspect
 
-revision: str = "0002_add_logging_moderation_schema"
+revision: str = "0002_log_moderation"
 down_revision: Union[str, None] = "0001_initial_schema"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -32,22 +32,31 @@ def create_table_if_missing(name: str, *args, **kwargs) -> None:
         op.create_table(name, *args, **kwargs)
 
 
+def create_index_if_missing(name: str, table_name: str, columns: list[str]) -> None:
+    inspector = inspect(op.get_context().bind)
+    if not inspector.has_table(table_name):
+        return
+    if any(index.get("name") == name for index in inspector.get_indexes(table_name)):
+        return
+    op.create_index(name, table_name, columns)
+
+
 def upgrade() -> None:
     add_column_if_missing(
         "punishments",
-        sa.Column("guild_id", sa.Integer(), nullable=True),
+        sa.Column("guild_id", sa.BigInteger(), nullable=True),
     )
     add_column_if_missing(
         "punishments",
-        sa.Column("moderator_id", sa.Integer(), nullable=True),
+        sa.Column("moderator_id", sa.BigInteger(), nullable=True),
     )
     add_column_if_missing(
         "punishments",
-        sa.Column("duration_seconds", sa.Integer(), nullable=True),
+        sa.Column("duration_seconds", sa.BigInteger(), nullable=True),
     )
     add_column_if_missing(
         "punishments",
-        sa.Column("is_active", sa.Boolean(), server_default="1", nullable=True),
+        sa.Column("is_active", sa.BigInteger(), server_default="1", nullable=True),
     )
     add_column_if_missing(
         "punishments",
@@ -60,38 +69,38 @@ def upgrade() -> None:
 
     create_table_if_missing(
         "message_logs",
-        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("guild_id", sa.Integer(), nullable=False),
-        sa.Column("channel_id", sa.Integer(), nullable=False),
-        sa.Column("message_id", sa.Integer(), nullable=False),
-        sa.Column("author_id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
+        sa.Column("guild_id", sa.BigInteger(), nullable=False),
+        sa.Column("channel_id", sa.BigInteger(), nullable=False),
+        sa.Column("message_id", sa.BigInteger(), nullable=False),
+        sa.Column("author_id", sa.BigInteger(), nullable=False),
         sa.Column("author_name", sa.Text(), nullable=False),
         sa.Column("content", sa.Text()),
         sa.Column("event_type", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.datetime("now", "localtime"), nullable=False),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
         sa.Column("retention_until", sa.DateTime()),
     )
-    op.create_index("idx_message_logs_guild", "message_logs", ["guild_id"])
-    op.create_index("idx_message_logs_event", "message_logs", ["event_type"])
-    op.create_index("idx_message_logs_retention", "message_logs", ["retention_until"])
+    create_index_if_missing("idx_message_logs_guild", "message_logs", ["guild_id"])
+    create_index_if_missing("idx_message_logs_event", "message_logs", ["event_type"])
+    create_index_if_missing("idx_message_logs_retention", "message_logs", ["retention_until"])
 
     create_table_if_missing(
         "guild_event_logs",
-        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("guild_id", sa.Integer(), nullable=False),
-        sa.Column("channel_id", sa.Integer()),
-        sa.Column("actor_id", sa.Integer()),
+        sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
+        sa.Column("guild_id", sa.BigInteger(), nullable=False),
+        sa.Column("channel_id", sa.BigInteger()),
+        sa.Column("actor_id", sa.BigInteger()),
         sa.Column("actor_name", sa.Text()),
-        sa.Column("target_id", sa.Integer()),
+        sa.Column("target_id", sa.BigInteger()),
         sa.Column("target_name", sa.Text()),
         sa.Column("event_type", sa.Text(), nullable=False),
         sa.Column("details", sa.Text()),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.datetime("now", "localtime"), nullable=False),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
         sa.Column("retention_until", sa.DateTime()),
     )
-    op.create_index("idx_guild_event_logs_guild", "guild_event_logs", ["guild_id"])
-    op.create_index("idx_guild_event_logs_event", "guild_event_logs", ["event_type"])
-    op.create_index("idx_guild_event_logs_retention", "guild_event_logs", ["retention_until"])
+    create_index_if_missing("idx_guild_event_logs_guild", "guild_event_logs", ["guild_id"])
+    create_index_if_missing("idx_guild_event_logs_event", "guild_event_logs", ["event_type"])
+    create_index_if_missing("idx_guild_event_logs_retention", "guild_event_logs", ["retention_until"])
 
 
 def downgrade() -> None:

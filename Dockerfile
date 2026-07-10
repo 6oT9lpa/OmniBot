@@ -30,10 +30,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
+RUN groupadd --system omnibot && useradd --system --gid omnibot --create-home omnibot
+
 COPY --from=builder /opt/venv /opt/venv
 
-COPY . .
+COPY --chown=omnibot:omnibot . .
 
-RUN mkdir -p /app/data /app/logs
+RUN mkdir -p /app/data /app/logs && chown -R omnibot:omnibot /app/data /app/logs
+
+USER omnibot
 
 CMD ["python", "main.py"]

@@ -9,8 +9,8 @@ from typing import Sequence, Union
 from alembic import op
 from sqlalchemy import inspect
 
-revision: str = "0008_add_voice_room_members"
-down_revision: Union[str, None] = "0007_add_voice_room_admin_id"
+revision: str = "0008_voice_members"
+down_revision: Union[str, None] = "0007_voice_admin"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -21,10 +21,10 @@ def upgrade() -> None:
         op.execute(
             """
             CREATE TABLE voice_room_members (
-                channel_id INTEGER NOT NULL,
-                guild_id INTEGER NOT NULL,
-                user_id INTEGER NOT NULL,
-                joined_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                channel_id BIGINT NOT NULL,
+                guild_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (channel_id, user_id)
             )
             """
