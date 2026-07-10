@@ -92,12 +92,20 @@ class DiscordService:
             logger.warning("Safe Discord request suppressed method=%s path=%s status=%s", method, path, exc.status_code)
             return None
 
-    async def list_channels(self, guild_id: str, kind: Optional[Literal["text", "voice"]] = None) -> list[DiscordChannel]:
+    async def list_channels(
+        self,
+        guild_id: str,
+        kind: Optional[Literal["text", "voice", "moderation"]] = None,
+    ) -> list[DiscordChannel]:
         logger.info("Listing Discord channels guild_id=%s kind=%s", guild_id, kind or "all")
-        channel_types = {"text": 0, "voice": 2}
+        channel_types = {
+            "text": {0},
+            "voice": {2},
+            "moderation": {0, 5},
+        }
         channels = await self._cached_bot_resource("channels", guild_id, f"/guilds/{guild_id}/channels")
         if kind:
-            channels = [channel for channel in channels if channel.get("type") == channel_types[kind]]
+            channels = [channel for channel in channels if channel.get("type") in channel_types[kind]]
         return [
             DiscordChannel(
                 id=channel["id"],
@@ -117,6 +125,15 @@ class DiscordService:
             return
         logger.warning("Rejected non-guild text channel ids guild_id=%s", guild_id)
         raise HTTPException(status_code=422, detail="Selected channels must be text channels from this server")
+
+    async def validate_moderation_channel_ids(self, guild_id: str, channel_ids: set[int]) -> None:
+        if not channel_ids:
+            return
+        moderation_channel_ids = {int(channel.id) for channel in await self.list_channels(guild_id, "moderation")}
+        if channel_ids.issubset(moderation_channel_ids):
+            return
+        logger.warning("Rejected non-moderatable channel ids guild_id=%s", guild_id)
+        raise HTTPException(status_code=422, detail="Selected channels must be message channels from this server")
 
     async def list_roles(self, guild_id: str) -> list[DiscordRole]:
         logger.info("Listing Discord roles guild_id=%s", guild_id)

@@ -34,7 +34,7 @@ class AiModerationCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: disnake.Message) -> None:
-        if message.author.bot or message.guild is None or not isinstance(message.channel, disnake.TextChannel):
+        if message.author.bot or message.guild is None or not isinstance(message.channel, (disnake.TextChannel, disnake.NewsChannel)):
             return
         if not await self._settings_service.is_enabled_for_channel(message.guild.id, message.channel.id):
             return
@@ -112,7 +112,7 @@ class AiModerationCog(commands.Cog):
             return
         member = guild.get_member(request.user_id)
         channel = guild.get_channel(request.channel_id)
-        message = channel.get_partial_message(request.message_id) if isinstance(channel, disnake.TextChannel) else None
+        message = channel.get_partial_message(request.message_id) if isinstance(channel, (disnake.TextChannel, disnake.NewsChannel)) else None
         status = "SUCCESS"
         try:
             for action in decision.execution_plan:
@@ -150,7 +150,7 @@ class AiModerationCog(commands.Cog):
     async def _send_log(self, guild: disnake.Guild, decision: AiModerationDecision, status: str) -> None:
         channel_id = await self._channel_service.get_purpose_channel(guild.id, ChannelPurpose.AI_MODERATION_LOG)
         channel = guild.get_channel(channel_id) if channel_id else None
-        if not isinstance(channel, disnake.TextChannel):
+        if not isinstance(channel, (disnake.TextChannel, disnake.NewsChannel)):
             return
         embed = disnake.Embed(title="AI moderation decision", color=disnake.Color.orange())
         embed.add_field(name="User", value=f"<@{decision.user_id}>", inline=True)

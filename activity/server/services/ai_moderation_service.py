@@ -31,13 +31,13 @@ class AiModerationService:
             "log_channel_id": str(log_row["channel_id"]) if log_row else None,
             "policy": effective_policy,
             "is_default_policy": is_default_policy,
-            "available_channels": await self._discord_service.list_channels(str(guild_id), "text"),
+            "available_channels": await self._discord_service.list_channels(str(guild_id), "moderation"),
         }
 
     async def save_channels(self, payload: AiModerationChannelsPayload, access_token: str) -> dict[str, Any]:
         await self._access_service.ensure_module_access(access_token, str(payload.guild_id), "ai-moderator", "manage")
         channel_ids = set(payload.channel_ids)
-        await self._discord_service.validate_text_channel_ids(str(payload.guild_id), channel_ids)
+        await self._discord_service.validate_moderation_channel_ids(str(payload.guild_id), channel_ids)
         await get_db().execute("DELETE FROM ai_moderation_channels WHERE guild_id = ?", (payload.guild_id,))
         for channel_id in channel_ids:
             await get_db().execute("INSERT INTO ai_moderation_channels (guild_id, channel_id) VALUES (?, ?) ON CONFLICT DO NOTHING", (payload.guild_id, channel_id))
