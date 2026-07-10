@@ -22,7 +22,7 @@ const productLinks = [
 const communityLinks = [
   { label: "Creator Alerts", href: `${knowledgeBaseUrl}#6-creator-alerts` },
   { label: "Dev Blog", href: `${knowledgeBaseUrl}#7-dev-blog` },
-  { label: "Upcoming AI", href: `${knowledgeBaseUrl}#12-upcoming-ai-moderation` },
+  { label: "AI Moderator", href: `${knowledgeBaseUrl}#12-ai-moderation` },
   { label: "Logging", href: `${knowledgeBaseUrl}#9-logs-and-audit` },
 ];
 const team = ["6oT9lpa", "Arnetik", "Jimmy"];

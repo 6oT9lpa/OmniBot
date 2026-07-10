@@ -438,6 +438,66 @@ a {
   border-bottom: 1px solid var(--border);
 }
 
+.ai-story-band {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+  gap: 32px;
+  align-items: start;
+  margin-top: 72px;
+  padding: clamp(32px, 5vw, 56px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 24px 80px var(--shadow);
+}
+
+.ai-story-copy h2 {
+  max-width: 680px;
+  margin: 0 0 18px;
+  font-size: clamp(2rem, 4vw, 4rem);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.ai-story-copy p,
+.ai-story-grid p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.ai-story-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.ai-story-grid article {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+  padding: 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.ai-story-grid svg {
+  width: 42px;
+  height: 42px;
+  padding: 10px;
+  color: var(--accent-2);
+  background: rgba(125, 92, 255, 0.14);
+  border: 1px solid rgba(125, 92, 255, 0.28);
+  border-radius: 8px;
+}
+
+.ai-story-grid strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
 .showcase-stack {
   display: grid;
   gap: 12px;
@@ -2710,6 +2770,7 @@ input[type="color"] {
 @media (max-width: 1100px) {
   .hero-section,
   .showcase-band,
+  .ai-story-band,
   .about-grid,
   .editor-grid {
     grid-template-columns: 1fr;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bot, RadioTower, ShieldCheck } from "@lucide/vue";
+import { Bot, BrainCircuit, Database, RadioTower, ServerCog, ShieldCheck } from "@lucide/vue";
 import RevealOnScroll from "../components/common/RevealOnScroll.vue";
 import FeatureCard from "../components/landing/FeatureCard.vue";
 import HeroText from "../components/landing/HeroText.vue";
@@ -36,6 +36,29 @@ const features = [
     text: "Message edits, deletions, role changes and moderation actions are logged with configurable retention for transparent admin history.",
   },
 ];
+
+const aiCapabilities = [
+  {
+    icon: ShieldCheck,
+    title: "Signals before punishment",
+    text: "AI Moderator returns labels, risk score, confidence, reasons and recommended actions. Staff policy still defines what can happen next.",
+  },
+  {
+    icon: BrainCircuit,
+    title: "Local ruBERT model",
+    text: "The moderation API can load the trained ruBERT tiny2 model locally and use CUDA on the server when NVIDIA drivers are available.",
+  },
+  {
+    icon: ServerCog,
+    title: "Activity controlled",
+    text: "Admins choose covered channels, blacklist words, allowed domains, label thresholds and maximum action levels from the Activity panel.",
+  },
+  {
+    icon: Database,
+    title: "Audit friendly",
+    text: "Health checks, policy decisions and moderation metadata stay visible for troubleshooting, review and safer iteration.",
+  },
+];
 </script>
 
 <template>
@@ -61,6 +84,28 @@ const features = [
         />
       </RevealOnScroll>
     </section>
+
+    <RevealOnScroll tag="section" class="ai-story-band">
+      <div class="ai-story-copy">
+        <span class="eyebrow">AI Moderator</span>
+        <h2>Local moderation intelligence, controlled by your server rules.</h2>
+        <p>
+          OmniBot does not treat AI as a magic ban button. Selected Discord channels are
+          sent to a local AI Moderator API, where rules, semantic checks, ruBERT
+          classification, risk scoring and policy resolution work together. The result is
+          a clear moderation signal that admins can tune from Activity.
+        </p>
+      </div>
+      <div class="ai-story-grid" aria-label="AI Moderator capabilities">
+        <article v-for="item in aiCapabilities" :key="item.title">
+          <component :is="item.icon" :size="22" />
+          <div>
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.text }}</p>
+          </div>
+        </article>
+      </div>
+    </RevealOnScroll>
 
     <RevealOnScroll tag="section" class="showcase-band">
       <div class="showcase-copy">
