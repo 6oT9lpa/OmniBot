@@ -29,7 +29,8 @@ export function getAiModeratorSettings(guildId: string, token: string) {
 }
 
 export function saveAiModeratorChannels(guildId: string, token: string, channelIds: string[]) {
-  return apiRequest<AiModeratorSettings>("/api/ai-moderator/channels", { method: "PUT", body: JSON.stringify({ guild_id: guildId, channel_ids: channelIds.map(Number) }) }, token);
+  // Discord snowflakes exceed JavaScript's safe integer range; keep them as strings in JSON.
+  return apiRequest<AiModeratorSettings>("/api/ai-moderator/channels", { method: "PUT", body: JSON.stringify({ guild_id: guildId, channel_ids: channelIds }) }, token);
 }
 
 export function saveAiModeratorPolicy(guildId: string, token: string, policy: Record<string, unknown>) {

@@ -15,6 +15,7 @@ from core.domain.creator_alert import (
     CreatorPlatform,
 )
 from infrastructure.api.url_parser import CreatorUrlParser
+from infrastructure.config import get_config
 from infrastructure.logging import get_logger
 from presentation.embeds.creator_alert_embed import CreatorAlertEmbedBuilder
 
@@ -29,17 +30,18 @@ class StreamsCog(commands.Cog):
         self._creator_alert_service = creator_alert_service
         self._fallback_event_ids: set[str] = set()
         self._published_stream_keys: dict[tuple[str, str, str, str], datetime] = {}
+        self.monitor_creator_sources.change_interval(seconds=get_config().creator_alert_poll_interval_seconds)
         logger.info("StreamsCog initialized")
 
     def cog_load(self) -> None:
         self.monitor_creator_sources.start()
-        logger.info("Creator alert monitor started")
+        logger.info("Creator alert monitor started interval_seconds=%s", self.monitor_creator_sources.seconds)
 
     def cog_unload(self) -> None:
         self.monitor_creator_sources.cancel()
         logger.info("Creator alert monitor stopped")
 
-    @tasks.loop(minutes=3)
+    @tasks.loop(seconds=180)
     async def monitor_creator_sources(self) -> None:
         logger.info("Running creator alert monitor")
         for guild in self._bot.guilds:

@@ -129,11 +129,30 @@ class DiscordService:
     async def validate_moderation_channel_ids(self, guild_id: str, channel_ids: set[int]) -> None:
         if not channel_ids:
             return
-        moderation_channel_ids = {int(channel.id) for channel in await self.list_channels(guild_id, "moderation")}
-        if channel_ids.issubset(moderation_channel_ids):
+        valid_channel_ids = await self.filter_moderation_channel_ids(guild_id, channel_ids)
+        if channel_ids == valid_channel_ids:
             return
-        logger.warning("Rejected non-moderatable channel ids guild_id=%s", guild_id)
+        invalid_channel_ids = sorted(channel_ids - valid_channel_ids)
+        logger.warning(
+            "Rejected non-moderatable channel ids guild_id=%s invalid_channel_ids=%s",
+            guild_id,
+            invalid_channel_ids,
+        )
         raise HTTPException(status_code=422, detail="Selected channels must be message channels from this server")
+
+    async def filter_moderation_channel_ids(self, guild_id: str, channel_ids: set[int]) -> set[int]:
+        if not channel_ids:
+            return set()
+        moderation_channel_ids = {int(channel.id) for channel in await self.list_channels(guild_id, "moderation")}
+        valid_channel_ids = channel_ids & moderation_channel_ids
+        invalid_channel_ids = sorted(channel_ids - valid_channel_ids)
+        if invalid_channel_ids:
+            logger.warning(
+                "Filtered non-moderatable channel ids guild_id=%s invalid_channel_ids=%s",
+                guild_id,
+                invalid_channel_ids,
+            )
+        return valid_channel_ids
 
     async def list_roles(self, guild_id: str) -> list[DiscordRole]:
         logger.info("Listing Discord roles guild_id=%s", guild_id)

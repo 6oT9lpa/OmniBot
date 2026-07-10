@@ -60,7 +60,7 @@ const tabs: Array<{ key: AiModeratorTab; label: string }> = [
 const moderationPolicy = reactive<AiModerationPolicy>(emptyPolicy());
 
 watch(settings, (value) => {
-  selectedChannels.value = value?.channels ?? [];
+  selectedChannels.value = visibleSelectedChannels(value?.channels ?? []);
   Object.assign(moderationPolicy, clonePolicy(value?.policy));
 }, { immediate: true });
 
@@ -112,11 +112,18 @@ function setMaximumAction(label: string, value: AiModerationAction) {
 
 async function saveChannels() {
   try {
+    selectedChannels.value = visibleSelectedChannels(selectedChannels.value);
     await activity.saveAiModeratorChannelValues(selectedChannels.value);
     status.value = "Moderated channels saved.";
   } catch (error) {
     status.value = error instanceof Error ? error.message : "Could not save channels.";
   }
+}
+
+function visibleSelectedChannels(channelIds: string[]): string[] {
+  const availableIds = new Set(settings.value?.available_channels.map((channel) => channel.id) ?? []);
+  if (!availableIds.size) return channelIds;
+  return channelIds.filter((channelId) => availableIds.has(channelId));
 }
 
 async function savePolicy(message: string) {

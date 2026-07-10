@@ -5,6 +5,8 @@ from activity.server.dependencies import get_db
 from activity.server.schemas.activity import ActivityHealthResponse, ActivityHealthSignal
 from activity.server.services.access_service import ActivityAccessService
 from activity.server.services.discord_service import DiscordService
+from activity.server.services.ai_moderator_health_probe import AiModeratorHealthProbe
+from infrastructure.config import get_config
 from infrastructure.logging import get_logger
 
 
@@ -15,6 +17,11 @@ class ActivityHealthService:
     def __init__(self) -> None:
         self._access_service = ActivityAccessService()
         self._discord = DiscordService()
+        config = get_config()
+        self._ai_moderator = AiModeratorHealthProbe(
+            config.ai_moderator_api_url,
+            config.ai_moderator_request_timeout_seconds,
+        )
 
     async def get_health(self, guild_id: str, access_token: str) -> ActivityHealthResponse:
         logger.info("Loading Activity health guild_id=%s", guild_id)
@@ -22,21 +29,18 @@ class ActivityHealthService:
 
         discord_latency = await self._discord.measure_latency()
         database_latency = await self._measure_database_latency()
+        ai_latency = await self._ai_moderator.measure_latency()
+        poll_interval_seconds = get_config().creator_alert_poll_interval_seconds
 
         return ActivityHealthResponse(
             guild_id=guild_id,
             bot_latency_ms=discord_latency,
             signals=[
                 ActivityHealthSignal(
-                    name="Discord API",
+                    name="Bot latency",
                     value=f"{discord_latency} ms" if discord_latency is not None else "Unavailable",
                     status="operational" if discord_latency is not None else "degraded",
                     latency_ms=discord_latency,
-                ),
-                ActivityHealthSignal(
-                    name="Activity API",
-                    value="Serving",
-                    status="operational",
                 ),
                 ActivityHealthSignal(
                     name="PostgreSQL",
@@ -45,14 +49,16 @@ class ActivityHealthService:
                     latency_ms=database_latency,
                 ),
                 ActivityHealthSignal(
-                    name="Ollama",
-                    value="Configured by bot service",
-                    status="degraded",
+                    name="AI Moderator",
+                    value=f"{ai_latency} ms" if ai_latency is not None else "Unavailable",
+                    status="operational" if ai_latency is not None else "degraded",
+                    latency_ms=ai_latency,
                 ),
                 ActivityHealthSignal(
-                    name="Stream Checker",
-                    value="Configured by bot service",
-                    status="degraded",
+                    name="Stream platform polling",
+                    value=f"Every {poll_interval_seconds} seconds",
+                    status="operational",
+                    latency_ms=poll_interval_seconds,
                 ),
             ],
         )

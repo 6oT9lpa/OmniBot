@@ -19,6 +19,7 @@ class AiModerationService:
         self._discord_service = DiscordService()
 
     async def get_settings(self, guild_id: int, access_token: str) -> dict[str, Any]:
+        logger.info("Loading AI moderation settings guild_id=%s", guild_id)
         await self._access_service.ensure_module_access(access_token, str(guild_id), "ai-moderator")
         channels = await get_db().fetch_all("SELECT channel_id FROM ai_moderation_channels WHERE guild_id = ? ORDER BY channel_id", (guild_id,))
         policy_row = await get_db().fetch_one("SELECT policy_json FROM ai_moderation_settings WHERE guild_id = ?", (guild_id,))
@@ -35,13 +36,26 @@ class AiModerationService:
         }
 
     async def save_channels(self, payload: AiModerationChannelsPayload, access_token: str) -> dict[str, Any]:
+        logger.info(
+            "Saving AI moderation channel coverage guild_id=%s channel_count=%s",
+            payload.guild_id,
+            len(payload.channel_ids),
+        )
         await self._access_service.ensure_module_access(access_token, str(payload.guild_id), "ai-moderator", "manage")
-        channel_ids = set(payload.channel_ids)
-        await self._discord_service.validate_moderation_channel_ids(str(payload.guild_id), channel_ids)
+        requested_channel_ids = set(payload.channel_ids)
+        channel_ids = await self._discord_service.filter_moderation_channel_ids(str(payload.guild_id), requested_channel_ids)
+        dropped_channel_ids = sorted(requested_channel_ids - channel_ids)
+        if dropped_channel_ids:
+            logger.warning(
+                "Dropped non-moderatable AI moderation channels guild_id=%s channel_ids=%s",
+                payload.guild_id,
+                dropped_channel_ids,
+            )
         await get_db().execute("DELETE FROM ai_moderation_channels WHERE guild_id = ?", (payload.guild_id,))
         for channel_id in channel_ids:
             await get_db().execute("INSERT INTO ai_moderation_channels (guild_id, channel_id) VALUES (?, ?) ON CONFLICT DO NOTHING", (payload.guild_id, channel_id))
         await get_db().commit()
+        logger.info("Saved AI moderation channel coverage guild_id=%s", payload.guild_id)
         return await self.get_settings(payload.guild_id, access_token)
 
     def _effective_policy(self, stored_policy: dict[str, object] | None, guild_id: int) -> tuple[dict[str, object], bool]:
@@ -54,10 +68,18 @@ class AiModerationService:
             return default_ai_moderation_policy().model_dump(mode="json"), True
 
     async def save_policy(self, payload: AiModerationPolicyPayload, access_token: str) -> dict[str, Any]:
+        logger.info(
+            "Saving AI moderation policy guild_id=%s blacklist_count=%s domain_count=%s label_count=%s",
+            payload.guild_id,
+            len(payload.policy.blacklist_words),
+            len(payload.policy.allowed_domains),
+            len(payload.policy.labels),
+        )
         await self._access_service.ensure_module_access(access_token, str(payload.guild_id), "ai-moderator", "manage")
         await get_db().execute(
             "INSERT INTO ai_moderation_settings (guild_id, policy_json) VALUES (?, ?) ON CONFLICT(guild_id) DO UPDATE SET policy_json = excluded.policy_json, updated_at = CURRENT_TIMESTAMP",
             (payload.guild_id, Jsonb(payload.policy.model_dump(mode="json"))),
         )
         await get_db().commit()
+        logger.info("Saved AI moderation policy guild_id=%s", payload.guild_id)
         return await self.get_settings(payload.guild_id, access_token)

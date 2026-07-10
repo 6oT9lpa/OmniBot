@@ -23,6 +23,22 @@ async def test_moderation_channel_listing_includes_text_and_announcement_channel
 
 
 @pytest.mark.asyncio
+async def test_moderation_channel_filter_drops_voice_channel(monkeypatch) -> None:
+    service = DiscordService()
+
+    async def channels(*_: object) -> list[dict[str, object]]:
+        return [
+            {"id": "10", "name": "general", "type": 0},
+            {"id": "11", "name": "news", "type": 5},
+            {"id": "12", "name": "voice", "type": 2},
+        ]
+
+    monkeypatch.setattr(service, "_cached_bot_resource", channels)
+
+    assert await service.filter_moderation_channel_ids("1", {10, 11, 12}) == {10, 11}
+
+
+@pytest.mark.asyncio
 async def test_moderation_channel_validation_rejects_voice_channel(monkeypatch) -> None:
     service = DiscordService()
 
