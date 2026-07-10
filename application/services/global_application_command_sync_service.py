@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from infrastructure.logging import get_logger
@@ -44,10 +45,17 @@ class GlobalApplicationCommandSyncService:
         return global_commands
 
     async def _fetch_managed_global_commands(self, bot: Any) -> list[dict[str, Any]]:
-        payload = await bot._connection.http.get_global_commands(  # noqa: SLF001
-            bot.application_id,
-            with_localizations=True,
-        )
+        try:
+            payload = await asyncio.wait_for(
+                bot._connection.http.get_global_commands(  # noqa: SLF001
+                    bot.application_id,
+                    with_localizations=True,
+                ),
+                timeout=15,
+            )
+        except TimeoutError:
+            logger.warning("Global command lookup timed out; missing commands will be created")
+            return []
         return [
             command
             for command in payload

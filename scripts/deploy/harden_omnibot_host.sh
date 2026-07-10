@@ -21,6 +21,7 @@ mkdir -p "${APP_DIR}/data" "${APP_DIR}/logs"
 find "${APP_DIR}" -path "${APP_DIR}/data" -prune -o -path "${APP_DIR}/logs" -prune -o -exec chmod go-w {} +
 chown -R "${RUNTIME_USER}:${RUNTIME_USER}" "${APP_DIR}/data" "${APP_DIR}/logs"
 chmod 0750 "${APP_DIR}/data" "${APP_DIR}/logs"
+sed -i 's/\r$//' "${APP_DIR}/.env"
 chown root:"${RUNTIME_USER}" "${APP_DIR}/.env"
 chmod 0640 "${APP_DIR}/.env"
 
