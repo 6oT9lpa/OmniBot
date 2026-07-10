@@ -425,6 +425,7 @@ class ModerationCog(commands.Cog):
         )
 
     @commands.user_command(name="📋 История пользователя")
+    @commands.has_permissions(moderate_members=True)
     async def user_history(
         self,
         interaction: disnake.CmdInteraction,
@@ -495,6 +496,7 @@ class ModerationCog(commands.Cog):
         await interaction.edit_original_response(embed=embed)
 
     @commands.message_command(name="⚠️ Быстрое предупреждение")
+    @commands.has_permissions(moderate_members=True)
     async def quick_warn(
         self,
         interaction: disnake.CmdInteraction,
@@ -533,6 +535,7 @@ class ModerationCog(commands.Cog):
         await interaction.edit_original_response(embed=embed)
 
     @commands.user_command(name="🔇 Замутить")
+    @commands.has_permissions(moderate_members=True)
     async def quick_mute(
         self,
         interaction: disnake.CmdInteraction,

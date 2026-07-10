@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 import disnake
 
 from infrastructure.logging import get_logger
-from presentation.views.roles_panel_management.helpers import panel_option_label, COLOR_ORANGE, COLOR_GREEN, COLOR_RED
+from presentation.views.roles_panel_management.helpers import AdministratorOnlyView, panel_option_label, COLOR_ORANGE, COLOR_GREEN, COLOR_RED, is_safe_self_assignable_role
 from presentation.views.roles_panel_management.panel_add_role_view import PanelAddRoleView
 from presentation.views.roles_panel_management.panel_remove_role_view import PanelRemoveRoleView
 from presentation.views.roles_panel_management.delete_panel_confirm_view import DeletePanelConfirmView
@@ -11,7 +11,7 @@ from presentation.views.roles_panel_management.delete_panel_confirm_view import 
 logger = get_logger(__name__)
 
 
-class PanelSelectView(disnake.ui.View):
+class PanelSelectView(AdministratorOnlyView):
     def __init__(
         self,
         panels: List[Dict[str, Any]],
@@ -74,9 +74,7 @@ class PanelSelectView(disnake.ui.View):
             if rd["role_id"] in existing_ids:
                 continue
             role = self._guild.get_role(rd["role_id"])
-            if not role or role.permissions.administrator or role.managed:
-                continue
-            if self._guild.me.top_role.position <= role.position:
+            if not is_safe_self_assignable_role(self._guild, role):
                 continue
             available.append(rd)
 

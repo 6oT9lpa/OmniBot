@@ -4,12 +4,12 @@ import disnake
 
 from infrastructure.logging import get_logger
 from presentation.views.role_panel_view import RolePanelView
-from presentation.views.roles_panel_management.helpers import rebuild_panel_embed, COLOR_GREEN, COLOR_RED
+from presentation.views.roles_panel_management.helpers import AdministratorOnlyView, rebuild_panel_embed, COLOR_GREEN, COLOR_RED, is_safe_self_assignable_role
 
 logger = get_logger(__name__)
 
 
-class PanelRemoveRoleView(disnake.ui.View):
+class PanelRemoveRoleView(AdministratorOnlyView):
     def __init__(
         self,
         role_service,
@@ -94,6 +94,13 @@ class PanelRemoveRoleView(disnake.ui.View):
 
         role = self._guild.get_role(self._selected_role_id)
         role_name = role.name if role else str(self._selected_role_id)
+
+        if not is_safe_self_assignable_role(self._guild, role):
+            await interaction.edit_original_response(
+                embed=disnake.Embed(title="Protected role", description="Role panels cannot remove roles that grant Discord permissions.", color=COLOR_RED),
+                view=None,
+            )
+            return
 
         try:
             await self._role_service.remove_button_from_panel(

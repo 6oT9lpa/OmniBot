@@ -20,6 +20,9 @@ class RoleButton(Button):
         self.role_id = role_id
     
     async def callback(self, interaction: disnake.MessageInteraction):
+        if not interaction.guild or not isinstance(interaction.user, disnake.Member):
+            await interaction.response.send_message("This control is available only in a server.", ephemeral=True)
+            return
         user = interaction.user
         logger.info(f"Role button clicked: {self.label} by {user}")
 
@@ -27,8 +30,15 @@ class RoleButton(Button):
         if not role:
             await interaction.response.send_message("Роль не найдена", ephemeral=True)
             return
+        if role.managed or int(role.permissions.value) != 0:
+            logger.warning("Blocked unsafe self-assignable role id=%s", role.id)
+            await interaction.response.send_message("This role cannot be assigned through a role panel.", ephemeral=True)
+            return
         
         member = interaction.user
+        if interaction.guild.me is None or interaction.guild.me.top_role.position <= role.position:
+            await interaction.response.send_message("I cannot change this role because it is above my highest role.", ephemeral=True)
+            return
         if role in member.roles:
             await member.remove_roles(role, reason="Снятие через панель ролей")
             await interaction.response.send_message(f"Роль **{role.name}** снята", ephemeral=True)

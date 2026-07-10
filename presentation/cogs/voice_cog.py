@@ -15,11 +15,15 @@ class VoiceCog(commands.Cog):
         self._bot = bot
         self._service = service
         self._trigger_cache: dict[int, int] = {}
-        self._bot.loop.create_task(self._on_start())
+        self._startup_task = self._bot.loop.create_task(self._on_start())
+
+    def cog_unload(self) -> None:
+        if not self._startup_task.done():
+            self._startup_task.cancel()
 
     async def _on_start(self) -> None:
         await self._bot.wait_until_ready()
-        self._bot.add_view(VoiceControlView(self._service))
+        self._bot.add_view(VoiceControlView(self._service, timeout=None))
         for guild in self._bot.guilds:
             trigger = await self._service.get_trigger(guild.id)
             if trigger is not None:

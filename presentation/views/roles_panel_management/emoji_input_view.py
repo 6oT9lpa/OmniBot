@@ -4,13 +4,13 @@ import disnake
 
 from infrastructure.logging import get_logger
 from presentation.views.role_panel_view import RolePanelView
-from presentation.views.roles_panel_management.helpers import COLOR_BLUE, COLOR_GREEN, COLOR_RED, COMMON_EMOJIS, MAX_PANEL_ITEMS, get_emoji_select_options
+from presentation.views.roles_panel_management.helpers import AdministratorOnlyView, COLOR_BLUE, COLOR_GREEN, COLOR_RED, COMMON_EMOJIS, MAX_PANEL_ITEMS, get_emoji_select_options, is_safe_self_assignable_role
 from presentation.views.roles_panel_management.panel_mode_toggle_button import PanelModeToggleButton
 
 logger = get_logger(__name__)
 
 
-class EmojiInputView(disnake.ui.View):
+class EmojiInputView(AdministratorOnlyView):
     def __init__(
         self,
         role_service,
@@ -187,6 +187,9 @@ class EmojiInputView(disnake.ui.View):
 
             color_value = disnake.Color.green().value
             visible_role_ids = self._selected_role_ids[:MAX_PANEL_ITEMS]
+
+            if not all(is_safe_self_assignable_role(self._guild, self._guild.get_role(role_id)) for role_id in visible_role_ids):
+                raise ValueError("Self-assignable roles must not grant Discord permissions")
 
             role_lines = [
                 f"{self._emoji_map.get(rid, '🎭')}  <@&{rid}>"

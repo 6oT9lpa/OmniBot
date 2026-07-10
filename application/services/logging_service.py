@@ -8,6 +8,7 @@ from core.domain.value_objects import EventType, PunishmentType
 from core.interfaces.repositories import GuildEventLogRepositoryInterface, MessageLogRepositoryInterface
 from core.interfaces.services import AuditLogServiceInterface, LoggingServiceInterface
 from infrastructure.config import BotConfig
+from infrastructure.database.connection import DatabaseManager
 from infrastructure.logging import get_logger
 from presentation.embeds import (
     ModerationBanEmbedBuilder,
@@ -39,11 +40,13 @@ class LoggingService(LoggingServiceInterface):
         guild_event_repo: GuildEventLogRepositoryInterface,
         audit_log_service: AuditLogServiceInterface,
         config: BotConfig,
+        database_manager: Optional[DatabaseManager] = None,
     ):
         self._message_repo = message_repo
         self._guild_event_repo = guild_event_repo
         self._audit_log_service = audit_log_service
         self._config = config
+        self._database_manager = database_manager
         self._bot: Optional[disnake.Client] = None
 
     def set_bot(self, bot: disnake.Client) -> None:
@@ -631,6 +634,20 @@ class LoggingService(LoggingServiceInterface):
         cutoff = datetime.now(timezone.utc).isoformat(timespec="seconds")
         await self._message_repo.cleanup_expired(cutoff)
         await self._guild_event_repo.cleanup_expired(cutoff)
+        if self._database_manager is not None:
+            deleted = await self._database_manager.cleanup_retention(
+                message_retention_days=self._config.message_log_retention_days,
+                punishment_retention_days=self._config.punishment_retention_days,
+            )
+            logger.info(
+                "Retention cleanup completed messages=%s punishments=%s",
+                deleted["messages"],
+                deleted["punishments"],
+            )
+
+    @property
+    def retention_cleanup_interval_hours(self) -> int:
+        return max(1, self._config.retention_cleanup_interval_hours)
 
     async def _persist_and_send(
         self,

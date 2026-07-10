@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 import disnake
 
 from core.interfaces.services.voice_service_interface import VoiceServiceInterface
@@ -7,6 +9,6 @@ from presentation.views.voice_control.voice_action_select import VoiceActionSele
 
 
 class VoiceControlView(disnake.ui.View):
-    def __init__(self, service: VoiceServiceInterface) -> None:
-        super().__init__(timeout=None)
+    def __init__(self, service: VoiceServiceInterface, *, timeout: Optional[float] = 900) -> None:
+        super().__init__(timeout=timeout)
         self.add_item(VoiceActionSelect(service))

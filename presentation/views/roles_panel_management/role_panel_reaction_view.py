@@ -2,6 +2,7 @@ from typing import List, Dict, Any
 import disnake
 
 from infrastructure.logging import get_logger
+from presentation.views.roles_panel_management.helpers import is_safe_self_assignable_role
 
 logger = get_logger(__name__)
 
@@ -82,8 +83,8 @@ class RolePanelReactionView:
             return
 
         try:
-            if guild.me.top_role.position <= role.position:
-                logger.warning("Cannot assign role id=%s to member id=%s: bot role is lower", role_id, member.id)
+            if not is_safe_self_assignable_role(guild, role):
+                logger.warning("Blocked unsafe reaction-panel role id=%s for member id=%s", role_id, member.id)
                 return
 
             if role in member.roles:

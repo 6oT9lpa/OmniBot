@@ -4,12 +4,12 @@ import disnake
 
 from infrastructure.logging import get_logger
 from presentation.views.role_panel_view import RolePanelView
-from presentation.views.roles_panel_management.helpers import get_emoji_select_options, rebuild_panel_embed, COLOR_GREEN, COLOR_RED
+from presentation.views.roles_panel_management.helpers import AdministratorOnlyView, get_emoji_select_options, rebuild_panel_embed, COLOR_GREEN, COLOR_RED, is_safe_self_assignable_role
 
 logger = get_logger(__name__)
 
 
-class PanelAddRoleView(disnake.ui.View):
+class PanelAddRoleView(AdministratorOnlyView):
     def __init__(
         self,
         role_service,
@@ -125,7 +125,7 @@ class PanelAddRoleView(disnake.ui.View):
         await interaction.response.defer()
 
         role = self._guild.get_role(self._selected_role_id)
-        if not role:
+        if not is_safe_self_assignable_role(self._guild, role):
             await interaction.edit_original_response(
                 embed=disnake.Embed(title="Роль не найдена", color=COLOR_RED), view=None
             )

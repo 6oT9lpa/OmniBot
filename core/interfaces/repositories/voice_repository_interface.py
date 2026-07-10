@@ -43,6 +43,16 @@ class VoiceRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def claim_admin(self, channel_id: int, admin_id: int) -> bool:
+        """Atomically claim an unoccupied temporary admin slot."""
+        pass
+
+    @abstractmethod
+    async def clear_admin_if(self, channel_id: int, admin_id: int) -> bool:
+        """Clear the admin slot only when it is held by the expected member."""
+        pass
+
+    @abstractmethod
     async def add_member(self, channel_id: int, guild_id: int, user_id: int) -> None:
         """Track a member currently connected to a dynamic voice room."""
         pass

@@ -1,4 +1,6 @@
 import logging 
+import os
+import re
 from logging.config import dictConfig
 from pathlib import Path
 from typing import Optional
@@ -28,8 +30,13 @@ class LoggerManager:
 
         log_dir = Path("logs")
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / "discord_bot.log"
-        activity_log_file = log_dir / "activity.log"
+        service_name = re.sub(
+            r"[^a-zA-Z0-9_.-]+",
+            "_",
+            os.getenv("OMNIBOT_SERVICE_NAME", "discord_bot"),
+        ).strip("._") or "discord_bot"
+        log_file = log_dir / f"{service_name}.log"
+        activity_log_file = log_dir / f"{service_name}_activity.log"
 
         handlers = {}
         active_handlers = []

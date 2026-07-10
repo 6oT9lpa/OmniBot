@@ -4,12 +4,12 @@ import disnake
 
 from infrastructure.logging import get_logger
 from presentation.views.roles_panel_management.emoji_input_view import EmojiInputView
-from presentation.views.roles_panel_management.helpers import COLOR_BLUE
+from presentation.views.roles_panel_management.helpers import AdministratorOnlyView, COLOR_BLUE
 
 logger = get_logger(__name__)
 
 
-class CreatePanelRoleSelectView(disnake.ui.View):
+class CreatePanelRoleSelectView(AdministratorOnlyView):
     def __init__(
         self,
         role_service,

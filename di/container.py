@@ -252,6 +252,7 @@ class Container:
                 guild_event_repo,
                 audit_log_service,
                 self.config,
+                await self.get_database(),
             )
             logger.info("LoggingService created")
         return self._logging_service

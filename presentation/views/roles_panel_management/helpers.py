@@ -12,6 +12,27 @@ COLOR_ORANGE = 0xFEE75C
 COLOR_GREY = 0x99AAB5
 MAX_PANEL_ITEMS = 25
 
+
+class AdministratorOnlyView(disnake.ui.View):
+    """Defence in depth for stateful role-panel management interactions."""
+
+    async def interaction_check(self, interaction: disnake.MessageInteraction) -> bool:
+        member = interaction.author
+        if interaction.guild and isinstance(member, disnake.Member) and member.guild_permissions.administrator:
+            return True
+        if not interaction.response.is_done():
+            await interaction.response.send_message("Only administrators can manage role panels.", ephemeral=True)
+        logger.warning("Blocked role-panel management interaction user_id=%s", getattr(member, "id", None))
+        return False
+
+
+def is_safe_self_assignable_role(guild: disnake.Guild, role: disnake.Role | None) -> bool:
+    """Self-assignable roles must not grant Discord permissions or be managed."""
+    if role is None or role.managed or int(role.permissions.value) != 0:
+        return False
+    me = guild.me
+    return bool(me and me.top_role.position > role.position)
+
 COMMON_EMOJIS = ["🎮", "🎨", "🎵", "📚", "💻", "⚽", "🌍", "🔥", "🎭", "✨",
                  "🚀", "🎯", "💎", "🦁", "🐉", "🌸", "🎃", "☕", "🎲", "🏆"]
 

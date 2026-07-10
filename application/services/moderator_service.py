@@ -43,6 +43,20 @@ class ModeratorService(ModeratorServiceInterface):
         duration_seconds: Optional[int] = None,
     ) -> Dict[str, Any]:
         try:
+            if not self._can_moderate(moderator, target, "moderate_members"):
+                logger.warning(
+                    "[WARN] Permission denied | moderator=%s target=%s",
+                    moderator.id,
+                    target.id,
+                )
+                return {
+                    "success": False,
+                    "punishment_id": None,
+                    "type": PunishmentType.WARN.value,
+                    "dm_sent": False,
+                    "escalation": False,
+                }
+
             punishment_id = await self._create_punishment(
                 moderator=moderator,
                 target=target,
@@ -117,15 +131,35 @@ class ModeratorService(ModeratorServiceInterface):
         duration_seconds: Optional[int] = 0,
     ) -> Dict[str, Any]:
         try:
-            if not self._can_moderate(moderator, target):
+            if not self._can_moderate(moderator, target, "moderate_members"):
                 logger.warning(
                     f"[MUTE] Permission denied | "
                     f"moderator={moderator.id} target={target.id}"
                 )
-                return False
+                return {
+                    "success": False,
+                    "punishment_id": None,
+                    "type": PunishmentType.MUTE.value,
+                    "dm_sent": False,
+                    "escalation": False,
+                }
 
             duration_seconds = duration_seconds or 0
             duration = max(duration_seconds, 60)
+
+            success = (
+                await self.timeout_user(moderator, target, duration, reason)
+                if use_timeout else True
+            )
+            if not success:
+                logger.warning("[MUTE] Timeout was not applied target=%s", target.id)
+                return {
+                    "success": False,
+                    "punishment_id": None,
+                    "type": PunishmentType.MUTE.value,
+                    "dm_sent": False,
+                    "escalation": False,
+                }
 
             punishment_id = await self._create_punishment(
                 moderator=moderator,
@@ -141,11 +175,6 @@ class ModeratorService(ModeratorServiceInterface):
                 f"Duration: {duration}s | "
                 f"Reason: {reason} | "
                 f"Punishment ID: {punishment_id}"
-            )
-
-            success = (
-                await self.timeout_user(moderator, target, duration, reason)
-                if use_timeout else True
             )
 
             dm_sent = (
@@ -247,7 +276,7 @@ class ModeratorService(ModeratorServiceInterface):
         send_dm: bool = True,
     ) -> bool:
         try:
-            if not self._can_moderate(moderator, target):
+            if not self._can_moderate(moderator, target, "kick_members"):
                 logger.warning(
                     f"[KICK] Permission denied | "
                     f"moderator={moderator.id} target={target.id}"
@@ -321,7 +350,7 @@ class ModeratorService(ModeratorServiceInterface):
                 else None
             )
 
-            if member and not self._can_moderate(moderator, member):
+            if member and not self._can_moderate(moderator, member, "ban_members"):
                 logger.warning(
                     "[BAN] Permission denied | moderator=%s target=%s",
                     moderator.id,
@@ -419,7 +448,7 @@ class ModeratorService(ModeratorServiceInterface):
         reason: str,
     ) -> bool:
         try:
-            if not self._can_moderate(moderator, target):
+            if not self._can_moderate(moderator, target, "moderate_members"):
                 logger.warning(
                     "[TIMEOUT] Permission denied | moderator=%s target=%s",
                     moderator.id,
@@ -449,7 +478,7 @@ class ModeratorService(ModeratorServiceInterface):
         reason: str = "Досрочное снятие таймаута",
     ) -> bool:
         try:
-            if not self._can_moderate(moderator, target):
+            if not self._can_moderate(moderator, target, "moderate_members"):
                 logger.warning(
                     "[UNTIMEOUT] Permission denied | moderator=%s target=%s",
                     moderator.id,
@@ -504,20 +533,31 @@ class ModeratorService(ModeratorServiceInterface):
         self,
         moderator: disnake.Member,
         target: disnake.Member,
+        permission: str,
     ) -> bool:
-        if not isinstance(moderator, disnake.Member):
-            return True
+        moderator_guild = getattr(moderator, "guild", None)
+        target_guild = getattr(target, "guild", None)
+        if moderator_guild is None or target_guild is None:
+            return False
 
-        if moderator.guild.id != target.guild.id:
+        if moderator_guild.id != target_guild.id:
             return False
 
         if moderator.id == target.id:
             return False
 
-        if target.guild_permissions.administrator:
-            return moderator.guild_permissions.administrator
+        permissions = getattr(moderator, "guild_permissions", None)
+        if permissions is None:
+            return False
+        if not permissions.administrator and not bool(getattr(permissions, permission, False)):
+            return False
 
-        return moderator.top_role.position > target.top_role.position
+        moderator_top_role = getattr(moderator, "top_role", None)
+        target_top_role = getattr(target, "top_role", None)
+        if moderator_top_role is None or target_top_role is None:
+            return False
+
+        return moderator_top_role.position > target_top_role.position
 
     async def _remove_administrator_roles(self, target: disnake.Member, reason: str) -> list[int]:
         roles = [

@@ -3,12 +3,12 @@ from typing import Optional
 import disnake
 
 from infrastructure.logging import get_logger
-from presentation.views.roles_panel_management.helpers import COLOR_GREEN, COLOR_RED, COLOR_GREY
+from presentation.views.roles_panel_management.helpers import AdministratorOnlyView, COLOR_GREEN, COLOR_RED, COLOR_GREY
 
 logger = get_logger(__name__)
 
 
-class DeletePanelConfirmView(disnake.ui.View):
+class DeletePanelConfirmView(AdministratorOnlyView):
     def __init__(
         self,
         role_service,

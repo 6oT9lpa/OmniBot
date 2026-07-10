@@ -17,6 +17,9 @@ class LoggingCog(commands.Cog):
         self._bot: Optional[commands.Bot] = None
 
     def cog_load(self):
+        self.cleanup_retention.change_interval(
+            hours=self._logging_service.retention_cleanup_interval_hours
+        )
         self.cleanup_retention.start()
         logger.info("LoggingCog initialized")
 

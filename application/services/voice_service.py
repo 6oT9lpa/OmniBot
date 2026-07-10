@@ -75,10 +75,12 @@ class VoiceService(VoiceServiceInterface):
         self._cancel_task(channel.id)
 
         async def _delayed_delete() -> None:
-            await asyncio.sleep(delay)
-            if not channel.members:
-                await self.delete(channel)
-            self._delete_tasks.pop(channel.id, None)
+            try:
+                await asyncio.sleep(delay)
+                if not channel.members:
+                    await self.delete(channel)
+            finally:
+                self._delete_tasks.pop(channel.id, None)
 
         self._delete_tasks[channel.id] = asyncio.create_task(_delayed_delete())
         logger.debug("Scheduled delete for channel_id=%s in %.0fs", channel.id, delay)
@@ -191,8 +193,32 @@ class VoiceService(VoiceServiceInterface):
             logger.warning("User %s attempted to claim occupied admin channel_id=%s", user.id, channel.id)
             raise PermissionError("Admin rights are already taken")
 
-        await self._grant_admin(channel, user)
+        if admin_id == user.id:
+            return
+
+        if not await self._repo.claim_admin(channel.id, user.id):
+            raise PermissionError("Admin rights are already taken")
+        try:
+            await channel.set_permissions(
+                user,
+                connect=True,
+                manage_channels=True,
+                manage_permissions=True,
+                move_members=True,
+            )
+        except Exception:
+            await self._repo.clear_admin_if(channel.id, user.id)
+            raise
         logger.info("Temporary voice admin claimed: channel_id=%s admin_id=%s", channel.id, user.id)
+
+    async def shutdown(self) -> None:
+        pending = set(self._delete_tasks.values()) | set(self._owner_transfer_tasks.values())
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        self._delete_tasks.clear()
+        self._owner_transfer_tasks.clear()
 
     async def release_admin(self, channel: disnake.VoiceChannel, user: disnake.Member) -> None:
         logger.info("Voice admin release requested: channel_id=%s user_id=%s", channel.id, user.id)

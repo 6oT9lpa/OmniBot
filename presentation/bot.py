@@ -132,7 +132,7 @@ class DiscordBot(commands.Bot):
             return
         embed = disnake.Embed(
             title="Ошибка команды",
-            description=str(error),
+            description="Команда не выполнена. Детали записаны в журнал.",
             color=disnake.Color.red(),
         )
         try:
@@ -148,7 +148,7 @@ class DiscordBot(commands.Bot):
             await interaction.response.send_message(
                 embed=disnake.Embed(
                     title="Ошибка взаимодействия",
-                    description=str(error),
+                    description="Действие не выполнено. Детали записаны в журнал.",
                     color=disnake.Color.red(),
                 ),
                 ephemeral=True,

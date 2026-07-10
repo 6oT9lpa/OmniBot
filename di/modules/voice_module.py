@@ -27,5 +27,8 @@ class VoiceModule:
             return None
 
     async def shutdown(self):
+        service = getattr(self._container, "_voice_service", None)
+        if service is not None:
+            await service.shutdown()
         self._cog = None
         logger.info("VoiceModule shutdown")

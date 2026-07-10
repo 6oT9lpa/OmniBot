@@ -37,6 +37,8 @@ class Bootstrap:
         self._moderation_module = None
         self._member_events_module = None
         self._streams_module = None
+        self._shutdown_lock = asyncio.Lock()
+        self._shutdown_complete = False
 
     async def run(self):
         try:
@@ -89,14 +91,14 @@ class Bootstrap:
 
         except KeyboardInterrupt:
             logger.info("KeyboardInterrupt received. Shutting down...")
-            await self._shutdown()
         except asyncio.CancelledError:
             logger.info("Task cancelled. Shutting down...")
-            await self._shutdown()
+            raise
         except Exception as e:
             logger.error(f"Unexpected error: {e}", exc_info=True)
-            await self._shutdown()
             sys.exit(1)
+        finally:
+            await self._shutdown()
 
     def _setup_signal_handlers(self):
         try:
@@ -195,40 +197,44 @@ class Bootstrap:
 
     # ---------- Завершение работы ----------
     async def _shutdown(self):
-        logger.info("Shutting down...")
+        async with self._shutdown_lock:
+            if self._shutdown_complete:
+                return
+            logger.info("Shutting down...")
 
-        if self._general_module:
-            await self._general_module.shutdown()
-        if self._roles_module:
-            await self._roles_module.shutdown()
-        if self._stats_module:
-            await self._stats_module.shutdown()
-        if self._voice_module:
-            await self._voice_module.shutdown()
-        if self._logging_module:
-            await self._logging_module.shutdown()
-        if self._moderation_module:
-            await self._moderation_module.shutdown()
-        if self._member_events_module:
-            await self._member_events_module.shutdown()
-        if self._streams_module:
-            await self._streams_module.shutdown()
+            if self._general_module:
+                await self._general_module.shutdown()
+            if self._roles_module:
+                await self._roles_module.shutdown()
+            if self._stats_module:
+                await self._stats_module.shutdown()
+            if self._voice_module:
+                await self._voice_module.shutdown()
+            if self._logging_module:
+                await self._logging_module.shutdown()
+            if self._moderation_module:
+                await self._moderation_module.shutdown()
+            if self._member_events_module:
+                await self._member_events_module.shutdown()
+            if self._streams_module:
+                await self._streams_module.shutdown()
 
-        if self.bot and not self.bot.is_closed():
-            try:
-                await self.bot.close()
-                logger.info("Bot closed")
-            except Exception as e:
-                logger.error(f"Error closing bot: {e}")
+            if self.bot and not self.bot.is_closed():
+                try:
+                    await self.bot.close()
+                    logger.info("Bot closed")
+                except Exception as e:
+                    logger.error(f"Error closing bot: {e}")
 
-        if self.container:
-            try:
-                await self.container.shutdown()
-                logger.info("Container shutdown complete")
-            except Exception as e:
-                logger.error(f"Error shutting down container: {e}")
+            if self.container:
+                try:
+                    await self.container.shutdown()
+                    logger.info("Container shutdown complete")
+                except Exception as e:
+                    logger.error(f"Error shutting down container: {e}")
 
-        logger.info("Shutdown complete")
+            self._shutdown_complete = True
+            logger.info("Shutdown complete")
 
 
 def handle_exception(loop, context):
