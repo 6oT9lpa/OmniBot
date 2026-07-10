@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import httpx
 from datetime import datetime, timezone
+from typing import Any
 
 from application.dto.ai_moderation_decision import AiModerationDecision
 from application.dto.ai_moderation_request import AiModerationRequest
+from infrastructure.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class AiModeratorApiClient:
@@ -14,13 +18,19 @@ class AiModeratorApiClient:
         self._timeout = httpx.Timeout(timeout_seconds)
 
     async def moderate(self, request: AiModerationRequest) -> AiModerationDecision:
-        payload = request.model_dump(mode="json")
-        payload["platform"] = "discord"
+        payload = self._moderation_payload(request)
         async with httpx.AsyncClient(timeout=self._timeout, trust_env=False) as client:
             response = await client.post(
                 f"{self._base_url}/moderation/messages",
                 headers={"X-Internal-Api-Key": self._api_key},
                 json=payload,
+            )
+        if response.status_code >= 400:
+            logger.warning(
+                "AI moderator request failed status=%s body=%s message_id=%s",
+                response.status_code,
+                response.text[:500],
+                request.message_id,
             )
         response.raise_for_status()
         data = response.json()
@@ -36,6 +46,14 @@ class AiModeratorApiClient:
             execution_plan=tuple(data["execution_plan"]),
             dry_run=data.get("execution_status") == "DRY_RUN",
         )
+
+    def _moderation_payload(self, request: AiModerationRequest) -> dict[str, Any]:
+        payload = request.model_dump(mode="json")
+        payload["platform"] = "discord"
+        for key in ("guild_id", "channel_id", "user_id", "message_id", "reply_to_message_id"):
+            if payload.get(key) is not None:
+                payload[key] = str(payload[key])
+        return payload
 
     async def report_action(self, event_id: int, action: str, status: str, dry_run: bool) -> None:
         async with httpx.AsyncClient(timeout=self._timeout, trust_env=False) as client:
