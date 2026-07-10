@@ -15,6 +15,7 @@ const channelPurposes: Array<{ key: ChannelPurpose; label: string }> = [
   { key: "channel_log", label: "Log channel" },
   { key: "stream_announce", label: "Stream alerts" },
   { key: "dev_blog", label: "Dev Blog" },
+  { key: "ai_moderation_log", label: "AI moderation log" },
 ];
 const rolePurposes: Array<{ key: ActivityRolePurpose; label: string }> = [
   { key: "activity_admin", label: "Activity admin" },

@@ -153,7 +153,8 @@ export type ChannelPurpose =
   | "message_log"
   | "channel_log"
   | "stream_announce"
-  | "dev_blog";
+  | "dev_blog"
+  | "ai_moderation_log";
 
 export type BotSettingsPayload = {
   guild_id: string | number;

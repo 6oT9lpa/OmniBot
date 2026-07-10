@@ -26,10 +26,9 @@ class GlobalApplicationCommandSyncService:
             ",".join(command_names),
         )
 
-        for command in global_commands:
-            await self._upsert_global_command(bot, command)
+        await bot.bulk_overwrite_global_commands(global_commands)
 
-        logger.info("Manual global application command sync completed count=%s", len(global_commands))
+        logger.info("Global application command sync completed count=%s", len(global_commands))
         return global_commands
 
     def _collect_global_commands(self, bot: Any) -> list[Any]:
@@ -37,14 +36,6 @@ class GlobalApplicationCommandSyncService:
         for command in bot.application_commands_iterator():
             commands.append(command.body)
         return commands
-
-    async def _upsert_global_command(self, bot: Any, command: Any) -> None:
-        try:
-            await bot.create_global_command(command)
-            logger.info("Global command upserted name=%s type=%s", command.name, command.type)
-        except Exception:
-            logger.exception("Failed to upsert global command name=%s type=%s", command.name, command.type)
-            raise
 
     async def remove_legacy_guild_commands(
         self,

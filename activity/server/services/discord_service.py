@@ -109,6 +109,15 @@ class DiscordService:
             for channel in sorted(channels, key=lambda item: (item.get("position", 0), item.get("name", "")))
         ]
 
+    async def validate_text_channel_ids(self, guild_id: str, channel_ids: set[int]) -> None:
+        if not channel_ids:
+            return
+        text_channel_ids = {int(channel.id) for channel in await self.list_channels(guild_id, "text")}
+        if channel_ids.issubset(text_channel_ids):
+            return
+        logger.warning("Rejected non-guild text channel ids guild_id=%s", guild_id)
+        raise HTTPException(status_code=422, detail="Selected channels must be text channels from this server")
+
     async def list_roles(self, guild_id: str) -> list[DiscordRole]:
         logger.info("Listing Discord roles guild_id=%s", guild_id)
         roles = await self._cached_bot_resource("roles", guild_id, f"/guilds/{guild_id}/roles")
