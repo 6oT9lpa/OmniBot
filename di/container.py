@@ -16,6 +16,7 @@ from infrastructure.database import (
     VoiceRepository,
     ServerRolePurposeRepository,
     CreatorAlertRepository
+    ,AiModerationRepository
 )
 from application.services import (
     RoleService,
@@ -29,6 +30,7 @@ from application.services import (
     StatsService,
     ServerRolePurposeService,
     CreatorAlertService
+    ,AiModerationSettingsService
 )
 from core.domain.creator_alert import CreatorPlatform
 from infrastructure.api.kick_client import KickClient
@@ -68,6 +70,8 @@ class Container:
         self._moderator_service: Optional[ModeratorService] = None
         self._server_role_purpose_service: Optional[ServerRolePurposeService] = None
         self._creator_alert_service: Optional[CreatorAlertService] = None
+        self._ai_moderation_repository: Optional[AiModerationRepository] = None
+        self._ai_moderation_settings_service: Optional[AiModerationSettingsService] = None
         self._member_events_module: Optional[MemberEventsModule] = None
         self._logging_module: Optional[LoggingModule] = None
         self._moderation_module: Optional[ModerationModule] = None
@@ -154,6 +158,11 @@ class Container:
             self._creator_alert_repo = CreatorAlertRepository(db)
         return self._creator_alert_repo
 
+    async def get_ai_moderation_repository(self) -> AiModerationRepository:
+        if not self._ai_moderation_repository:
+            self._ai_moderation_repository = AiModerationRepository(await self.get_database())
+        return self._ai_moderation_repository
+
     #=============== Service =====================
 
     async def get_stats_service(self) -> StatsService:
@@ -207,6 +216,11 @@ class Container:
             )
             logger.info("CreatorAlertService created")
         return self._creator_alert_service
+
+    async def get_ai_moderation_settings_service(self) -> AiModerationSettingsService:
+        if not self._ai_moderation_settings_service:
+            self._ai_moderation_settings_service = AiModerationSettingsService(await self.get_ai_moderation_repository())
+        return self._ai_moderation_settings_service
 
     async def get_role_service(self) -> RoleService:
         if not self._role_service:

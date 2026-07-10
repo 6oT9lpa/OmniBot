@@ -6,6 +6,7 @@ from di.modules.roles_module import RolesModule
 from di.modules.stats_module import StatsModule
 from di.modules.voice_module import VoiceModule
 from di.modules.streams_module import StreamsModule
+from di.modules.ai_moderation_module import AiModerationModule
 
 __all__ = [
     'GeneralModule',
@@ -15,5 +16,6 @@ __all__ = [
     'RolesModule',
     'StatsModule',
     'VoiceModule',
-    'StreamsModule'
+    'StreamsModule',
+    'AiModerationModule',
 ]

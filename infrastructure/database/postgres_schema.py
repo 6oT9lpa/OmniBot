@@ -116,6 +116,39 @@ class PostgresSchema:
             "CREATE INDEX IF NOT EXISTS idx_channel_guild ON channel_config(guild_id)",
             "CREATE INDEX IF NOT EXISTS idx_channel_whitelist ON channel_config(is_ai_whitelisted)",
             """
+            CREATE TABLE IF NOT EXISTS ai_moderation_channels (
+                guild_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (guild_id, channel_id)
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_ai_moderation_channels_guild ON ai_moderation_channels(guild_id)",
+            """
+            CREATE TABLE IF NOT EXISTS ai_moderation_settings (
+                guild_id BIGINT PRIMARY KEY,
+                policy_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS ai_moderation_events (
+                id BIGSERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
+                message_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
+                risk_score DOUBLE PRECISION NOT NULL,
+                decision_action TEXT NOT NULL,
+                primary_label TEXT NOT NULL,
+                labels_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                status TEXT NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (guild_id, message_id)
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_ai_moderation_events_guild_created ON ai_moderation_events(guild_id, created_at DESC)",
+            """
             CREATE TABLE IF NOT EXISTS user_stats (
                 user_id BIGINT NOT NULL,
                 guild_id BIGINT NOT NULL,

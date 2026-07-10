@@ -35,7 +35,7 @@ class GeneralCog(commands.Cog):
         {"section": "Роли и панели", "command": "/panel_remove", "description": "Удалить роль из панели", "permission": "administrator"},
         {"section": "Роли и панели", "command": "/panel_list", "description": "Показать панели ролей на сервере", "permission": "administrator"},
         {"section": "Роли и панели", "command": "/delete_panel", "description": "Удалить панель ролей", "permission": "administrator"},
-        {"section": "Каналы и welcome", "command": "/set_channel", "description": "Назначить системный канал: welcome, logs, streams, Dev Blog", "permission": "administrator"},
+        {"section": "Каналы и welcome", "command": "/set_channel", "description": "Назначить системный канал: welcome, logs, streams, Dev Blog или AI moderation log", "permission": "administrator"},
         {"section": "Каналы и welcome", "command": "/list_channels", "description": "Показать назначенные системные каналы", "permission": "administrator"},
         {"section": "Каналы и welcome", "command": "/welcome setup", "description": "Настроить welcome-сообщение", "permission": "administrator"},
         {"section": "Каналы и welcome", "command": "/welcome media", "description": "Настроить медиа welcome-сообщения", "permission": "administrator"},
@@ -61,7 +61,10 @@ class GeneralCog(commands.Cog):
         {"section": "Модерация", "command": "/punishments", "description": "Активные наказания", "permission": "moderate_members"},
         {"section": "Модерация", "command": "/slowmode", "description": "Настроить slowmode канала", "permission": "manage_channels"},
         {"section": "Модерация", "command": "/purge", "description": "Массово удалить сообщения", "permission": "manage_messages"},
-        {"section": "Скоро", "command": "AI moderation", "description": "Модуль ИИ-модерации на базе локальной модели планируется к подключению"},
+        {"section": "AI moderation", "command": "/set ai-channel", "description": "Добавить текстовый канал в локальную AI-модерацию", "permission": "administrator"},
+        {"section": "AI moderation", "command": "/list ai-channel", "description": "Показать каналы, отслеживаемые AI", "permission": "administrator"},
+        {"section": "AI moderation", "command": "/ai-policy label|blacklist|domains", "description": "Настроить лимиты действий, риск, blacklist и домены", "permission": "administrator"},
+        {"section": "AI moderation", "command": "Activity -> AI Moderator", "description": "Вкладка с каналами, политиками и безопасными настройками", "permission": "administrator"},
     )
 
     def __init__(self, bot: commands.Bot):

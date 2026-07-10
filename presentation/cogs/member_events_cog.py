@@ -162,6 +162,7 @@ class MemberEventsCog(commands.Cog):
                 ChannelPurpose.CHANNEL_LOG: "Лог каналов",
                 ChannelPurpose.STREAM_ANNOUNCE: "Анонсы стримов",
                 ChannelPurpose.DEV_BLOG: "Dev Blog",
+                ChannelPurpose.AI_MODERATION_LOG: "AI moderation log",
             }
             label = purpose_labels.get(purpose_enum, purpose)
 
@@ -212,6 +213,7 @@ class MemberEventsCog(commands.Cog):
                 "channel_log": "Лог каналов",
                 "stream_announce": "Анонсы стримов",
                 "dev_blog": "Dev Blog",
+                "ai_moderation_log": "AI moderation log",
             }
 
             embed = disnake.Embed(

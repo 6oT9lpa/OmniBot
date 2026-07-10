@@ -15,6 +15,7 @@ from di.modules import (
     StatsModule,
     VoiceModule,
     StreamsModule
+    ,AiModerationModule
 )
 
 logger = get_logger(__name__)
@@ -37,6 +38,7 @@ class Bootstrap:
         self._moderation_module = None
         self._member_events_module = None
         self._streams_module = None
+        self._ai_moderation_module = None
         self._shutdown_lock = asyncio.Lock()
         self._shutdown_complete = False
 
@@ -72,6 +74,7 @@ class Bootstrap:
             self._moderation_module = ModerationModule(self.container)
             self._member_events_module = MemberEventsModule(self.container)
             self._streams_module = StreamsModule(self.container)
+            self._ai_moderation_module = AiModerationModule(self.container)
 
             # Регистрация всех когов через модули
             await self._register_general_cog()
@@ -82,6 +85,7 @@ class Bootstrap:
             await self._register_logging_cog()
             await self._register_moderation_cog()
             await self._register_streams_cog()
+            await self._register_ai_moderation_cog()
 
             self._setup_signal_handlers()
 
@@ -195,6 +199,14 @@ class Bootstrap:
         else:
             logger.warning("Failed to register StreamsCog")
 
+    async def _register_ai_moderation_cog(self):
+        cog = await self._ai_moderation_module.get_cog(self.bot)
+        if cog:
+            self.bot.add_cog(cog)
+            logger.info("AiModerationCog registered")
+        else:
+            logger.warning("AI moderation cog is not configured")
+
     # ---------- Завершение работы ----------
     async def _shutdown(self):
         async with self._shutdown_lock:
@@ -218,6 +230,8 @@ class Bootstrap:
                 await self._member_events_module.shutdown()
             if self._streams_module:
                 await self._streams_module.shutdown()
+            if self._ai_moderation_module:
+                await self._ai_moderation_module.shutdown()
 
             if self.bot and not self.bot.is_closed():
                 try:

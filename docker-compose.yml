@@ -54,6 +54,8 @@ services:
       DISCORD_PROXY_URL: ${DISCORD_PROXY_URL_DOCKER:-}
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

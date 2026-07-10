@@ -9,6 +9,7 @@ from application.services.stats_service import StatsService
 from application.services.voice_service import VoiceService
 from application.services.server_role_purpose_service import ServerRolePurposeService
 from application.services.creator_alert_service import CreatorAlertService
+from application.services.ai_moderation_settings_service import AiModerationSettingsService
 
 
 __all__ = [
@@ -22,5 +23,6 @@ __all__ = [
     'StatsService',
     'VoiceService',
     'ServerRolePurposeService',
-    'CreatorAlertService'
+    'CreatorAlertService',
+    'AiModerationSettingsService',
 ]

@@ -8,6 +8,7 @@ from infrastructure.database.repositories.channel_config_repository import Chann
 from infrastructure.database.repositories.welcome_config_repository import WelcomeConfigRepository
 from infrastructure.database.repositories.server_role_purpose_repository import ServerRolePurposeRepository
 from infrastructure.database.repositories.creator_alert_repository import CreatorAlertRepository
+from infrastructure.database.repositories.ai_moderation_repository import AiModerationRepository
 from core.domain.channel_purpose import ChannelPurpose
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     'ChannelPurpose',
     'WelcomeConfigRepository',
     'ServerRolePurposeRepository',
-    'CreatorAlertRepository'
+    'CreatorAlertRepository',
+    'AiModerationRepository',
 ]

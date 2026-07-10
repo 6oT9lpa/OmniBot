@@ -9,3 +9,4 @@ class ChannelPurpose(str, Enum):
     CHANNEL_LOG = "channel_log" 
     STREAM_ANNOUNCE = "stream_announce"
     DEV_BLOG = "dev_blog"
+    AI_MODERATION_LOG = "ai_moderation_log"

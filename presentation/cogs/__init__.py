@@ -6,6 +6,7 @@ from presentation.cogs.voice_cog import VoiceCog
 from presentation.cogs.stats_cog import StatsCog
 from presentation.cogs.general_cog import GeneralCog
 from presentation.cogs.streams_cog import StreamsCog
+from presentation.cogs.ai_moderation_cog import AiModerationCog
 
 __all__ = [
     'GeneralCog',
@@ -15,5 +16,6 @@ __all__ = [
     'MemberEventsCog',
     'StatsCog',
     'VoiceCog',
-    'StreamsCog'
+    'StreamsCog',
+    'AiModerationCog',
 ]

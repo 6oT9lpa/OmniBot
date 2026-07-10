@@ -36,6 +36,12 @@ class BotConfig(BaseSettings):
     twitch_client_secret: Optional[SecretStr] = None
     youtube_api_key: Optional[SecretStr] = None
 
+    ai_moderator_api_url: str = "http://127.0.0.1:8000"
+    ai_moderator_internal_api_key: Optional[SecretStr] = None
+    ai_moderator_queue_size: int = 500
+    ai_moderator_worker_count: int = 2
+    ai_moderator_request_timeout_seconds: float = 12.0
+
     @field_validator('activity_rotation_interval_seconds')
     @classmethod
     def validate_activity_rotation_interval(cls, v: int) -> int:
