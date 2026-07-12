@@ -7,7 +7,12 @@ from pathlib import Path
 import httpx
 
 from application.services.discord_message_export_service import DiscordMessageExportService
-from scripts.dataset.export_discord_messages import execute_in_worker
+from scripts.dataset.export_discord_messages import CHANNEL_ID, GUILD_ID, execute_in_worker
+
+
+def test_export_script_targets_configured_discord_channel() -> None:
+    assert GUILD_ID == "1030229862310486036"
+    assert CHANNEL_ID == "1030232745793818644"
 
 
 def test_export_splits_jsonl_and_delivers_every_part(tmp_path: Path) -> None:
