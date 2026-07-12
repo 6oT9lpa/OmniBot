@@ -36,17 +36,3 @@ def validate_reason(value: str) -> str:
     if len(value) > 500:
         raise ValueError("Reason must not exceed 500 characters")
     return value.strip()
-
-
-def validate_duration_seconds(value: Optional[int]) -> Optional[int]:
-    if value is None:
-        return None
-    if value <= 0:
-        raise ValueError("Duration must be greater than 0 seconds")
-    return value
-
-
-def validate_user_id(value: int) -> int:
-    if value <= 0:
-        raise ValueError("Invalid Discord user ID")
-    return value

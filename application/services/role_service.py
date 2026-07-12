@@ -1,6 +1,5 @@
 from typing import List, Optional, Dict, Any
 import disnake
-from datetime import datetime, timezone, timedelta
 from hashlib import sha256
 from ipaddress import ip_address
 from urllib.parse import urlparse
@@ -15,12 +14,6 @@ from infrastructure.logging import get_logger
 logger = get_logger(__name__)
 
 MAX_PANEL_ITEMS = 25
-
-
-def get_msk_timestamp() -> str:
-    """Получить текущий timestamp в МСК"""
-    msk_tz = timezone(timedelta(hours=3))
-    return datetime.now(msk_tz).strftime("%Y-%m-%d %H:%M:%S")
 
 
 class RoleService(RoleServiceInterface):

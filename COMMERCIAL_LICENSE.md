@@ -1,6 +1,6 @@
 # Commercial License Terms
 
-Copyright (c) 2026 Alexandr Spivak. All rights reserved.
+Copyright (c) 2026 OmniDev Corp. All rights reserved.
 
 These terms are a baseline commercial license template for paid OmniBot
 customers. They apply only when the copyright holder grants a written
@@ -37,7 +37,9 @@ Unless the paid agreement expressly allows it, the customer may not:
 
 ## 4. Ownership
 
-The original Software remains owned by Alexandr Spivak.
+All right, title, and interest in and to the original Software, including all
+associated intellectual property rights, remain vested exclusively in OmniDev
+Corp.
 
 Customer modifications created under a paid license may be owned by the customer
 unless the paid agreement states otherwise, but those modifications do not remove
