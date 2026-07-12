@@ -28,4 +28,6 @@ async def test_settings_service_persists_channels_and_policy() -> None:
     await service.add_channel(1, 10)
     await service.save_policy(1, {"blacklist_words": ["blocked"]})
     assert await service.is_enabled_for_channel(1, 10)
-    assert (await service.get_policy(1))["blacklist_words"] == ["blocked"]
+    policy = await service.get_policy(1)
+    assert policy["blacklist_words"] == ["blocked"]
+    assert policy["labels"]["PROFANITY"]["max_action"] == "WARN"

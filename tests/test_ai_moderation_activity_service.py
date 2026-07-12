@@ -23,4 +23,6 @@ def test_activity_service_keeps_valid_stored_policy() -> None:
     policy, is_default = service._effective_policy(stored_policy, 1)
 
     assert is_default is False
-    assert policy == stored_policy
+    assert policy["blacklist_action"] == stored_policy["blacklist_action"]
+    assert policy["labels"]["PROFANITY"]["max_action"] == "WARN"
+    assert policy["labels"]["POLITICS_IRL"]["min_action"] == "REVIEW"

@@ -5,7 +5,7 @@ from activity.server.services.access_service import ActivityAccessService
 from activity.server.services.discord_service import DiscordService
 from activity.server.schemas.ai_moderation_channels import AiModerationChannelsPayload
 from activity.server.schemas.ai_moderation_policy import AiModerationPolicyPayload
-from core.domain.default_ai_moderation_policy import default_ai_moderation_policy
+from core.domain.default_ai_moderation_policy import default_ai_moderation_policy, merge_with_default_ai_moderation_policy
 from core.domain.ai_moderation_guild_policy import AiModerationGuildPolicy
 from infrastructure.logging import get_logger
 from psycopg.types.json import Jsonb
@@ -62,7 +62,8 @@ class AiModerationService:
         if stored_policy is None:
             return default_ai_moderation_policy().model_dump(mode="json"), True
         try:
-            return AiModerationGuildPolicy.model_validate(stored_policy).model_dump(mode="json"), False
+            policy = AiModerationGuildPolicy.model_validate(stored_policy)
+            return merge_with_default_ai_moderation_policy(policy).model_dump(mode="json"), False
         except ValueError:
             logger.warning("Invalid stored AI moderation policy ignored guild_id=%s", guild_id)
             return default_ai_moderation_policy().model_dump(mode="json"), True

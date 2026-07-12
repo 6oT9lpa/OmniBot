@@ -54,3 +54,15 @@ def default_ai_moderation_policy() -> AiModerationGuildPolicy:
             ),
         }
     )
+
+
+def merge_with_default_ai_moderation_policy(policy: AiModerationGuildPolicy) -> AiModerationGuildPolicy:
+    """Preserve a guild policy while supplying defaults for labels introduced later."""
+    defaults = default_ai_moderation_policy()
+    return AiModerationGuildPolicy(
+        blacklist_words=policy.blacklist_words,
+        allowed_domains=policy.allowed_domains,
+        labels={**defaults.labels, **policy.labels},
+        blacklist_action=policy.blacklist_action,
+        unapproved_domain_action=policy.unapproved_domain_action,
+    )
