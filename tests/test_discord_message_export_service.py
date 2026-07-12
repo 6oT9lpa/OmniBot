@@ -11,8 +11,8 @@ from scripts.dataset.export_discord_messages import CHANNEL_ID, GUILD_ID, execut
 
 
 def test_export_script_targets_configured_discord_channel() -> None:
-    assert GUILD_ID == "1030229862310486036"
-    assert CHANNEL_ID == "1030232745793818644"
+    assert GUILD_ID == "1126816639296483388"
+    assert CHANNEL_ID == "1126816639896260690"
 
 
 def test_export_splits_jsonl_and_delivers_every_part(tmp_path: Path) -> None:
@@ -81,6 +81,44 @@ def test_export_rejects_channel_from_another_guild(tmp_path: Path) -> None:
         assert "does not belong" in str(exc)
     else:
         raise AssertionError("Expected guild validation failure")
+
+
+def test_unlimited_export_reads_until_discord_history_is_empty(tmp_path: Path) -> None:
+    history_requests = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal history_requests
+        if request.method == "GET" and request.url.path == "/api/v10/channels/channel-1":
+            return httpx.Response(200, json={"id": "channel-1", "guild_id": "guild-1"})
+        if request.method == "GET" and request.url.path == "/api/v10/channels/channel-1/messages":
+            history_requests += 1
+            messages = (
+                [_message(str(message_id), "user-1", "историческое сообщение") for message_id in range(100, 0, -1)]
+                if history_requests == 1
+                else []
+            )
+            return httpx.Response(200, json=messages)
+        if request.method == "POST" and request.url.path == "/api/v10/users/@me/channels":
+            return httpx.Response(200, json={"id": "dm-1"})
+        if request.method == "POST" and request.url.path == "/api/v10/channels/dm-1/messages":
+            return httpx.Response(200, json={"id": "delivery-1"})
+        return httpx.Response(404, json={"message": "not found"})
+
+    service = DiscordMessageExportService(
+        bot_token="token",
+        guild_id="guild-1",
+        channel_id="channel-1",
+        recipient_user_id="recipient-1",
+        output_directory=tmp_path,
+        hash_salt="s" * 32,
+        max_messages=None,
+        transport=httpx.MockTransport(handler),
+    )
+
+    manifest = service.run()
+
+    assert manifest["rows"] == 100
+    assert history_requests == 2
 
 
 def test_script_executes_export_in_named_worker_thread() -> None:

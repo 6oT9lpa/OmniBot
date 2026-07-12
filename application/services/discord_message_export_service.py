@@ -31,7 +31,7 @@ class DiscordMessageExportService:
         output_directory: Path,
         hash_salt: str,
         proxy_url: str | None = None,
-        max_messages: int = 5_000,
+        max_messages: int | None = 5_000,
         max_file_bytes: int = 7_500_000,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
@@ -39,7 +39,7 @@ class DiscordMessageExportService:
             raise ValueError("Discord bot token is required")
         if len(hash_salt) < 32:
             raise ValueError("Hash salt must contain at least 32 characters")
-        if max_messages < 1:
+        if max_messages is not None and max_messages < 1:
             raise ValueError("max_messages must be positive")
         if max_file_bytes < 1:
             raise ValueError("max_file_bytes must be positive")
@@ -68,7 +68,7 @@ class DiscordMessageExportService:
             "Discord dataset export started guild_id=%s channel_id=%s max_messages=%s",
             self._guild_id,
             self._channel_id,
-            self._max_messages,
+            self._max_messages if self._max_messages is not None else "all",
         )
         try:
             self._validate_channel()
@@ -114,8 +114,9 @@ class DiscordMessageExportService:
         skipped_empty_messages = 0
         before: str | None = None
 
-        while len(rows) + skipped_bot_messages + skipped_empty_messages < self._max_messages:
-            remaining = self._max_messages - len(rows) - skipped_bot_messages - skipped_empty_messages
+        while self._max_messages is None or len(rows) + skipped_bot_messages + skipped_empty_messages < self._max_messages:
+            exported_count = len(rows) + skipped_bot_messages + skipped_empty_messages
+            remaining = 100 if self._max_messages is None else self._max_messages - exported_count
             params: dict[str, str | int] = {"limit": min(100, remaining)}
             if before:
                 params["before"] = before
