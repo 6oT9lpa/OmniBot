@@ -26,7 +26,7 @@ class DiscordMessageExportService:
         *,
         bot_token: str,
         guild_id: str,
-        channel_id: str,
+        channel_ids: tuple[str, ...],
         recipient_user_id: str,
         output_directory: Path,
         hash_salt: str,
@@ -43,9 +43,12 @@ class DiscordMessageExportService:
             raise ValueError("max_messages must be positive")
         if max_file_bytes < 1:
             raise ValueError("max_file_bytes must be positive")
+        normalized_channel_ids = tuple(dict.fromkeys(channel_id.strip() for channel_id in channel_ids if channel_id.strip()))
+        if not normalized_channel_ids:
+            raise ValueError("At least one Discord channel is required")
 
         self._guild_id = guild_id
-        self._channel_id = channel_id
+        self._channel_ids = normalized_channel_ids
         self._recipient_user_id = recipient_user_id
         self._output_directory = output_directory
         self._hash_salt = hash_salt
@@ -65,14 +68,14 @@ class DiscordMessageExportService:
 
     def run(self) -> dict[str, Any]:
         logger.info(
-            "Discord dataset export started guild_id=%s channel_id=%s max_messages=%s",
+            "Discord dataset export started guild_id=%s channel_count=%s max_messages_per_channel=%s",
             self._guild_id,
-            self._channel_id,
+            len(self._channel_ids),
             self._max_messages if self._max_messages is not None else "all",
         )
         try:
-            self._validate_channel()
-            rows, skipped_bot_messages, skipped_empty_messages = self._collect_rows()
+            self._validate_channels()
+            rows, skipped_bot_messages, skipped_empty_messages, channel_counts = self._collect_rows()
             parts = self._write_jsonl_parts(rows)
             dm_channel_id = self._create_dm_channel()
             self._deliver_parts(dm_channel_id, parts, len(rows))
@@ -81,11 +84,12 @@ class DiscordMessageExportService:
                 parts=parts,
                 skipped_bot_messages=skipped_bot_messages,
                 skipped_empty_messages=skipped_empty_messages,
+                channel_counts=channel_counts,
             )
             logger.info(
-                "Discord dataset export completed guild_id=%s channel_id=%s rows=%s parts=%s recipient_user_id=%s",
+                "Discord dataset export completed guild_id=%s channel_count=%s rows=%s parts=%s recipient_user_id=%s",
                 self._guild_id,
-                self._channel_id,
+                len(self._channel_ids),
                 len(rows),
                 len(parts),
                 self._recipient_user_id,
@@ -93,22 +97,42 @@ class DiscordMessageExportService:
             return manifest
         except Exception:
             logger.exception(
-                "Discord dataset export failed guild_id=%s channel_id=%s recipient_user_id=%s",
+                "Discord dataset export failed guild_id=%s channel_count=%s recipient_user_id=%s",
                 self._guild_id,
-                self._channel_id,
+                len(self._channel_ids),
                 self._recipient_user_id,
             )
             raise
         finally:
             self._client.close()
 
-    def _validate_channel(self) -> None:
-        channel = self._request("GET", f"/channels/{self._channel_id}").json()
-        if str(channel.get("guild_id")) != self._guild_id:
-            raise ValueError("Configured channel does not belong to the configured guild")
-        logger.info("Discord export channel validated guild_id=%s channel_id=%s", self._guild_id, self._channel_id)
+    def _validate_channels(self) -> None:
+        for channel_id in self._channel_ids:
+            channel = self._request("GET", f"/channels/{channel_id}").json()
+            if str(channel.get("guild_id")) != self._guild_id:
+                raise ValueError(f"Configured channel does not belong to the configured guild channel_id={channel_id}")
+            logger.info("Discord export channel validated guild_id=%s channel_id=%s", self._guild_id, channel_id)
 
-    def _collect_rows(self) -> tuple[list[dict[str, Any]], int, int]:
+    def _collect_rows(self) -> tuple[list[dict[str, Any]], int, int, dict[str, dict[str, int]]]:
+        rows: list[dict[str, Any]] = []
+        total_skipped_bot_messages = 0
+        total_skipped_empty_messages = 0
+        channel_counts: dict[str, dict[str, int]] = {}
+
+        for channel_id in self._channel_ids:
+            channel_rows, skipped_bot_messages, skipped_empty_messages = self._collect_channel_rows(channel_id)
+            rows.extend(channel_rows)
+            total_skipped_bot_messages += skipped_bot_messages
+            total_skipped_empty_messages += skipped_empty_messages
+            channel_counts[channel_id] = {
+                "rows": len(channel_rows),
+                "skipped_bot_messages": skipped_bot_messages,
+                "skipped_empty_messages": skipped_empty_messages,
+            }
+
+        return rows, total_skipped_bot_messages, total_skipped_empty_messages, channel_counts
+
+    def _collect_channel_rows(self, channel_id: str) -> tuple[list[dict[str, Any]], int, int]:
         rows: list[dict[str, Any]] = []
         skipped_bot_messages = 0
         skipped_empty_messages = 0
@@ -120,7 +144,7 @@ class DiscordMessageExportService:
             params: dict[str, str | int] = {"limit": min(100, remaining)}
             if before:
                 params["before"] = before
-            messages = self._request("GET", f"/channels/{self._channel_id}/messages", params=params).json()
+            messages = self._request("GET", f"/channels/{channel_id}/messages", params=params).json()
             if not messages:
                 break
 
@@ -130,7 +154,7 @@ class DiscordMessageExportService:
                 if author.get("bot"):
                     skipped_bot_messages += 1
                     continue
-                row = self._to_training_row(message)
+                row = self._to_training_row(message, channel_id)
                 if row is None:
                     skipped_empty_messages += 1
                     continue
@@ -141,14 +165,14 @@ class DiscordMessageExportService:
 
         logger.info(
             "Discord messages collected channel_id=%s rows=%s skipped_bots=%s skipped_empty=%s",
-            self._channel_id,
+            channel_id,
             len(rows),
             skipped_bot_messages,
             skipped_empty_messages,
         )
         return rows, skipped_bot_messages, skipped_empty_messages
 
-    def _to_training_row(self, message: dict[str, Any]) -> dict[str, Any] | None:
+    def _to_training_row(self, message: dict[str, Any], channel_id: str) -> dict[str, Any] | None:
         content = self._sanitize_content(str(message.get("content") or ""))
         if not content:
             return None
@@ -167,7 +191,7 @@ class DiscordMessageExportService:
                 "source_bucket": "project",
                 "source_tag": "discord_safe_training_channel",
                 "guild_id_hash": self._hash(self._guild_id),
-                "channel_id_hash": self._hash(self._channel_id),
+                "channel_id_hash": self._hash(channel_id),
                 "user_id_hash": self._hash(str(author.get("id", ""))),
                 "attachments_count": len(message.get("attachments") or []),
                 "embeds_count": len(message.get("embeds") or []),
@@ -244,11 +268,13 @@ class DiscordMessageExportService:
         parts: list[Path],
         skipped_bot_messages: int,
         skipped_empty_messages: int,
+        channel_counts: dict[str, dict[str, int]],
     ) -> dict[str, Any]:
         manifest = {
             "created_at": datetime.now(UTC).isoformat(),
             "guild_id_hash": self._hash(self._guild_id),
-            "channel_id_hash": self._hash(self._channel_id),
+            "channel_id_hashes": {channel_id: self._hash(channel_id) for channel_id in self._channel_ids},
+            "channel_counts": channel_counts,
             "rows": rows,
             "parts": [part.name for part in parts],
             "part_sizes": [part.stat().st_size for part in parts],

@@ -7,12 +7,14 @@ from pathlib import Path
 import httpx
 
 from application.services.discord_message_export_service import DiscordMessageExportService
-from scripts.dataset.export_discord_messages import CHANNEL_ID, GUILD_ID, execute_in_worker
+from scripts.dataset.export_discord_messages import CHANNEL_IDS, GUILD_ID, execute_in_worker
 
 
-def test_export_script_targets_configured_discord_channel() -> None:
-    assert GUILD_ID == "1126816639296483388"
-    assert CHANNEL_ID == "1126816639896260690"
+def test_export_script_targets_configured_discord_channels() -> None:
+    assert GUILD_ID == "785950838534438972"
+    assert len(CHANNEL_IDS) == 24
+    assert CHANNEL_IDS[0] == "785957900869959730"
+    assert CHANNEL_IDS[-1] == "785962801323180042"
 
 
 def test_export_splits_jsonl_and_delivers_every_part(tmp_path: Path) -> None:
@@ -41,7 +43,7 @@ def test_export_splits_jsonl_and_delivers_every_part(tmp_path: Path) -> None:
     service = DiscordMessageExportService(
         bot_token="token",
         guild_id="guild-1",
-        channel_id="channel-1",
+        channel_ids=("channel-1",),
         recipient_user_id="recipient-1",
         output_directory=tmp_path,
         hash_salt="s" * 32,
@@ -68,7 +70,7 @@ def test_export_rejects_channel_from_another_guild(tmp_path: Path) -> None:
     service = DiscordMessageExportService(
         bot_token="token",
         guild_id="guild-1",
-        channel_id="channel-1",
+        channel_ids=("channel-1",),
         recipient_user_id="recipient-1",
         output_directory=tmp_path,
         hash_salt="s" * 32,
@@ -107,7 +109,7 @@ def test_unlimited_export_reads_until_discord_history_is_empty(tmp_path: Path) -
     service = DiscordMessageExportService(
         bot_token="token",
         guild_id="guild-1",
-        channel_id="channel-1",
+        channel_ids=("channel-1",),
         recipient_user_id="recipient-1",
         output_directory=tmp_path,
         hash_salt="s" * 32,
@@ -119,6 +121,43 @@ def test_unlimited_export_reads_until_discord_history_is_empty(tmp_path: Path) -
 
     assert manifest["rows"] == 100
     assert history_requests == 2
+
+
+def test_export_combines_multiple_channels_and_tracks_counts(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path in {
+            "/api/v10/channels/channel-1",
+            "/api/v10/channels/channel-2",
+        }:
+            return httpx.Response(200, json={"id": request.url.path.rsplit("/", 1)[-1], "guild_id": "guild-1"})
+        if request.method == "GET" and request.url.path == "/api/v10/channels/channel-1/messages":
+            return httpx.Response(200, json=[_message("1", "user-1", "первый канал")])
+        if request.method == "GET" and request.url.path == "/api/v10/channels/channel-2/messages":
+            return httpx.Response(200, json=[_message("2", "user-2", "второй канал")])
+        if request.method == "POST" and request.url.path == "/api/v10/users/@me/channels":
+            return httpx.Response(200, json={"id": "dm-1"})
+        if request.method == "POST" and request.url.path == "/api/v10/channels/dm-1/messages":
+            return httpx.Response(200, json={"id": "delivery-1"})
+        return httpx.Response(404, json={"message": "not found"})
+
+    service = DiscordMessageExportService(
+        bot_token="token",
+        guild_id="guild-1",
+        channel_ids=("channel-1", "channel-2"),
+        recipient_user_id="recipient-1",
+        output_directory=tmp_path,
+        hash_salt="s" * 32,
+        max_messages=None,
+        transport=httpx.MockTransport(handler),
+    )
+
+    manifest = service.run()
+    rows = [json.loads(line) for line in (tmp_path / "discord_messages_part_001.jsonl").read_text(encoding="utf-8").splitlines()]
+
+    assert manifest["rows"] == 2
+    assert manifest["channel_counts"]["channel-1"]["rows"] == 1
+    assert manifest["channel_counts"]["channel-2"]["rows"] == 1
+    assert rows[0]["metadata"]["channel_id_hash"] != rows[1]["metadata"]["channel_id_hash"]
 
 
 def test_script_executes_export_in_named_worker_thread() -> None:
