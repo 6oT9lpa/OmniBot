@@ -41,6 +41,8 @@ const labelDefinitions: LabelDefinition[] = [
   { key: "INVITE", title: "Invite links", description: "Discord invites and unsolicited community links.", defaultPolicy: policy(20, "LOG", "DELETE") },
   { key: "SCAM", title: "Scam", description: "Fraud, phishing, or attempts to steal access.", defaultPolicy: policy(55, "DELETE_WARN", "BAN") },
   { key: "TOXIC", title: "Toxicity", description: "Hostile or disruptive language.", defaultPolicy: policy(45, "LOG", "WARN") },
+  { key: "PROFANITY", title: "Profanity", description: "Swearing or obscene language without a targeted threat.", defaultPolicy: policy(25, "LOG", "WARN") },
+  { key: "POLITICS_IRL", title: "Politics / IRL", description: "Real-world political discussion that requires staff review.", defaultPolicy: policy(40, "REVIEW", "REVIEW") },
   { key: "HATE", title: "Hate speech", description: "Content attacking protected groups.", defaultPolicy: policy(55, "WARN", "TIMEOUT") },
   { key: "THREAT", title: "Threats", description: "Threats of violence or harm.", defaultPolicy: policy(65, "DELETE_WARN", "BAN") },
   { key: "NSFW", title: "Adult content", description: "Sexual or explicit material.", defaultPolicy: policy(55, "DELETE", "TIMEOUT") },

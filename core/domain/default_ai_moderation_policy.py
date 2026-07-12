@@ -15,6 +15,12 @@ def default_ai_moderation_policy() -> AiModerationGuildPolicy:
                 max_action=AiModerationAction.BAN,
             ),
             "TOXIC": AiModerationLabelPolicy(risk_threshold=45, max_action=AiModerationAction.WARN),
+            "PROFANITY": AiModerationLabelPolicy(risk_threshold=25, max_action=AiModerationAction.WARN),
+            "POLITICS_IRL": AiModerationLabelPolicy(
+                risk_threshold=40,
+                min_action=AiModerationAction.REVIEW,
+                max_action=AiModerationAction.REVIEW,
+            ),
             "HATE": AiModerationLabelPolicy(
                 risk_threshold=55,
                 min_action=AiModerationAction.WARN,
