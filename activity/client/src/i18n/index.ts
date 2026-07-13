@@ -1,4 +1,4 @@
-import { computed, readonly, ref } from "vue";
+import { readonly, ref } from "vue";
 import en from "./locales/en.json";
 import ru from "./locales/ru.json";
 
@@ -43,10 +43,6 @@ export function setLocale(locale: Locale): void {
   console.info(`[i18n] Activity locale changed to ${locale}`);
 }
 
-export function toggleLocale(): void {
-  setLocale(activeLocale.value === "en" ? "ru" : "en");
-}
-
 export function initializeLocale(): void {
   setLocale(activeLocale.value);
 }
@@ -54,9 +50,7 @@ export function initializeLocale(): void {
 export function useI18n() {
   return {
     locale: readonly(activeLocale),
-    localeLabel: computed(() => t(`common.language.${activeLocale.value === "en" ? "english" : "russian"}`)),
     setLocale,
     t,
-    toggleLocale,
   };
 }

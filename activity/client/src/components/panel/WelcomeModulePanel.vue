@@ -61,7 +61,7 @@ function setColor(value: string) {
 </script>
 
 <template>
-  <section class="editor-grid">
+  <section class="editor-grid preview-editor-grid">
     <form class="control-surface" @submit.prevent="saveWelcome">
       <div class="section-heading">
         <span>{{ $t("module.welcome") }}</span>
@@ -136,6 +136,6 @@ function setColor(value: string) {
       </div>
     </form>
 
-    <DiscordEmbedPreview :config="welcomeDraft" />
+    <DiscordEmbedPreview class="sticky-preview" :config="welcomeDraft" />
   </section>
 </template>

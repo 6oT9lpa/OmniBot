@@ -34,12 +34,25 @@ function previewText(value: string) {
     </div>
     <h3>{{ previewText(config.title) }}</h3>
     <p>{{ previewText(config.description) }}</p>
-    <div class="preview-media">
-      {{ config.thumbnail_url || $t("welcome.thumbnail_area") }}
+    <div class="preview-media" :class="{ 'has-image': config.thumbnail_url }">
+      <img
+        v-if="config.thumbnail_url"
+        :src="config.thumbnail_url"
+        :alt="$t('welcome.preview_image_alt')"
+        loading="lazy"
+      />
+      <span v-else>{{ $t("welcome.thumbnail_area") }}</span>
     </div>
     <footer>
       <span>{{ previewText(config.footer_text || "OmniBot Activity") }}</span>
-      <span>{{ config.footer_icon_url || hexColor(config.color) }}</span>
+      <img
+        v-if="config.footer_icon_url"
+        class="preview-footer-icon"
+        :src="config.footer_icon_url"
+        :alt="$t('welcome.preview_footer_icon_alt')"
+        loading="lazy"
+      />
+      <span v-else>{{ hexColor(config.color) }}</span>
     </footer>
   </article>
 </template>

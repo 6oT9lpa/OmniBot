@@ -102,7 +102,7 @@ function normalizeEmbeds(value: unknown): DevBlogEditorEmbed[] {
 </script>
 
 <template>
-  <section class="editor-grid">
+  <section class="editor-grid preview-editor-grid">
     <form class="control-surface" @submit.prevent="saveDevBlog('published')">
       <div class="section-heading">
         <span>{{ $t("dev.eyebrow") }}</span>
@@ -174,13 +174,24 @@ function normalizeEmbeds(value: unknown): DevBlogEditorEmbed[] {
         <small>{{ saving.message }}</small>
       </div>
     </form>
-    <article class="discord-preview">
+    <article class="discord-preview sticky-preview">
       <div class="discord-preview-header"><span>{{ $t("dev.preview") }}</span><strong>{{ $t(`common.${devBlogDraft.status}`) }}</strong></div>
       <h3>{{ devBlogDraft.title }}</h3>
       <p>{{ devBlogDraft.content || devBlogDraft.embeds[0]?.description }}</p>
-      <div v-for="(embed, index) in devBlogDraft.embeds" :key="`preview-${index}`" class="preview-media">
+      <div
+        v-for="(embed, index) in devBlogDraft.embeds"
+        :key="`preview-${index}`"
+        class="preview-media"
+        :class="{ 'has-image': embed.image_url }"
+      >
         <span>{{ embed.title || $t("dev.embed_number", { number: index + 1 }) }}</span>
-        <small>{{ embed.image_url || $t("dev.no_image") }}</small>
+        <img
+          v-if="embed.image_url"
+          :src="embed.image_url"
+          :alt="$t('dev.preview_image_alt', { number: index + 1 })"
+          loading="lazy"
+        />
+        <small v-else>{{ $t("dev.no_image") }}</small>
       </div>
       <footer><span>{{ $t("dev.embed_count", { count: devBlogDraft.embeds.length }) }}</span><span>#{{ channelName(activity.channelPurposes.dev_blog) }}</span></footer>
       <small>{{ $t(devBlogDraft.image_render_mode === "inline_between_text" ? "dev.inline_help" : "dev.gallery_help") }}</small>

@@ -124,7 +124,7 @@ function fieldValue(index: number) {
 </script>
 
 <template>
-  <section class="editor-grid creator-alerts-grid">
+  <section class="editor-grid preview-editor-grid creator-alerts-grid">
     <form class="control-surface" @submit.prevent="saveCreator">
       <div class="section-heading">
         <span>{{ $t("creator.workspace") }}</span>
@@ -216,7 +216,7 @@ function fieldValue(index: number) {
       </div>
     </form>
 
-    <article class="discord-preview creator-preview" :style="{ borderLeftColor: hexColor(previewEmbed?.color ?? creatorDraft.color) }">
+    <article class="discord-preview sticky-preview creator-preview" :style="{ borderLeftColor: hexColor(previewEmbed?.color ?? creatorDraft.color) }">
       <div class="discord-preview-header"><span>{{ $t("creator.preview_heading") }}</span><strong>{{ $t("common.test") }}</strong></div>
       <template v-if="previewEmbed">
         <p v-if="previewContent()" class="preview-content">{{ previewContent() }}</p>

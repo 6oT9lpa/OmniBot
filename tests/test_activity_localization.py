@@ -65,8 +65,38 @@ def test_language_switcher_is_available_in_public_and_panel_headers() -> None:
     i18n_module = (CLIENT_ROOT / "i18n" / "index.ts").read_text(encoding="utf-8")
 
     assert "Languages" in switcher
-    assert "toggleLocale" in switcher
+    assert 'role="menu"' in switcher
+    assert 'role="menuitemradio"' in switcher
+    assert 'data-testid="language-menu-trigger"' in switcher
+    assert "locale.toUpperCase()" not in switcher
+    assert "selectLocale(option.code)" in switcher
     assert "<LanguageSwitcher />" in public_header
     assert "<LanguageSwitcher />" in panel_header
     assert '"omnibot.activity.locale"' in i18n_module
     assert 'export type Locale = "en" | "ru"' in i18n_module
+
+
+def test_editor_previews_stay_at_the_top_while_scrolling() -> None:
+    component_names = ("WelcomeModulePanel.vue", "DevBlogPanel.vue", "CreatorAlertsPanel.vue")
+    for component_name in component_names:
+        source = (CLIENT_ROOT / "components" / "panel" / component_name).read_text(encoding="utf-8")
+        assert "preview-editor-grid" in source, component_name
+        assert "sticky-preview" in source, component_name
+
+    styles = (CLIENT_ROOT / "style.css").read_text(encoding="utf-8")
+    assert 'grid-template-areas: "editor preview"' in styles
+    assert '"preview"\n      "editor"' in styles
+    assert ".sticky-preview" in styles
+    assert "position: sticky" in styles
+
+
+def test_welcome_and_dev_blog_previews_render_configured_images() -> None:
+    welcome_preview = (CLIENT_ROOT / "components" / "panel" / "DiscordEmbedPreview.vue").read_text(encoding="utf-8")
+    dev_blog = (CLIENT_ROOT / "components" / "panel" / "DevBlogPanel.vue").read_text(encoding="utf-8")
+
+    assert 'v-if="config.thumbnail_url"' in welcome_preview
+    assert ':src="config.thumbnail_url"' in welcome_preview
+    assert 'v-if="config.footer_icon_url"' in welcome_preview
+    assert ':src="config.footer_icon_url"' in welcome_preview
+    assert 'v-if="embed.image_url"' in dev_blog
+    assert ':src="embed.image_url"' in dev_blog
