@@ -14,6 +14,7 @@ const props = withDefaults(
 );
 
 const characters = computed(() => Array.from(props.text));
+const visibleText = computed(() => characters.value.slice(0, visibleCount.value).join(""));
 const visibleCount = ref(0);
 let timerId: number | undefined;
 
@@ -50,15 +51,6 @@ onBeforeUnmount(clearTypingTimer);
 
 <template>
   <component :is="props.as" class="staggered-headline typewriter-headline" :aria-label="props.text">
-    <span
-      v-for="(character, index) in characters.slice(0, visibleCount)"
-      :key="`${character}-${index}`"
-      class="typewriter-letter"
-      :class="{ 'is-space': character === ' ' }"
-      aria-hidden="true"
-    >
-      {{ character === " " ? "\u00A0" : character }}
-    </span>
-    <span class="typewriter-cursor" aria-hidden="true"></span>
+    <span class="typewriter-copy" aria-hidden="true">{{ visibleText }}</span>
   </component>
 </template>

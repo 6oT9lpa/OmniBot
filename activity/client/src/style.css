@@ -425,37 +425,43 @@ a {
 }
 
 .staggered-headline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-  align-items: baseline;
+  display: block;
   max-width: 980px;
   margin: 0;
-  font-size: clamp(2.5rem, 8vw, 7rem);
+  font-size: 4.5rem;
   font-weight: 900;
-  line-height: 0.86;
+  line-height: 0.92;
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.typewriter-letter {
-  display: inline-block;
-  min-width: 0;
-  overflow-wrap: anywhere;
+.hero-copy .staggered-headline,
+.about-hero .staggered-headline {
+  font-size: 4.5rem;
 }
 
-.typewriter-letter.is-space {
-  width: 0.28em;
+.typewriter-copy {
+  white-space: pre-wrap;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
-.typewriter-cursor {
+.typewriter-copy::after {
   display: inline-block;
   width: 0.06em;
   height: 0.78em;
   margin-left: 0.08em;
+  content: "";
   background: currentcolor;
   transform: translateY(0.08em);
   animation: caretBlink 850ms steps(1, end) infinite;
+}
+
+@media (min-width: 1600px) {
+  .hero-copy .staggered-headline,
+  .about-hero .staggered-headline {
+    font-size: 6rem;
+  }
 }
 
 .hero-body,
@@ -477,6 +483,11 @@ a {
   margin-top: 56px;
 }
 
+.feature-grid > .reveal-on-scroll {
+  display: flex;
+  height: 100%;
+}
+
 .feature-card,
 .about-panel,
 .control-surface,
@@ -493,8 +504,16 @@ a {
 }
 
 .feature-card {
+  width: 100%;
+  height: 100%;
   min-height: 260px;
   padding: 28px;
+}
+
+.feature-grid .feature-card h3 {
+  font-size: 2rem;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
 }
 
 .feature-card h3,
@@ -1020,7 +1039,7 @@ a {
 
 .panel-workspace {
   min-width: 0;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .panel-topbar {
@@ -1057,7 +1076,7 @@ a {
   gap: 24px;
   min-width: 0;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
   padding: clamp(20px, 3vw, 40px);
 }
 
@@ -1442,12 +1461,11 @@ input[type="color"] {
 }
 
 .sticky-preview {
+  position: sticky;
+  top: 112px;
   align-self: start;
-  max-height: calc(100vh - 128px);
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
+  max-height: none;
+  overflow: visible;
 }
 
 .discord-preview-header {
@@ -1603,9 +1621,17 @@ input[type="color"] {
   display: block;
   width: 100%;
   max-width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
+  max-height: 260px;
+  object-fit: contain;
   border-radius: 6px;
+}
+
+.preview-image-error {
+  display: grid;
+  min-height: 96px;
+  place-items: center;
+  color: var(--warning);
+  text-align: center;
 }
 
 .discord-preview footer {
@@ -2633,6 +2659,33 @@ input[type="color"] {
   line-height: 1.55;
 }
 
+.log-detail-list {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  margin: 0;
+}
+
+.log-detail-list > div {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.log-detail-list dt {
+  color: var(--soft);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.log-detail-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .log-record small {
   color: var(--soft);
   white-space: nowrap;
@@ -2968,8 +3021,14 @@ input[type="color"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .hero-copy .staggered-headline,
+  .about-hero .staggered-headline {
+    font-size: 4.25rem;
+  }
+
   .discord-preview {
-    position: static;
+    position: sticky;
+    top: 112px;
   }
 }
 
@@ -3034,7 +3093,6 @@ input[type="color"] {
 
   .sticky-preview {
     top: 142px;
-    max-height: calc(100vh - 158px);
   }
 
   .section-heading,
@@ -3061,9 +3119,19 @@ input[type="color"] {
 }
 
 @media (max-width: 620px) {
+  .staggered-headline {
+    font-size: 2.65rem;
+    line-height: 0.98;
+  }
+
   .hero-copy h1,
   .about-hero h1 {
     font-size: clamp(2.75rem, 15vw, 4.15rem);
+  }
+
+  .hero-copy .staggered-headline,
+  .about-hero .staggered-headline {
+    font-size: 2.65rem;
   }
 
   .header-actions {

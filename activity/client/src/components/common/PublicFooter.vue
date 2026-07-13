@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import RevealOnScroll from "./RevealOnScroll.vue";
+import { useActivityStore } from "../../stores/activity.store";
+import { openExternalLink, shouldHandleExternalClick } from "../../utils/externalLinks";
 
 const currentYear = new Date().getFullYear();
+const activity = useActivityStore();
 const githubDocsBase =
   "https://github.com/6oT9lpa/discord-ai-moderation-bot/blob/main/docs";
 
@@ -25,7 +28,13 @@ const communityLinks = [
   { key: "footer.ai_moderator", href: `${knowledgeBaseUrl}#12-ai-moderation` },
   { key: "footer.logging", href: `${knowledgeBaseUrl}#9-logs-and-audit` },
 ];
-const team = ["6oT9lpa", "Arnetik", "Jimmy"];
+const team = ["6oT9lpa", "Jimmy"];
+
+async function handleExternalClick(event: MouseEvent, url: string) {
+  if (!shouldHandleExternalClick(event)) return;
+  event.preventDefault();
+  await openExternalLink(url, activity.discordSdk);
+}
 </script>
 
 <template>
@@ -33,19 +42,19 @@ const team = ["6oT9lpa", "Arnetik", "Jimmy"];
     <div class="footer-grid">
       <section>
         <span>{{ $t("footer.product") }}</span>
-        <a v-for="link in productLinks" :key="link.key" :href="link.href" target="_blank" rel="noreferrer">
+        <a v-for="link in productLinks" :key="link.key" :href="link.href" target="_blank" rel="noreferrer" @click="handleExternalClick($event, link.href)">
           {{ $t(link.key) }}
         </a>
       </section>
       <section>
         <span>{{ $t("footer.legal") }}</span>
-        <a v-for="link in legalLinks" :key="link.key" :href="link.href" target="_blank" rel="noreferrer">
+        <a v-for="link in legalLinks" :key="link.key" :href="link.href" target="_blank" rel="noreferrer" @click="handleExternalClick($event, link.href)">
           {{ $t(link.key) }}
         </a>
       </section>
       <section>
         <span>{{ $t("footer.community") }}</span>
-        <a v-for="link in communityLinks" :key="link.key" :href="link.href" target="_blank" rel="noreferrer">
+        <a v-for="link in communityLinks" :key="link.key" :href="link.href" target="_blank" rel="noreferrer" @click="handleExternalClick($event, link.href)">
           {{ $t(link.key) }}
         </a>
       </section>
@@ -57,7 +66,7 @@ const team = ["6oT9lpa", "Arnetik", "Jimmy"];
 
     <div class="footer-bottom">
       <p>{{ $t("footer.copyright", { year: currentYear }) }}</p>
-      <a class="donate-button" href="https://boosty.to/REPLACE_ME" target="_blank" rel="noreferrer">
+      <a class="donate-button" href="https://boosty.to/6o9lpa" target="_blank" rel="noreferrer" @click="handleExternalClick($event, 'https://boosty.to/6o9lpa')">
         {{ $t("footer.donate") }}
       </a>
     </div>

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useActivityStore } from "../../stores/activity.store";
 import { t, useI18n } from "../../i18n";
+import { logDetailRows, logEventTitle } from "../../utils/logPresentation";
 
 const activity = useActivityStore();
 const { locale } = useI18n();
@@ -41,46 +42,8 @@ async function goPage(delta: number) {
   await loadAudit();
 }
 
-function eventTitle(value: unknown) {
-  const raw = String(value || "log_event");
-  const named: Record<string, string> = {
-    voice_join: t("dashboard.event.voice_join"),
-    voice_leave: t("dashboard.event.voice_leave"),
-    voice_move: t("dashboard.event.voice_move"),
-    activity_synced_role_assignments_updated: t("dashboard.event.roles_updated"),
-    activity_welcome_test_sent: t("dashboard.event.welcome_test"),
-  };
-  return named[raw] || raw.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
 function actorLabel(row: Record<string, unknown>) {
   return String(row.actor_name || row.author_name || row.actor_id || row.author_id || t("logs.system"));
-}
-
-function rowDetails(row: Record<string, unknown>) {
-  // Convert stored bot payloads into short human-readable activity sentences.
-  const eventType = String(row.event_type || "");
-  const details = parseDetails(row.details ?? row.content);
-  if (eventType === "voice_join" && details.channel) return t("dashboard.event.joined", { channel: String(details.channel) });
-  if (eventType === "voice_leave" && details.channel) return t("dashboard.event.left", { channel: String(details.channel) });
-  if (eventType === "voice_move") {
-    const before = details.before_channel || t("dashboard.unknown");
-    const after = details.after_channel || t("dashboard.unknown");
-    return t("dashboard.event.moved", { before: String(before), after: String(after) });
-  }
-  if (typeof details._raw === "string" && details._raw.trim()) return details._raw;
-  return t("dashboard.no_details");
-}
-
-function parseDetails(value: unknown): Record<string, unknown> & { _raw?: string } {
-  if (value && typeof value === "object") return value as Record<string, unknown>;
-  const raw = String(value ?? "");
-  if (!raw.trim()) return {};
-  try {
-    return JSON.parse(raw.replaceAll("'", "\""));
-  } catch {
-    return { _raw: raw };
-  }
 }
 
 function timeLabel(value: unknown) {
@@ -123,18 +86,28 @@ onMounted(() => {
 
     <div class="record-list compact-list">
       <article v-for="row in combinedRows" :key="`log-${row.source}-${row.id}`" class="log-record">
-        <strong>{{ eventTitle(row.event_type) }}</strong>
+        <strong>{{ logEventTitle(row.event_type) }}</strong>
         <span>{{ actorLabel(row) }}</span>
-        <p>{{ rowDetails(row) }}</p>
+        <dl class="log-detail-list">
+          <div v-for="detail in logDetailRows(row)" :key="detail.key">
+            <dt>{{ detail.label }}</dt>
+            <dd>{{ detail.value }}</dd>
+          </div>
+        </dl>
         <small>{{ timeLabel(row.created_at) }}</small>
       </article>
     </div>
 
     <div class="record-list">
       <article v-for="row in activity.auditPage?.items || []" :key="`audit-${row.id}`" class="log-record">
-        <strong>{{ eventTitle(row.event_type) }}</strong>
+        <strong>{{ logEventTitle(row.event_type) }}</strong>
         <span>{{ actorLabel(row as unknown as Record<string, unknown>) }}</span>
-        <p>{{ rowDetails(row as unknown as Record<string, unknown>) }}</p>
+        <dl class="log-detail-list">
+          <div v-for="detail in logDetailRows(row as unknown as Record<string, unknown>)" :key="detail.key">
+            <dt>{{ detail.label }}</dt>
+            <dd>{{ detail.value }}</dd>
+          </div>
+        </dl>
         <small>{{ timeLabel(row.created_at) }}</small>
       </article>
     </div>
