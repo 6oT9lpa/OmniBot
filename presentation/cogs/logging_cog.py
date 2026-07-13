@@ -97,8 +97,6 @@ class LoggingCog(commands.Cog):
     @commands.Cog.listener()
     async def on_member_update(self, before: disnake.Member, after: disnake.Member):
         if before.roles != after.roles:
-            added = [r for r in after.roles if r not in before.roles]
-            removed = [r for r in before.roles if r not in after.roles]
             moderator = None
             try:
                 async for entry in after.guild.audit_logs(limit=5, action=disnake.AuditLogAction.member_role_update):
@@ -107,7 +105,12 @@ class LoggingCog(commands.Cog):
                         break
             except Exception:
                 pass
-            await self._logging_service.log_member_role_update(member=after, after_roles=added, before_roles=removed, moderator=moderator)
+            await self._logging_service.log_member_role_update(
+                member=after,
+                after_roles=list(after.roles),
+                before_roles=list(before.roles),
+                moderator=moderator,
+            )
 
         changed = []
         if before.nick != after.nick:

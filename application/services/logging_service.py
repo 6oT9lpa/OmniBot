@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any, Union
 
@@ -252,8 +253,11 @@ class LoggingService(LoggingServiceInterface):
         await self._persist_and_send(
             guild_id=role.guild.id,
             event_type="role_create",
+            actor_id=moderator.id if moderator else None,
+            actor_name=str(moderator) if moderator else None,
             target_id=role.id,
             target_name=role.name,
+            details={"role": {"id": role.id, "name": role.name}},
             embed=embed,
         )
         logger.info("Logged role create for role %s", role.id)
@@ -268,8 +272,11 @@ class LoggingService(LoggingServiceInterface):
         await self._persist_and_send(
             guild_id=role.guild.id,
             event_type="role_delete",
+            actor_id=moderator.id if moderator else None,
+            actor_name=str(moderator) if moderator else None,
             target_id=role.id,
             target_name=role.name,
+            details={"role": {"id": role.id, "name": role.name}},
             embed=embed,
         )
         logger.info("Logged role delete for role %s", role.id)
@@ -286,8 +293,11 @@ class LoggingService(LoggingServiceInterface):
         await self._persist_and_send(
             guild_id=after.guild.id,
             event_type="role_update",
+            actor_id=moderator.id if moderator else None,
+            actor_name=str(moderator) if moderator else None,
             target_id=after.id,
             target_name=after.name,
+            details={"changes": changes},
             embed=embed,
         )
         logger.info("Logged role update for role %s, changes: %s", after.id, changes)
@@ -309,10 +319,14 @@ class LoggingService(LoggingServiceInterface):
         await self._persist_and_send(
             guild_id=member.guild.id,
             event_type="member_role_update",
-            actor_id=member.id,
-            actor_name=str(member),
+            actor_id=moderator.id if moderator else None,
+            actor_name=str(moderator) if moderator else None,
             target_id=member.id,
             target_name=str(member),
+            details={
+                "added_roles": [{"id": role.id, "name": role.name} for role in added],
+                "removed_roles": [{"id": role.id, "name": role.name} for role in removed],
+            },
             embed=embed,
         )
         logger.info("Logged member role update for %s, added: %s, removed: %s", member.id, [r.id for r in added], [r.id for r in removed])
@@ -425,8 +439,11 @@ class LoggingService(LoggingServiceInterface):
             guild_id=channel.guild.id,
             event_type="channel_create",
             source_channel_id=channel.id,
+            actor_id=moderator.id if moderator else None,
+            actor_name=str(moderator) if moderator else None,
             target_id=channel.id,
             target_name=channel.name,
+            details=self._channel_details(channel),
             embed=embed,
         )
 
@@ -443,8 +460,11 @@ class LoggingService(LoggingServiceInterface):
             guild_id=channel.guild.id,
             event_type="channel_delete",
             source_channel_id=channel.id,
+            actor_id=moderator.id if moderator else None,
+            actor_name=str(moderator) if moderator else None,
             target_id=channel.id,
             target_name=channel.name,
+            details=self._channel_details(channel),
             embed=embed,
         )
         logger.info("Logged channel delete for channel %s", channel.id)
@@ -467,8 +487,11 @@ class LoggingService(LoggingServiceInterface):
             guild_id=after.guild.id,
             event_type="channel_update",
             source_channel_id=after.id, 
+            actor_id=moderator.id if moderator else None,
+            actor_name=str(moderator) if moderator else None,
             target_id=after.id,
             target_name=after.name,
+            details={**self._channel_details(after), "changes": changes},
             embed=embed,
         )
 
@@ -577,6 +600,8 @@ class LoggingService(LoggingServiceInterface):
         await self._persist_and_send(
             guild_id=resolved_guild_id,
             event_type="moderation_audit_ban",
+            actor_id=moderator.id,
+            actor_name=str(moderator),
             target_id=target.id,
             target_name=str(target),
             details={"reason": reason},
@@ -608,6 +633,8 @@ class LoggingService(LoggingServiceInterface):
         await self._persist_and_send(
             guild_id=resolved_guild_id,
             event_type="moderation_audit_unban",
+            actor_id=moderator.id,
+            actor_name=str(moderator),
             target_id=target.id,
             target_name=str(target),
             details={"reason": reason},
@@ -663,6 +690,8 @@ class LoggingService(LoggingServiceInterface):
         embed: Optional[disnake.Embed] = None,
     ) -> None:
         now = datetime.now(timezone.utc)
+        if embed is None:
+            embed = self._build_embed(event_type, details)
 
         await self._guild_event_repo.add(
             GuildEventLogDTO(
@@ -673,14 +702,11 @@ class LoggingService(LoggingServiceInterface):
                 target_id=target_id,
                 target_name=target_name,
                 event_type=event_type,
-                details=str(details) if details else None,
+                details=self._serialize_details(details, embed),
                 created_at=now,
                 retention_until=self._retention_until(),
             )
         )
-
-        if embed is None:
-            embed = self._build_embed(event_type, details)
 
         if guild_id is not None:
             try:
@@ -695,6 +721,37 @@ class LoggingService(LoggingServiceInterface):
                 )
 
         logger.debug("Persisted and sent event %s for guild %s", event_type, guild_id)
+
+    def _serialize_details(
+        self,
+        details: Optional[Dict[str, Any]],
+        embed: disnake.Embed,
+    ) -> Optional[str]:
+        payload: Dict[str, Any] = {
+            key: value for key, value in (details or {}).items() if value is not None
+        }
+        embed_data = embed.to_dict()
+        for key in ("title", "description"):
+            if embed_data.get(key) and key not in payload:
+                payload[key] = embed_data[key]
+        for key in ("fields", "author", "footer"):
+            if embed_data.get(key) and key not in payload:
+                payload[key] = embed_data[key]
+
+        if not payload:
+            return None
+        logger.debug("Serializing event details keys=%s", sorted(payload))
+        return json.dumps(payload, ensure_ascii=False, default=str)
+
+    @staticmethod
+    def _channel_details(channel: Any) -> Dict[str, Any]:
+        category = getattr(channel, "category", None)
+        return {
+            "channel": {"id": channel.id, "name": channel.name},
+            "channel_type": str(getattr(channel, "type", type(channel).__name__)),
+            "category": getattr(category, "name", None),
+            "position": getattr(channel, "position", None),
+        }
 
     def _build_moderation_embed(
         self,

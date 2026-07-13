@@ -1,5 +1,7 @@
+import json
 from datetime import datetime, timezone
 
+import disnake
 import pytest
 
 from application.dto.logging_dto import MessageLogDTO
@@ -126,3 +128,56 @@ def test_voice_admin_overwrite_change_is_suppressed_from_channel_update():
     after = type("Channel", (), {"name": "Room", "position": 1, "overwrites": {"new": object()}})()
 
     assert service._detect_channel_changes(before, after) == []
+
+
+@pytest.mark.asyncio
+async def test_persisted_event_details_include_embed_information():
+    guild_repo = FakeGuildEventLogRepository()
+    service = LoggingService(FakeMessageLogRepository(), guild_repo, FakeAuditLogService(), config=None)
+    service._config = type("Config", (), {"message_log_retention_days": 30})()
+    embed = disnake.Embed(title="Channel deleted", description="The archive channel was removed")
+    embed.add_field(name="Channel", value="archive (123)")
+
+    await service._persist_and_send(
+        guild_id=1,
+        event_type="channel_delete",
+        target_id=123,
+        target_name="archive",
+        details={"reason": "cleanup"},
+        embed=embed,
+    )
+
+    details = json.loads(guild_repo.rows[0].details)
+    assert details["reason"] == "cleanup"
+    assert details["title"] == "Channel deleted"
+    assert details["description"] == "The archive channel was removed"
+    assert details["fields"][0]["value"] == "archive (123)"
+
+
+@pytest.mark.asyncio
+async def test_member_role_update_persists_added_and_removed_roles(monkeypatch):
+    guild_repo = FakeGuildEventLogRepository()
+    service = LoggingService(FakeMessageLogRepository(), guild_repo, FakeAuditLogService(), config=None)
+    service._config = type("Config", (), {"message_log_retention_days": 30})()
+    guild = type("Guild", (), {"id": 1})()
+    member = type("Member", (), {"guild": guild, "id": 20, "__str__": lambda self: "member"})()
+    moderator = type("Moderator", (), {"id": 30, "__str__": lambda self: "moderator"})()
+    old_role = type("Role", (), {"id": 40, "name": "Old"})()
+    new_role = type("Role", (), {"id": 50, "name": "New"})()
+    monkeypatch.setattr(
+        "application.services.logging_service.MemberRoleUpdateEmbedBuilder.build_update",
+        lambda *args, **kwargs: disnake.Embed(title="Roles updated"),
+    )
+
+    await service.log_member_role_update(
+        member=member,
+        before_roles=[old_role],
+        after_roles=[new_role],
+        moderator=moderator,
+    )
+
+    row = guild_repo.rows[0]
+    details = json.loads(row.details)
+    assert row.actor_id == 30
+    assert details["added_roles"] == [{"id": 50, "name": "New"}]
+    assert details["removed_roles"] == [{"id": 40, "name": "Old"}]
