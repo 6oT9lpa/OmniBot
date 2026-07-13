@@ -123,6 +123,21 @@ def test_public_layout_and_footer_integrations_are_stable() -> None:
     assert ".typewriter-copy.is-complete::after" in styles
 
 
+def test_about_module_cards_keep_equal_heights_and_aligned_mockups() -> None:
+    styles = (CLIENT_ROOT / "style.css").read_text(encoding="utf-8")
+
+    wrapper_rule = styles[styles.index(".about-module-grid .reveal-on-scroll"):
+                          styles.index(".about-module-panel {")]
+    panel_rule = styles[styles.index(".about-module-panel {"):
+                        styles.index(".about-module-panel h3")]
+
+    assert "display: flex" in wrapper_rule
+    assert "height: 100%" in wrapper_rule
+    assert "grid-template-rows: 1fr auto" in panel_rule
+    assert "width: 100%" in panel_rule
+    assert "height: 100%" in panel_rule
+
+
 def test_activity_logs_use_localized_titles_and_structured_details() -> None:
     panel = (CLIENT_ROOT / "components" / "panel" / "LogsPanel.vue").read_text(encoding="utf-8")
     presenter = (CLIENT_ROOT / "utils" / "logPresentation.ts").read_text(encoding="utf-8")
