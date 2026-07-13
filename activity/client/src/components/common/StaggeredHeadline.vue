@@ -51,6 +51,10 @@ onBeforeUnmount(clearTypingTimer);
 
 <template>
   <component :is="props.as" class="staggered-headline typewriter-headline" :aria-label="props.text">
-    <span class="typewriter-copy" aria-hidden="true">{{ visibleText }}</span>
+    <span
+      class="typewriter-copy"
+      :class="{ 'is-complete': visibleCount >= characters.length }"
+      aria-hidden="true"
+    >{{ visibleText }}</span>
   </component>
 </template>

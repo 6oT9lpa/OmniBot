@@ -457,6 +457,10 @@ a {
   animation: caretBlink 850ms steps(1, end) infinite;
 }
 
+.typewriter-copy.is-complete::after {
+  display: none;
+}
+
 @media (min-width: 1600px) {
   .hero-copy .staggered-headline,
   .about-hero .staggered-headline {

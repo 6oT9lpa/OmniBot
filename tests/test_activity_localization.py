@@ -113,12 +113,14 @@ def test_public_layout_and_footer_integrations_are_stable() -> None:
 
     assert "visibleText" in headline
     assert "typewriter-copy" in headline
+    assert "'is-complete': visibleCount >= characters.length" in headline
     assert "typewriter-letter" not in headline
     assert "https://boosty.to/6o9lpa" in footer
     assert "Arnetik" not in footer
     assert "handleExternalClick" in footer
     assert "feature-grid > .reveal-on-scroll" in styles
     assert "word-break: normal" in styles
+    assert ".typewriter-copy.is-complete::after" in styles
 
 
 def test_activity_logs_use_localized_titles_and_structured_details() -> None:
