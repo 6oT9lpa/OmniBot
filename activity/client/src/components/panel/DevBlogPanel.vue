@@ -2,6 +2,7 @@
 import { computed, reactive } from "vue";
 import { useActivityStore } from "../../stores/activity.store";
 import { t } from "../../i18n";
+import AuthenticatedImage from "../common/AuthenticatedImage.vue";
 
 type DevBlogEditorEmbed = {
   title: string;
@@ -185,11 +186,10 @@ function normalizeEmbeds(value: unknown): DevBlogEditorEmbed[] {
         :class="{ 'has-image': embed.image_url }"
       >
         <span>{{ embed.title || $t("dev.embed_number", { number: index + 1 }) }}</span>
-        <img
+        <AuthenticatedImage
           v-if="embed.image_url"
           :src="embed.image_url"
           :alt="$t('dev.preview_image_alt', { number: index + 1 })"
-          loading="lazy"
         />
         <small v-else>{{ $t("dev.no_image") }}</small>
       </div>

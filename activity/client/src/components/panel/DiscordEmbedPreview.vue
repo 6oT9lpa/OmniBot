@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { WelcomeConfig } from "../../types/activity.types";
 import { t } from "../../i18n";
+import AuthenticatedImage from "../common/AuthenticatedImage.vue";
 
 const props = defineProps<{
   config: WelcomeConfig;
@@ -35,22 +36,20 @@ function previewText(value: string) {
     <h3>{{ previewText(config.title) }}</h3>
     <p>{{ previewText(config.description) }}</p>
     <div class="preview-media" :class="{ 'has-image': config.thumbnail_url }">
-      <img
+      <AuthenticatedImage
         v-if="config.thumbnail_url"
         :src="config.thumbnail_url"
         :alt="$t('welcome.preview_image_alt')"
-        loading="lazy"
       />
       <span v-else>{{ $t("welcome.thumbnail_area") }}</span>
     </div>
     <footer>
       <span>{{ previewText(config.footer_text || "OmniBot Activity") }}</span>
-      <img
+      <AuthenticatedImage
         v-if="config.footer_icon_url"
         class="preview-footer-icon"
         :src="config.footer_icon_url"
         :alt="$t('welcome.preview_footer_icon_alt')"
-        loading="lazy"
       />
       <span v-else>{{ hexColor(config.color) }}</span>
     </footer>

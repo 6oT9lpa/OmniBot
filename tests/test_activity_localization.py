@@ -88,6 +88,8 @@ def test_editor_previews_stay_at_the_top_while_scrolling() -> None:
     assert '"preview"\n      "editor"' in styles
     assert ".sticky-preview" in styles
     assert "position: sticky" in styles
+    assert "overflow-y: auto" not in styles[styles.index(".sticky-preview"):styles.index(".discord-preview-header")]
+    assert "overflow-x: clip" in styles
 
 
 def test_welcome_and_dev_blog_previews_render_configured_images() -> None:
@@ -95,8 +97,46 @@ def test_welcome_and_dev_blog_previews_render_configured_images() -> None:
     dev_blog = (CLIENT_ROOT / "components" / "panel" / "DevBlogPanel.vue").read_text(encoding="utf-8")
 
     assert 'v-if="config.thumbnail_url"' in welcome_preview
+    assert "AuthenticatedImage" in welcome_preview
     assert ':src="config.thumbnail_url"' in welcome_preview
     assert 'v-if="config.footer_icon_url"' in welcome_preview
     assert ':src="config.footer_icon_url"' in welcome_preview
     assert 'v-if="embed.image_url"' in dev_blog
+    assert "AuthenticatedImage" in dev_blog
     assert ':src="embed.image_url"' in dev_blog
+
+
+def test_public_layout_and_footer_integrations_are_stable() -> None:
+    headline = (CLIENT_ROOT / "components" / "common" / "StaggeredHeadline.vue").read_text(encoding="utf-8")
+    footer = (CLIENT_ROOT / "components" / "common" / "PublicFooter.vue").read_text(encoding="utf-8")
+    styles = (CLIENT_ROOT / "style.css").read_text(encoding="utf-8")
+
+    assert "visibleText" in headline
+    assert "typewriter-copy" in headline
+    assert "typewriter-letter" not in headline
+    assert "https://boosty.to/6o9lpa" in footer
+    assert "Arnetik" not in footer
+    assert "handleExternalClick" in footer
+    assert "feature-grid > .reveal-on-scroll" in styles
+    assert "word-break: normal" in styles
+
+
+def test_activity_logs_use_localized_titles_and_structured_details() -> None:
+    panel = (CLIENT_ROOT / "components" / "panel" / "LogsPanel.vue").read_text(encoding="utf-8")
+    presenter = (CLIENT_ROOT / "utils" / "logPresentation.ts").read_text(encoding="utf-8")
+
+    assert "logEventTitle" in panel
+    assert "logDetailRows" in panel
+    assert 'member_role_update: "logs.event.member_role_update"' in presenter
+    assert 'moderation_ban: "logs.event.moderation_ban"' in presenter
+    assert 'channel_delete: "logs.event.channel_delete"' in presenter
+
+
+def test_preview_images_use_authenticated_media_proxy() -> None:
+    image_component = (CLIENT_ROOT / "components" / "common" / "AuthenticatedImage.vue").read_text(encoding="utf-8")
+    media_router = (ROOT / "activity" / "server" / "routers" / "media.py").read_text(encoding="utf-8")
+
+    assert "/api/media/image" in image_component
+    assert "Authorization" in image_component
+    assert 'APIRouter(prefix="/api/media"' in media_router
+    assert "ensure_panel_access" in media_router

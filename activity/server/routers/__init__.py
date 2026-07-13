@@ -12,6 +12,7 @@ from activity.server.routers import (
     health,
     integrations,
     logs,
+    media,
     rbac,
     session,
     stats,
@@ -36,6 +37,7 @@ def include_activity_routers(app: FastAPI) -> None:
     app.include_router(voice_rooms.router)
     app.include_router(stats.router)
     app.include_router(logs.router)
+    app.include_router(media.router)
     app.include_router(bot_settings.router)
     app.include_router(integrations.router)
     app.include_router(health.router)
