@@ -218,6 +218,20 @@ a {
   border-radius: 8px;
 }
 
+.language-switcher {
+  width: auto;
+  min-width: 44px;
+  gap: 5px;
+  padding-inline: 9px;
+}
+
+.language-switcher span {
+  min-width: 18px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .panel-cta,
 .primary-button,
 .ghost-button,

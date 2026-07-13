@@ -14,7 +14,7 @@ onMounted(() => {
 
 <template>
   <div :class="['omni-app', `theme-${activity.theme}`]">
-    <LoadingState v-if="activity.loading && !activity.booted" title="Starting Omni" text="Preparing Activity workspace." />
+    <LoadingState v-if="activity.loading && !activity.booted" :title="$t('app.starting')" :text="$t('app.preparing')" />
     <template v-else>
       <AppHeader v-if="!$route.path.startsWith('/panel')" />
       <RouterView />
