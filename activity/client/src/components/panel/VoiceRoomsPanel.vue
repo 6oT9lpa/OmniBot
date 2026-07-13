@@ -8,10 +8,10 @@ const activity = useActivityStore();
 <template>
   <section class="panel-section">
     <div class="section-heading">
-      <span>Dynamic voice</span>
-      <h2>Bot-created rooms and controls.</h2>
+      <span>{{ $t("voice.eyebrow") }}</span>
+      <h2>{{ $t("voice.heading") }}</h2>
       <div>
-        <p>Manage room name, limit, lock state, temporary admin and member access from the Activity panel.</p>
+        <p>{{ $t("voice.description") }}</p>
       </div>
     </div>
 

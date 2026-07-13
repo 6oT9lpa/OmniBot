@@ -45,10 +45,10 @@ const icons = {
     <RouterLink class="panel-brand" to="/">
       <img class="panel-brand-logo" src="/omni-logo.png" alt="" />
       <strong>OMNI</strong>
-      <span>activity</span>
+      <span>{{ $t("panel.activity") }}</span>
     </RouterLink>
 
-    <nav class="panel-nav" aria-label="Panel modules">
+    <nav class="panel-nav" :aria-label="$t('panel.modules')">
       <RouterLink
         v-for="module in modules"
         :key="module.key"

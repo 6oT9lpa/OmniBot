@@ -1,32 +1,33 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useActivityStore } from "../../stores/activity.store";
+import { t } from "../../i18n";
 
 const activity = useActivityStore();
 const integrationRows = computed(() =>
   Object.entries(activity.integrations || {}).map(([key, value]) => ({
     key,
-    title: key.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    title: t(`integrations.${key}`),
     status: integrationStatus(value),
     details: integrationDetails(value),
   })),
 );
 
 function integrationStatus(value: unknown) {
-  if (Array.isArray(value)) return value.length ? `${value.length} sources` : "No sources";
+  if (Array.isArray(value)) return value.length ? t("integrations.sources", { count: value.length }) : t("integrations.no_sources");
   if (value && typeof value === "object") {
-    return String((value as Record<string, unknown>).status || "configured");
+    return t(`integrations.${String((value as Record<string, unknown>).status || "configured")}`);
   }
   return formatRecordValue(value);
 }
 
 function integrationDetails(value: unknown) {
   if (Array.isArray(value)) {
-    if (!value.length) return "No creator platforms are connected yet.";
+    if (!value.length) return t("integrations.no_platforms");
     return value
       .map((row) => {
         const item = row as Record<string, unknown>;
-        return `${item.platform}: ${item.active_count || 0}/${item.count || 0} active`;
+        return t("integrations.active_sources", { platform: String(item.platform), active: Number(item.active_count || 0), total: Number(item.count || 0) });
       })
       .join(", ");
   }
@@ -36,11 +37,11 @@ function integrationDetails(value: unknown) {
       const sourceDetails = item.sources
         .map((source) => {
           const row = source as Record<string, unknown>;
-          return `${row.platform}: ${row.active_count || 0}/${row.count || 0} active`;
+          return t("integrations.active_sources", { platform: String(row.platform), active: Number(row.active_count || 0), total: Number(row.count || 0) });
         })
         .join(", ");
-      const interval = item.poll_interval_seconds ? `Polls every ${item.poll_interval_seconds} seconds.` : "";
-      return [interval, sourceDetails || "No creator sources are connected yet."].filter(Boolean).join(" ");
+      const interval = item.poll_interval_seconds ? t("integrations.poll_interval", { seconds: Number(item.poll_interval_seconds) }) : "";
+      return [interval, sourceDetails || t("integrations.no_creator_sources")].filter(Boolean).join(" ");
     }
     return Object.entries(value as Record<string, unknown>)
       .map(([key, item]) => `${key}: ${formatRecordValue(item)}`)
@@ -59,10 +60,10 @@ function formatRecordValue(value: unknown) {
 <template>
   <section class="panel-section">
     <div class="section-heading">
-      <span>Integrations</span>
-      <h2>External services and connected creator platforms.</h2>
+      <span>{{ $t("module.integrations") }}</span>
+      <h2>{{ $t("integrations.heading") }}</h2>
       <div>
-        <p>Check Discord, creator platform, database and bot service connectivity at a glance.</p>
+        <p>{{ $t("integrations.description") }}</p>
       </div>
     </div>
     <div class="integration-grid">

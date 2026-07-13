@@ -79,6 +79,7 @@ import type {
   WelcomeConfig,
   VoiceRoom,
 } from "../types/activity.types";
+import { t } from "../i18n";
 
 type Auth = CommandResponse<"authenticate">;
 
@@ -211,7 +212,7 @@ export const useActivityStore = defineStore("activity", {
       this.session = null;
       this.accessError = {
         code: "discord_activity_required",
-        message: "Omni Activity is available only inside Discord.",
+        message: t("access.activity_only"),
         can_sync_roles: false,
       };
       this.error = this.accessError.message;
@@ -243,14 +244,14 @@ export const useActivityStore = defineStore("activity", {
       });
 
       if (!this.auth) {
-        throw new Error("Discord authentication failed.");
+        throw new Error(t("access.authentication_failed"));
       }
 
       if (!discordSdk.guildId) {
         this.session = null;
         this.accessError = {
           code: "guild_required",
-          message: "Omni Activity must be opened from a Discord server.",
+          message: t("access.guild_required"),
           can_sync_roles: false,
         };
         return;

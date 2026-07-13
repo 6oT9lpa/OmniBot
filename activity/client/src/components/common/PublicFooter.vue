@@ -6,24 +6,24 @@ const githubDocsBase =
   "https://github.com/6oT9lpa/discord-ai-moderation-bot/blob/main/docs";
 
 const legalLinks = [
-  { label: "Privacy Policy", href: `${githubDocsBase}/PRIVACY_POLICY.md` },
-  { label: "Terms of Service", href: `${githubDocsBase}/TERMS_OF_SERVICE.md` },
-  { label: "Knowledge Base", href: `${githubDocsBase}/KNOWLEDGE_BASE.md` },
+  { key: "footer.privacy", href: `${githubDocsBase}/PRIVACY_POLICY.md` },
+  { key: "footer.terms", href: `${githubDocsBase}/TERMS_OF_SERVICE.md` },
+  { key: "footer.knowledge", href: `${githubDocsBase}/KNOWLEDGE_BASE.md` },
 ];
 
 const knowledgeBaseUrl = `${githubDocsBase}/KNOWLEDGE_BASE.md`;
 
 const productLinks = [
-  { label: "Welcome", href: `${knowledgeBaseUrl}#5-welcome-alerts` },
-  { label: "Role Panels", href: `${knowledgeBaseUrl}#4-roles-and-role-panels` },
-  { label: "Voice Rooms", href: `${knowledgeBaseUrl}#11-dynamic-voice-rooms` },
-  { label: "Server Stats", href: `${knowledgeBaseUrl}#10-statistics` },
+  { key: "footer.welcome", href: `${knowledgeBaseUrl}#5-welcome-alerts` },
+  { key: "footer.role_panels", href: `${knowledgeBaseUrl}#4-roles-and-role-panels` },
+  { key: "footer.voice_rooms", href: `${knowledgeBaseUrl}#11-dynamic-voice-rooms` },
+  { key: "footer.server_stats", href: `${knowledgeBaseUrl}#10-statistics` },
 ];
 const communityLinks = [
-  { label: "Creator Alerts", href: `${knowledgeBaseUrl}#6-creator-alerts` },
-  { label: "Dev Blog", href: `${knowledgeBaseUrl}#7-dev-blog` },
-  { label: "AI Moderator", href: `${knowledgeBaseUrl}#12-ai-moderation` },
-  { label: "Logging", href: `${knowledgeBaseUrl}#9-logs-and-audit` },
+  { key: "footer.creator_alerts", href: `${knowledgeBaseUrl}#6-creator-alerts` },
+  { key: "footer.dev_blog", href: `${knowledgeBaseUrl}#7-dev-blog` },
+  { key: "footer.ai_moderator", href: `${knowledgeBaseUrl}#12-ai-moderation` },
+  { key: "footer.logging", href: `${knowledgeBaseUrl}#9-logs-and-audit` },
 ];
 const team = ["6oT9lpa", "Arnetik", "Jimmy"];
 </script>
@@ -32,33 +32,33 @@ const team = ["6oT9lpa", "Arnetik", "Jimmy"];
   <RevealOnScroll tag="footer" class="public-footer">
     <div class="footer-grid">
       <section>
-        <span>Product</span>
-        <a v-for="link in productLinks" :key="link.label" :href="link.href" target="_blank" rel="noreferrer">
-          {{ link.label }}
+        <span>{{ $t("footer.product") }}</span>
+        <a v-for="link in productLinks" :key="link.key" :href="link.href" target="_blank" rel="noreferrer">
+          {{ $t(link.key) }}
         </a>
       </section>
       <section>
-        <span>Legal</span>
-        <a v-for="link in legalLinks" :key="link.label" :href="link.href" target="_blank" rel="noreferrer">
-          {{ link.label }}
+        <span>{{ $t("footer.legal") }}</span>
+        <a v-for="link in legalLinks" :key="link.key" :href="link.href" target="_blank" rel="noreferrer">
+          {{ $t(link.key) }}
         </a>
       </section>
       <section>
-        <span>Community</span>
-        <a v-for="link in communityLinks" :key="link.label" :href="link.href" target="_blank" rel="noreferrer">
-          {{ link.label }}
+        <span>{{ $t("footer.community") }}</span>
+        <a v-for="link in communityLinks" :key="link.key" :href="link.href" target="_blank" rel="noreferrer">
+          {{ $t(link.key) }}
         </a>
       </section>
       <section>
-        <span>Team</span>
+        <span>{{ $t("footer.team") }}</span>
         <strong v-for="member in team" :key="member">{{ member }}</strong>
       </section>
     </div>
 
     <div class="footer-bottom">
-      <p>&copy; 2025-{{ currentYear }} OmniBot. Built for Discord communities.</p>
+      <p>{{ $t("footer.copyright", { year: currentYear }) }}</p>
       <a class="donate-button" href="https://boosty.to/REPLACE_ME" target="_blank" rel="noreferrer">
-        Donate
+        {{ $t("footer.donate") }}
       </a>
     </div>
   </RevealOnScroll>

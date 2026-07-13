@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive } from "vue";
 import { useActivityStore } from "../../stores/activity.store";
+import { t } from "../../i18n";
 
 type DevBlogEditorEmbed = {
   title: string;
@@ -12,11 +13,11 @@ type DevBlogEditorEmbed = {
 const activity = useActivityStore();
 const saving = reactive({ value: false, message: "" });
 const devBlogDraft = reactive({
-  title: "OmniBot Activity update",
+  title: t("dev.default_title"),
   content: "",
   status: "published" as "draft" | "published",
   image_render_mode: "gallery_bottom" as "gallery_bottom" | "inline_between_text",
-  embeds: [{ title: "Release note", description: "Write the first embed body.", image_url: "", color: 0x5865f2 }],
+  embeds: [{ title: t("dev.release_note"), description: t("dev.first_body"), image_url: "", color: 0x5865f2 }],
 });
 const savedDrafts = computed(() => activity.devBlogPosts.filter((post) => post.status === "draft").slice(0, 10));
 
@@ -37,7 +38,7 @@ function removeDevBlogEmbed(index: number) {
 async function saveDevBlog(status: "draft" | "published") {
   devBlogDraft.status = status;
   saving.value = true;
-  saving.message = status === "draft" ? "Saving draft..." : "Publishing...";
+  saving.message = t(status === "draft" ? "dev.saving_draft" : "dev.publishing");
   try {
     await activity.createDevBlog({
       title: devBlogDraft.title,
@@ -51,9 +52,9 @@ async function saveDevBlog(status: "draft" | "published") {
         color: embed.color,
       })),
     });
-    saving.message = status === "draft" ? "Draft saved" : "Published to Dev Blog";
+    saving.message = t(status === "draft" ? "dev.draft_saved" : "dev.published");
   } catch (error) {
-    saving.message = error instanceof Error ? error.message : "Dev Blog channel is not configured";
+    saving.message = error instanceof Error ? error.message : t("dev.channel_missing");
   } finally {
     saving.value = false;
   }
@@ -71,7 +72,7 @@ function loadDraft(post: Record<string, unknown>) {
   devBlogDraft.image_render_mode = payload.image_render_mode === "inline_between_text" ? "inline_between_text" : "gallery_bottom";
   devBlogDraft.status = "draft";
   devBlogDraft.embeds.splice(0, devBlogDraft.embeds.length, ...normalizeEmbeds(payload.embeds));
-  saving.message = "Draft loaded";
+  saving.message = t("dev.draft_loaded");
 }
 
 function parsePayload(value: unknown) {
@@ -85,7 +86,7 @@ function parsePayload(value: unknown) {
 
 function normalizeEmbeds(value: unknown): DevBlogEditorEmbed[] {
   if (!Array.isArray(value) || value.length === 0) {
-    return [{ title: "Release note", description: "", image_url: "", color: 0x5865f2 }];
+    return [{ title: t("dev.release_note"), description: "", image_url: "", color: 0x5865f2 }];
   }
   return value.slice(0, 10).map((embed) => {
     const source = embed as Record<string, unknown>;
@@ -104,18 +105,18 @@ function normalizeEmbeds(value: unknown): DevBlogEditorEmbed[] {
   <section class="editor-grid">
     <form class="control-surface" @submit.prevent="saveDevBlog('published')">
       <div class="section-heading">
-        <span>Developer publishing</span>
-        <h2>Compose a multi-embed Dev Blog update.</h2>
+        <span>{{ $t("dev.eyebrow") }}</span>
+        <h2>{{ $t("dev.heading") }}</h2>
         <div>
-          <p>Build up to 10 embeds and publish them as one Discord message.</p>
+          <p>{{ $t("dev.description") }}</p>
         </div>
       </div>
       <label>
-        Title
+        {{ $t("welcome.title") }}
         <input v-model="devBlogDraft.title" maxlength="256" />
       </label>
       <label>
-        Message content
+        {{ $t("dev.message_content") }}
         <textarea v-model="devBlogDraft.content" rows="3" maxlength="2000" />
       </label>
       <label class="toggle-row">
@@ -124,12 +125,12 @@ function normalizeEmbeds(value: unknown): DevBlogEditorEmbed[] {
           :checked="devBlogDraft.image_render_mode === 'inline_between_text'"
           @change="devBlogDraft.image_render_mode = ($event.target as HTMLInputElement).checked ? 'inline_between_text' : 'gallery_bottom'"
         />
-        <span>Insert images between text blocks</span>
+        <span>{{ $t("dev.inline_images") }}</span>
       </label>
       <div class="embed-stack">
         <article v-for="(embed, index) in devBlogDraft.embeds" :key="index" class="embed-editor">
           <div class="discord-preview-header">
-            <span>Embed {{ index + 1 }}</span>
+            <span>{{ $t("dev.embed_number", { number: index + 1 }) }}</span>
             <button
               v-if="index > 0"
               class="ghost-button compact"
@@ -137,24 +138,24 @@ function normalizeEmbeds(value: unknown): DevBlogEditorEmbed[] {
               :disabled="devBlogDraft.embeds.length <= 1"
               @click="removeDevBlogEmbed(index)"
             >
-              Remove
+              {{ $t("dev.remove") }}
             </button>
           </div>
           <label>
-            Embed title
+            {{ $t("dev.embed_title") }}
             <input v-model="embed.title" maxlength="256" />
           </label>
           <label>
-            Description
+            {{ $t("welcome.message") }}
             <textarea v-model="embed.description" rows="5" maxlength="4096" required />
           </label>
           <div class="form-grid">
             <label>
-              Image URL
+              {{ $t("dev.image_url") }}
               <input v-model="embed.image_url" maxlength="2048" placeholder="https://..." />
             </label>
             <label>
-              Color
+              {{ $t("welcome.color") }}
               <input
                 type="color"
                 :value="colorToHex(embed.color)"
@@ -165,32 +166,32 @@ function normalizeEmbeds(value: unknown): DevBlogEditorEmbed[] {
         </article>
       </div>
       <div class="form-actions">
-        <button class="primary-button" type="submit" :disabled="saving.value">Publish</button>
-        <button class="ghost-button" type="button" :disabled="saving.value || savedDrafts.length >= 10" @click="saveDevBlog('draft')">Save Draft</button>
+        <button class="primary-button" type="submit" :disabled="saving.value">{{ $t("dev.publish") }}</button>
+        <button class="ghost-button" type="button" :disabled="saving.value || savedDrafts.length >= 10" @click="saveDevBlog('draft')">{{ $t("dev.save_draft") }}</button>
         <button class="ghost-button" type="button" :disabled="devBlogDraft.embeds.length >= 10" @click="addDevBlogEmbed">
-          Add embed
+          {{ $t("dev.add_embed") }}
         </button>
         <small>{{ saving.message }}</small>
       </div>
     </form>
     <article class="discord-preview">
-      <div class="discord-preview-header"><span>Dev Blog preview</span><strong>{{ devBlogDraft.status }}</strong></div>
+      <div class="discord-preview-header"><span>{{ $t("dev.preview") }}</span><strong>{{ $t(`common.${devBlogDraft.status}`) }}</strong></div>
       <h3>{{ devBlogDraft.title }}</h3>
       <p>{{ devBlogDraft.content || devBlogDraft.embeds[0]?.description }}</p>
       <div v-for="(embed, index) in devBlogDraft.embeds" :key="`preview-${index}`" class="preview-media">
-        <span>{{ embed.title || `Embed ${index + 1}` }}</span>
-        <small>{{ embed.image_url || "No image" }}</small>
+        <span>{{ embed.title || $t("dev.embed_number", { number: index + 1 }) }}</span>
+        <small>{{ embed.image_url || $t("dev.no_image") }}</small>
       </div>
-      <footer><span>{{ devBlogDraft.embeds.length }}/10 embeds</span><span>#{{ channelName(activity.channelPurposes.dev_blog) }}</span></footer>
-      <small>{{ devBlogDraft.image_render_mode === "inline_between_text" ? "Images render between matching text blocks." : "Images collect in one gallery at the bottom." }}</small>
+      <footer><span>{{ $t("dev.embed_count", { count: devBlogDraft.embeds.length }) }}</span><span>#{{ channelName(activity.channelPurposes.dev_blog) }}</span></footer>
+      <small>{{ $t(devBlogDraft.image_render_mode === "inline_between_text" ? "dev.inline_help" : "dev.gallery_help") }}</small>
     </article>
   </section>
   <section class="panel-section">
     <div class="section-heading">
-      <span>Publishing history</span>
-      <h2>Saved Dev Blog posts.</h2>
+      <span>{{ $t("dev.history") }}</span>
+      <h2>{{ $t("dev.saved_posts") }}</h2>
       <div>
-        <p>Load drafts back into the editor or review recently published updates.</p>
+        <p>{{ $t("dev.history_help") }}</p>
       </div>
     </div>
     <div v-if="savedDrafts.length" class="draft-button-row">
@@ -207,7 +208,7 @@ function normalizeEmbeds(value: unknown): DevBlogEditorEmbed[] {
     <div class="record-list">
       <article v-for="post in activity.devBlogPosts" :key="String(post.id)">
         <strong>{{ post.title }}</strong>
-        <span>{{ post.status }} - #{{ channelName(post.channel_id) }} - {{ post.created_at }}</span>
+        <span>{{ $t(`common.${post.status}`) }} - #{{ channelName(post.channel_id) }} - {{ post.created_at }}</span>
       </article>
     </div>
   </section>

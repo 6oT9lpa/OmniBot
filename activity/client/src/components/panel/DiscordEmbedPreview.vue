@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { WelcomeConfig } from "../../types/activity.types";
+import { t } from "../../i18n";
 
 const props = defineProps<{
   config: WelcomeConfig;
@@ -11,12 +12,12 @@ function hexColor(color: number) {
 
 function previewText(value: string) {
   return value
-    .replaceAll("{user}", "@User")
-    .replaceAll("{username}", "User")
-    .replaceAll("{server}", "Omni Server")
-    .replaceAll("{guild}", "Omni Server")
+    .replaceAll("{user}", `@${t("welcome.preview_user")}`)
+    .replaceAll("{username}", t("welcome.preview_user"))
+    .replaceAll("{server}", t("welcome.preview_server"))
+    .replaceAll("{guild}", t("welcome.preview_server"))
     .replaceAll("{member_count}", "1,248")
-    .replaceAll("{joined_at}", "today")
+    .replaceAll("{joined_at}", t("welcome.preview_today"))
     .replaceAll("{rules}", "#rules")
     .replaceAll("{roles}", "#roles")
     .replace(/\{channel\.(\d{15,25})\}/g, "#$1")
@@ -28,13 +29,13 @@ function previewText(value: string) {
 <template>
   <article class="discord-preview" :style="{ borderColor: hexColor(props.config.color) }">
     <div class="discord-preview-header">
-      <span>Discord preview</span>
-      <strong>{{ config.is_enabled ? "Enabled" : "Disabled" }}</strong>
+      <span>{{ $t("welcome.preview") }}</span>
+      <strong>{{ $t(config.is_enabled ? "common.enabled" : "common.disabled") }}</strong>
     </div>
     <h3>{{ previewText(config.title) }}</h3>
     <p>{{ previewText(config.description) }}</p>
     <div class="preview-media">
-      {{ config.thumbnail_url || "Thumbnail area" }}
+      {{ config.thumbnail_url || $t("welcome.thumbnail_area") }}
     </div>
     <footer>
       <span>{{ previewText(config.footer_text || "OmniBot Activity") }}</span>

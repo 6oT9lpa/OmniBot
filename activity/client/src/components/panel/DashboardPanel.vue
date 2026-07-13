@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
 import { useActivityStore } from "../../stores/activity.store";
-import { dashboardMetrics, timelineEvents } from "../../stores/mock-data";
+import { t, useI18n } from "../../i18n";
 import type { DashboardMetric, PanelModule, TimelineEvent } from "../../types/activity.types";
 import ActivityTimeline from "./ActivityTimeline.vue";
 import ModuleCard from "./ModuleCard.vue";
@@ -14,44 +14,48 @@ defineProps<{
 }>();
 
 const activity = useActivityStore();
+const { locale } = useI18n();
 const latencyCooldown = ref(0);
 let cooldownTimer: number | undefined;
 
 const dashboardCards = computed<DashboardMetric[]>(() => {
   const metrics = activity.dashboard?.metrics;
   if (!metrics) {
-    return dashboardMetrics.map((metric) =>
-      metric.label === "Bot latency" ? withLatencyState({ ...metric, key: "latency" }) : metric,
-    );
+    return [
+      { key: "modules", label: t("dashboard.modules_ready"), value: "8/13", delta: t("dashboard.loaded_access"), tone: "success" },
+      { key: "ai", label: t("dashboard.moderation_signals"), value: "0", delta: t("dashboard.review_items", { count: 0 }), tone: "neutral" },
+      { key: "creators", label: t("dashboard.creator_sources"), value: "0", delta: t("dashboard.connected_sources"), tone: "neutral" },
+      withLatencyState({ key: "latency", label: t("dashboard.bot_latency"), value: "-", delta: t("dashboard.click_refresh"), tone: "success" }),
+    ] as DashboardMetric[];
   }
 
   return [
     {
       key: "modules",
-      label: "Modules ready",
+      label: t("dashboard.modules_ready"),
       value: `${metrics.modules_ready}/${metrics.modules_total}`,
-      delta: "Loaded from access map",
+      delta: t("dashboard.loaded_access"),
       tone: "success",
     },
     {
       key: "ai",
-      label: "Moderation signals",
+      label: t("dashboard.moderation_signals"),
       value: String(metrics.ai_checks_today),
-      delta: `${metrics.ai_flagged_today} review items`,
+      delta: t("dashboard.review_items", { count: metrics.ai_flagged_today }),
       tone: metrics.ai_flagged_today > 0 ? "warning" : "neutral",
     },
     {
       key: "creators",
-      label: "Creator sources",
+      label: t("dashboard.creator_sources"),
       value: String(metrics.creator_sources),
-      delta: "Connected sources",
+      delta: t("dashboard.connected_sources"),
       tone: metrics.creator_sources > 0 ? "success" : "neutral",
     },
     withLatencyState({
       key: "latency",
-      label: "Bot latency",
-      value: activity.botLatencyMs === null ? "Unavailable" : `${activity.botLatencyMs} ms`,
-      delta: "Click to refresh",
+      label: t("dashboard.bot_latency"),
+      value: activity.botLatencyMs === null ? t("dashboard.unavailable") : `${activity.botLatencyMs} ms`,
+      delta: t("dashboard.click_refresh"),
       tone: activity.healthError ? "warning" : "success",
     }),
   ];
@@ -59,7 +63,7 @@ const dashboardCards = computed<DashboardMetric[]>(() => {
 
 const auditEvents = computed<TimelineEvent[]>(() => {
   const rows = (activity.dashboard?.audit ?? activity.logs?.audit ?? []).slice(0, 5);
-  if (!rows.length) return timelineEvents;
+  if (!rows.length) return [];
   return rows.map((row, index) => ({
     id: String(row.id ?? index),
     title: eventTitle(row.event_type),
@@ -85,8 +89,8 @@ async function refreshLatency(metric: DashboardMetric) {
 function withLatencyState(metric: DashboardMetric): DashboardMetric {
   return {
     ...metric,
-    value: activity.botLatencyMs === null ? "Unavailable" : `${activity.botLatencyMs} ms`,
-    delta: latencyCooldown.value > 0 ? `Refresh in ${latencyCooldown.value}s` : activity.healthError || metric.delta,
+    value: activity.botLatencyMs === null ? t("dashboard.unavailable") : `${activity.botLatencyMs} ms`,
+    delta: latencyCooldown.value > 0 ? t("dashboard.refresh_in", { seconds: latencyCooldown.value }) : activity.healthError || metric.delta,
     tone: activity.healthError ? "warning" : metric.tone,
   };
 }
@@ -94,11 +98,11 @@ function withLatencyState(metric: DashboardMetric): DashboardMetric {
 function eventTitle(value: unknown) {
   const raw = String(value || "audit_event");
   const titles: Record<string, string> = {
-    voice_join: "Voice join",
-    voice_leave: "Voice leave",
-    voice_move: "Voice move",
-    activity_synced_role_assignments_updated: "Activity role assignments updated",
-    activity_welcome_test_sent: "Welcome test sent",
+    voice_join: t("dashboard.event.voice_join"),
+    voice_leave: t("dashboard.event.voice_leave"),
+    voice_move: t("dashboard.event.voice_move"),
+    activity_synced_role_assignments_updated: t("dashboard.event.roles_updated"),
+    activity_welcome_test_sent: t("dashboard.event.welcome_test"),
   };
   return titles[raw] || raw.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -106,13 +110,13 @@ function eventTitle(value: unknown) {
 function eventDetail(row: Record<string, unknown>) {
   const type = String(row.event_type || "");
   const details = parseDetails(row.details);
-  if (type === "voice_join" && details.channel) return `Joined voice channel ${details.channel}.`;
-  if (type === "voice_leave" && details.channel) return `Left voice channel ${details.channel}.`;
+  if (type === "voice_join" && details.channel) return t("dashboard.event.joined", { channel: String(details.channel) });
+  if (type === "voice_leave" && details.channel) return t("dashboard.event.left", { channel: String(details.channel) });
   if (type === "voice_move") {
-    return `Moved from ${details.before_channel || "unknown"} to ${details.after_channel || "unknown"}.`;
+    return t("dashboard.event.moved", { before: String(details.before_channel || t("dashboard.unknown")), after: String(details.after_channel || t("dashboard.unknown")) });
   }
   if (typeof row.details === "string" && row.details.trim()) return row.details;
-  return String(row.target_name || "No details recorded.");
+  return String(row.target_name || t("dashboard.no_details"));
 }
 
 function parseDetails(value: unknown): Record<string, unknown> {
@@ -128,10 +132,10 @@ function parseDetails(value: unknown): Record<string, unknown> {
 
 function formatTime(value: unknown) {
   const raw = String(value || "");
-  if (!raw) return "recent";
+  if (!raw) return t("dashboard.recent");
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return raw;
-  return date.toLocaleString();
+  return date.toLocaleString(locale.value === "ru" ? "ru-RU" : "en-US");
 }
 
 onBeforeUnmount(() => {
@@ -142,9 +146,9 @@ onBeforeUnmount(() => {
 <template>
   <RevealOnScroll tag="section" class="dashboard-hero">
     <div>
-      <span class="eyebrow">OmniBot control center</span>
-      <h2>Live server operations in one Activity.</h2>
-      <p>Manage permissions, Creator Alerts, Dev Blog posts, AI moderation signals, voice rooms, logs and service health from the same protected workspace.</p>
+      <span class="eyebrow">{{ $t("dashboard.eyebrow") }}</span>
+      <h2>{{ $t("dashboard.heading") }}</h2>
+      <p>{{ $t("dashboard.description") }}</p>
     </div>
   </RevealOnScroll>
 
@@ -178,5 +182,5 @@ onBeforeUnmount(() => {
     </RevealOnScroll>
   </section>
 
-  <ActivityTimeline :events="auditEvents" action-label="Details" action-to="/panel/logs" />
+  <ActivityTimeline :events="auditEvents" :action-label="$t('dashboard.details')" action-to="/panel/logs" />
 </template>

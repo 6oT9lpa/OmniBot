@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { Plus, X } from "@lucide/vue";
 import { useActivityStore } from "../../stores/activity.store";
-import { accessConfigurableModules, moduleLabels } from "../../stores/mock-data";
+import { accessConfigurableModules, moduleLabel } from "../../stores/mock-data";
 import type { ModuleKey, PermissionLevel } from "../../types/activity.types";
 
 const activity = useActivityStore();
@@ -44,18 +44,18 @@ function setAccessValue(roleId: number, modules: Record<ModuleKey, PermissionLev
 <template>
   <section class="panel-section">
     <div class="section-heading">
-      <span>Access Roles</span>
-      <h2>Activity roles decide which tabs each user can see.</h2>
+      <span>{{ $t("module.access") }}</span>
+      <h2>{{ $t("access.heading") }}</h2>
       <div>
-        <p>Add custom Activity roles, remove unused ones and choose which tabs are visible.</p>
+        <p>{{ $t("access.description") }}</p>
       </div>
     </div>
 
     <form class="module-toolbar access-role-toolbar" @submit.prevent="addRole">
-      <input v-model="newRoleName" maxlength="48" placeholder="Unique role name" />
+      <input v-model="newRoleName" maxlength="48" :placeholder="$t('access.unique_role')" />
       <button class="primary-button" type="submit" :disabled="!newRoleName.trim() || activity.moduleLoading">
         <Plus :size="16" />
-        Add role
+        {{ $t("access.add_role") }}
       </button>
     </form>
 
@@ -64,13 +64,14 @@ function setAccessValue(roleId: number, modules: Record<ModuleKey, PermissionLev
         <header>
           <div>
             <strong>{{ role.name }}</strong>
-            <span>{{ role.is_builtin ? "universal" : "custom" }} - {{ savingRoleId === role.id ? "saving" : "saved" }}</span>
+            <span>{{ role.is_builtin ? $t("access.universal") : $t("access.custom") }} - {{ savingRoleId === role.id ? $t("access.saving") : $t("access.saved") }}</span>
           </div>
           <button
             v-if="!role.is_builtin"
             class="icon-button danger"
             type="button"
-            title="Delete role"
+            :title="$t('access.delete_role')"
+            :aria-label="$t('access.delete_role')"
             @click="deleteRole(role.id)"
           >
             <X :size="16" />
@@ -78,14 +79,14 @@ function setAccessValue(roleId: number, modules: Record<ModuleKey, PermissionLev
         </header>
         <div class="access-module-grid">
           <label v-for="module in visibleModules" :key="`${role.id}-${module}`">
-            <span>{{ moduleLabels[module] }}</span>
+            <span>{{ moduleLabel(module) }}</span>
             <select
               :value="accessValue(role.modules[module])"
               :disabled="role.slug === 'administrator'"
               @change="setAccessValue(role.id, role.modules, module, ($event.target as HTMLSelectElement).value)"
             >
-              <option value="access">access</option>
-              <option value="deny">deny</option>
+              <option value="access">{{ $t("access.allow") }}</option>
+              <option value="deny">{{ $t("access.deny") }}</option>
             </select>
           </label>
         </div>

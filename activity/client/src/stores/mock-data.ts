@@ -1,15 +1,14 @@
 import type {
   AccessLevel,
   AccessMatrixRow,
-  DashboardMetric,
   HealthSignal,
   ModuleKey,
   PanelModule,
   PanelSession,
   PermissionLevel,
-  TimelineEvent,
   WelcomeConfig,
 } from "../types/activity.types";
+import { t } from "../i18n";
 
 export const moduleOrder: ModuleKey[] = [
   "dashboard",
@@ -45,37 +44,13 @@ export const accessConfigurableModules: ModuleKey[] = [
   "bot-settings",
 ];
 
-export const moduleLabels: Record<ModuleKey, string> = {
-  dashboard: "Dashboard",
-  access: "Access Roles",
-  welcome: "Welcome Alerts",
-  "role-panels": "Role Panels",
-  "creator-alerts": "Creator Alerts",
-  "dev-blog": "Dev Blog",
-  "ai-moderator": "AI Moderation",
-  logs: "Logs",
-  "server-stats": "Server Stats",
-  "voice-rooms": "Voice Rooms",
-  "bot-settings": "Bot Settings",
-  integrations: "Integrations",
-  health: "Health Status",
-};
+export function moduleLabel(key: ModuleKey): string {
+  return t(`module.${key}`);
+}
 
-export const moduleDescriptions: Record<ModuleKey, string> = {
-  dashboard: "Live overview of modules, activity and configuration health.",
-  access: "Map Activity roles to tab permissions.",
-  welcome: "Design welcome messages with variables, preview and publishing checks.",
-  "role-panels": "Build role menus with buttons, select menus and validation states.",
-  "creator-alerts": "Manage Twitch, YouTube and Kick creator source notifications.",
-  "dev-blog": "Compose developer updates with embeds, links, images and CTA buttons.",
-  "ai-moderator": "Choose moderated channels and adjust AI moderation policy for this server.",
-  logs: "Filter server events, member events, punishments and AI flags.",
-  "server-stats": "Track members, messages, voice activity and leaderboards.",
-  "voice-rooms": "Configure dynamic voice triggers, room naming and cleanup rules.",
-  "bot-settings": "Control defaults, module toggles, language and embed styling.",
-  integrations: "Monitor Discord, creator platforms, database and service status.",
-  health: "Operational heartbeat for bot, API, database and background workers.",
-};
+export function moduleDescription(key: ModuleKey): string {
+  return t(`module.${key}.description`);
+}
 
 export const administratorPermissions = moduleOrder.reduce(
   (permissions, key) => ({ ...permissions, [key]: "manage" as PermissionLevel }),
@@ -116,37 +91,6 @@ export const mockWelcome: WelcomeConfig = {
   roles_channel_id: null,
 };
 
-export const dashboardMetrics: DashboardMetric[] = [
-  { label: "Modules ready", value: "8/13", delta: "+3 planned", tone: "success" },
-  { label: "Moderation actions", value: "18", delta: "history ready", tone: "neutral" },
-  { label: "Creator sources", value: "14", delta: "3 waiting auth", tone: "warning" },
-  { label: "Bot latency", value: "42 ms", delta: "stable", tone: "success" },
-];
-
-export const timelineEvents: TimelineEvent[] = [
-  {
-    id: "1",
-    title: "Welcome module edited",
-    detail: "Administrator updated the server entry message and preview variables.",
-    time: "2 min ago",
-    tone: "success",
-  },
-  {
-    id: "2",
-    title: "Creator alert source pending",
-    detail: "A YouTube channel is waiting for ownership verification.",
-    time: "19 min ago",
-    tone: "warning",
-  },
-  {
-    id: "3",
-    title: "Moderation history updated",
-    detail: "Punishment and audit history is available for review.",
-    time: "1 hour ago",
-    tone: "neutral",
-  },
-];
-
 export const healthSignals: HealthSignal[] = [
   { name: "Discord Gateway", value: "Online", status: "operational" },
   { name: "Activity API", value: "Serving", status: "operational" },
@@ -156,14 +100,14 @@ export const healthSignals: HealthSignal[] = [
 ];
 
 export function buildModules(session: PanelSession): PanelModule[] {
-  const roleLabel = session.activity_roles[0] || session.access_level;
+  const roleLabel = t(`permission.${session.access_level}`);
   return moduleOrder.map((key) => {
     const permission = session.permissions[key] ?? "disabled";
     return {
       key,
-      title: moduleLabels[key],
-      eyebrow: permission === "disabled" ? "Locked" : roleLabel,
-      description: moduleDescriptions[key],
+      title: moduleLabel(key),
+      eyebrow: permission === "disabled" ? t("module.state.locked") : t(`permission.${roleLabel}`),
+      description: moduleDescription(key),
       permission,
       status: permission === "disabled" ? "locked" : key === "health" ? "online" : key === "dev-blog" ? "draft" : "configured",
     };

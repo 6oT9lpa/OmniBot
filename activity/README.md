@@ -2,6 +2,12 @@
 
 This folder contains the Discord Activity control panel for OmniBot.
 
+The client supports English and Russian locales. Users can switch language next
+to the theme control in both public and panel headers. The preference is stored
+locally in the browser. Translation dictionaries live in
+`client/src/i18n/locales`, while `client/src/i18n/index.ts` owns locale selection,
+fallbacks, interpolation, and document language updates.
+
 The Activity is a Vue 3 frontend loaded inside Discord and a FastAPI backend that handles OAuth code exchange, RBAC checks, Discord API access, settings persistence, and Activity audit logging. Protected workspace routes are intended to work inside Discord only.
 
 ## Structure

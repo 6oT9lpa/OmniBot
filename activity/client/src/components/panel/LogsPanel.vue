@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useActivityStore } from "../../stores/activity.store";
+import { t, useI18n } from "../../i18n";
 
 const activity = useActivityStore();
+const { locale } = useI18n();
 const logQuery = ref("");
 const actorQuery = ref("");
 const dateFrom = ref("");
@@ -11,14 +13,7 @@ const source = ref("all");
 const page = ref(0);
 const pageSize = 20;
 const totalPages = computed(() => Math.max(1, Math.ceil((activity.auditPage?.total ?? 0) / pageSize)));
-const sourceOptions = [
-  { value: "all", label: "All logs" },
-  { value: "moderator", label: "Log moderator" },
-  { value: "welcome", label: "Log welcome" },
-  { value: "messages", label: "Log message" },
-  { value: "channel", label: "Log channel" },
-  { value: "activity", label: "Activity changes" },
-];
+const sourceOptions = computed(() => ["all", "moderator", "welcome", "message", "channel", "activity"].map((key) => ({ value: key === "message" ? "messages" : key, label: t(`logs.${key}`) })));
 const combinedRows = computed(() => [
   ...(activity.logs?.audit || []).map((row) => ({ ...row, source: "audit" })),
   ...(activity.logs?.messages || []).map((row) => ({ ...row, source: "message" })),
@@ -49,32 +44,32 @@ async function goPage(delta: number) {
 function eventTitle(value: unknown) {
   const raw = String(value || "log_event");
   const named: Record<string, string> = {
-    voice_join: "Voice join",
-    voice_leave: "Voice leave",
-    voice_move: "Voice move",
-    activity_synced_role_assignments_updated: "Activity role assignments updated",
-    activity_welcome_test_sent: "Welcome test sent",
+    voice_join: t("dashboard.event.voice_join"),
+    voice_leave: t("dashboard.event.voice_leave"),
+    voice_move: t("dashboard.event.voice_move"),
+    activity_synced_role_assignments_updated: t("dashboard.event.roles_updated"),
+    activity_welcome_test_sent: t("dashboard.event.welcome_test"),
   };
   return named[raw] || raw.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function actorLabel(row: Record<string, unknown>) {
-  return String(row.actor_name || row.author_name || row.actor_id || row.author_id || "system");
+  return String(row.actor_name || row.author_name || row.actor_id || row.author_id || t("logs.system"));
 }
 
 function rowDetails(row: Record<string, unknown>) {
   // Convert stored bot payloads into short human-readable activity sentences.
   const eventType = String(row.event_type || "");
   const details = parseDetails(row.details ?? row.content);
-  if (eventType === "voice_join" && details.channel) return `Joined voice channel ${details.channel}.`;
-  if (eventType === "voice_leave" && details.channel) return `Left voice channel ${details.channel}.`;
+  if (eventType === "voice_join" && details.channel) return t("dashboard.event.joined", { channel: String(details.channel) });
+  if (eventType === "voice_leave" && details.channel) return t("dashboard.event.left", { channel: String(details.channel) });
   if (eventType === "voice_move") {
-    const before = details.before_channel || "unknown";
-    const after = details.after_channel || "unknown";
-    return `Moved from ${before} to ${after}.`;
+    const before = details.before_channel || t("dashboard.unknown");
+    const after = details.after_channel || t("dashboard.unknown");
+    return t("dashboard.event.moved", { before: String(before), after: String(after) });
   }
   if (typeof details._raw === "string" && details._raw.trim()) return details._raw;
-  return "No details recorded.";
+  return t("dashboard.no_details");
 }
 
 function parseDetails(value: unknown): Record<string, unknown> & { _raw?: string } {
@@ -90,10 +85,10 @@ function parseDetails(value: unknown): Record<string, unknown> & { _raw?: string
 
 function timeLabel(value: unknown) {
   const raw = String(value || "");
-  if (!raw) return "recent";
+  if (!raw) return t("dashboard.recent");
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return raw;
-  return parsed.toLocaleString();
+  return parsed.toLocaleString(locale.value === "ru" ? "ru-RU" : "en-US");
 }
 
 onMounted(() => {
@@ -104,16 +99,16 @@ onMounted(() => {
 <template>
   <section class="panel-section">
     <div class="section-heading">
-      <span>Logs</span>
-      <h2>Searchable server and Activity logs.</h2>
+      <span>{{ $t("module.logs") }}</span>
+      <h2>{{ $t("logs.heading") }}</h2>
       <div>
-        <p>Filter bot log channels and Activity changes by source, event, date and actor.</p>
+        <p>{{ $t("logs.description") }}</p>
       </div>
     </div>
     <form class="module-toolbar" @submit.prevent="applyFilters">
-      <input v-model="logQuery" placeholder="Search event or details" />
+      <input v-model="logQuery" :placeholder="$t('logs.search')" />
       <select v-model="actorQuery">
-        <option value="">All users</option>
+        <option value="">{{ $t("logs.all_users") }}</option>
         <option v-for="actor in activity.logActors" :key="actor.id" :value="actor.id">
           {{ actor.name }} ({{ actor.id }})
         </option>
@@ -123,7 +118,7 @@ onMounted(() => {
       </select>
       <input v-model="dateFrom" type="datetime-local" />
       <input v-model="dateTo" type="datetime-local" />
-      <button class="primary-button" type="submit">Apply</button>
+      <button class="primary-button" type="submit">{{ $t("logs.apply") }}</button>
     </form>
 
     <div class="record-list compact-list">
@@ -144,9 +139,9 @@ onMounted(() => {
       </article>
     </div>
     <div class="pagination-row">
-      <button class="ghost-button compact" type="button" :disabled="page === 0" @click="goPage(-1)">Previous</button>
+      <button class="ghost-button compact" type="button" :disabled="page === 0" @click="goPage(-1)">{{ $t("logs.previous") }}</button>
       <span>{{ page + 1 }} / {{ totalPages }}</span>
-      <button class="ghost-button compact" type="button" :disabled="page + 1 >= totalPages" @click="goPage(1)">Next</button>
+      <button class="ghost-button compact" type="button" :disabled="page + 1 >= totalPages" @click="goPage(1)">{{ $t("logs.next") }}</button>
     </div>
   </section>
 </template>

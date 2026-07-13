@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from "vue";
 import { useActivityStore } from "../../stores/activity.store";
 import type { VoiceRoom } from "../../types/activity.types";
+import { t } from "../../i18n";
 
 const props = defineProps<{
   room: VoiceRoom;
@@ -40,7 +41,7 @@ const inviteMembers = computed(() => activity.members.filter((member) => member.
 const activeTargetMembers = computed(() => (activeMemberAction.value === "invite" ? inviteMembers.value : actionMembers.value));
 
 function memberName(id?: string | null) {
-  if (!id) return "Free";
+  if (!id) return t("voice.free");
   const member = activity.members.find((item) => item.id === String(id));
   return member ? member.display_name : String(id);
 }
@@ -107,32 +108,32 @@ async function memberAction(action: MemberAction) {
     <div class="voice-room-head">
       <div>
         <strong>{{ room.discord?.name || room.name }}</strong>
-        <span>Owner {{ memberName(room.owner_id) }} - Admin {{ memberName(room.admin_id) }}</span>
+        <span>{{ $t("voice.owner") }} {{ memberName(room.owner_id) }} - {{ $t("voice.admin") }} {{ memberName(room.admin_id) }}</span>
       </div>
       <span :class="['status-badge', isLocked(room) ? 'warning' : 'success']">
-        {{ isLocked(room) ? "locked" : "open" }}
+        {{ $t(isLocked(room) ? "voice.locked" : "voice.open") }}
       </span>
     </div>
 
     <div class="voice-control-grid">
       <label>
-        Name
+        {{ $t("voice.name") }}
         <input v-model="draft.name" maxlength="100" @change="updateRoomName" />
       </label>
       <label>
-        Limit
+        {{ $t("voice.limit") }}
         <input v-model.number="draft.userLimit" type="number" min="0" max="99" @change="updateRoomLimit" />
       </label>
       <label>
-        Owner
+        {{ $t("voice.owner") }}
         <select :value="room.owner_id" disabled>
           <option :value="room.owner_id">{{ memberName(room.owner_id) }}</option>
         </select>
       </label>
       <label v-if="isOwner && !hasAdmin">
-        Admin
+        {{ $t("voice.admin") }}
         <select v-model="draft.adminId" @change="assignAdmin">
-          <option value="">Free</option>
+          <option value="">{{ $t("voice.free") }}</option>
           <option
             v-for="member in voiceMembers"
             :key="member.id"
@@ -140,13 +141,13 @@ async function memberAction(action: MemberAction) {
           >
             {{ member.display_name }}
           </option>
-          <option v-if="voiceMembers.length === 0" value="" disabled>No users in room</option>
+          <option v-if="voiceMembers.length === 0" value="" disabled>{{ $t("voice.no_users_room") }}</option>
         </select>
       </label>
       <label>
-        Region
+        {{ $t("voice.region") }}
         <select v-model="draft.region" @change="updateRoomRegion">
-          <option value="">Automatic</option>
+          <option value="">{{ $t("voice.automatic") }}</option>
           <option value="rotterdam">Rotterdam</option>
           <option value="us-east">US East</option>
           <option value="us-west">US West</option>
@@ -161,11 +162,11 @@ async function memberAction(action: MemberAction) {
     </div>
 
     <div class="inline-actions">
-      <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { locked: true })">Lock</button>
-      <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { locked: false })">Unlock</button>
-      <button v-if="!hasAdmin && isCurrentVoiceMember && !isOwner" class="ghost-button compact" type="button" @click="takeAdmin">Take admin</button>
-      <button v-if="hasAdmin && (isOwner || isAdmin)" class="ghost-button compact" type="button" @click="clearAdmin">Clear admin</button>
-      <button class="ghost-button danger compact" type="button" @click="activity.deleteVoice(room.channel_id)">Delete</button>
+      <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { locked: true })">{{ $t("voice.lock") }}</button>
+      <button class="ghost-button compact" type="button" @click="activity.updateVoice(room.channel_id, { locked: false })">{{ $t("voice.unlock") }}</button>
+      <button v-if="!hasAdmin && isCurrentVoiceMember && !isOwner" class="ghost-button compact" type="button" @click="takeAdmin">{{ $t("voice.take_admin") }}</button>
+      <button v-if="hasAdmin && (isOwner || isAdmin)" class="ghost-button compact" type="button" @click="clearAdmin">{{ $t("voice.clear_admin") }}</button>
+      <button class="ghost-button danger compact" type="button" @click="activity.deleteVoice(room.channel_id)">{{ $t("common.delete") }}</button>
     </div>
 
     <div :class="['voice-member-actions', { 'is-selecting': activeMemberAction }]">
@@ -177,7 +178,7 @@ async function memberAction(action: MemberAction) {
           type="button"
           @click="memberAction('invite')"
         >
-          Invite
+          {{ $t("voice.invite") }}
         </button>
         <button
           v-if="!activeMemberAction || activeMemberAction === 'kick'"
@@ -186,7 +187,7 @@ async function memberAction(action: MemberAction) {
           type="button"
           @click="memberAction('kick')"
         >
-          Kick
+          {{ $t("voice.kick") }}
         </button>
         <button
           v-if="!activeMemberAction || activeMemberAction === 'ban'"
@@ -195,18 +196,18 @@ async function memberAction(action: MemberAction) {
           type="button"
           @click="memberAction('ban')"
         >
-          Ban
+          {{ $t("voice.ban") }}
         </button>
       </TransitionGroup>
 
       <Transition name="voice-target-slide">
-        <select v-if="activeMemberAction" v-model="draft.targetUserId" aria-label="Target user">
-          <option value="" disabled>Target user</option>
+        <select v-if="activeMemberAction" v-model="draft.targetUserId" :aria-label="$t('voice.target_user')">
+          <option value="" disabled>{{ $t("voice.target_user") }}</option>
           <option v-for="member in activeTargetMembers" :key="member.id" :value="member.id">
             {{ member.display_name }}
           </option>
           <option v-if="activeTargetMembers.length === 0" value="" disabled>
-            {{ activeMemberAction === "invite" ? "No users on server" : "No users in room" }}
+            {{ $t(activeMemberAction === "invite" ? "voice.no_users_server" : "voice.no_users_room") }}
           </option>
         </select>
       </Transition>

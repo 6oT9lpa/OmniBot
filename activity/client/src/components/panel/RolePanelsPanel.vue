@@ -27,14 +27,14 @@ async function toggleAssignment(discordRoleId: string, accessRoleId: number, ena
 <template>
   <section class="panel-section">
     <div class="section-heading role-panel-heading">
-      <span>Role Panels</span>
-      <h2>Discord roles mapped to Activity roles.</h2>
+      <span>{{ $t("module.role-panels") }}</span>
+      <h2>{{ $t("roles.heading") }}</h2>
       <div>
-        <p>Synced roles keep Discord permissions, while Activity roles define panel access.</p>
+        <p>{{ $t("roles.description") }}</p>
       </div>
       <button class="ghost-button" type="button" :disabled="activity.moduleLoading" @click="activity.syncRolesFromDiscord">
         <RefreshCcw :size="16" />
-        Sync roles
+        {{ $t("settings.sync_roles") }}
       </button>
     </div>
 
@@ -42,7 +42,7 @@ async function toggleAssignment(discordRoleId: string, accessRoleId: number, ena
       <article v-for="role in activity.syncedRoles" :key="role.role_id" class="role-map-row">
         <div class="role-main">
           <strong>{{ role.name }}</strong>
-          <span>{{ role.is_admin ? "Discord Administrator" : `permissions: ${role.permissions}` }}</span>
+          <span>{{ role.is_admin ? $t("roles.discord_admin") : $t("roles.permissions", { value: role.permissions }) }}</span>
         </div>
         <div class="role-chip-row">
           <label v-for="accessRole in availableRoles" :key="`${role.role_id}-${accessRole.id}`" class="role-chip selectable">

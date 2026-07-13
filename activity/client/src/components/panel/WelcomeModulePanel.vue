@@ -3,6 +3,7 @@ import { reactive, watch } from "vue";
 import { useActivityStore } from "../../stores/activity.store";
 import type { WelcomeConfig } from "../../types/activity.types";
 import DiscordEmbedPreview from "./DiscordEmbedPreview.vue";
+import { t } from "../../i18n";
 
 const activity = useActivityStore();
 const welcomeDraft = reactive<WelcomeConfig>({ ...activity.welcome });
@@ -16,12 +17,12 @@ watch(
 
 async function saveWelcome() {
   saving.value = true;
-  saving.message = "Saving...";
+  saving.message = t("common.saving");
   try {
     await activity.saveWelcome({ ...welcomeDraft });
-    saving.message = "Saved";
+    saving.message = t("common.saved");
   } catch (error) {
-    saving.message = error instanceof Error ? error.message : "Welcome settings could not be saved";
+    saving.message = error instanceof Error ? error.message : t("welcome.save_failed");
   } finally {
     saving.value = false;
   }
@@ -31,20 +32,20 @@ async function resetWelcome() {
   try {
     await activity.resetWelcome();
     Object.assign(welcomeDraft, activity.welcome);
-    saving.message = "Reset complete";
+    saving.message = t("welcome.reset_complete");
   } catch (error) {
-    saving.message = error instanceof Error ? error.message : "Welcome settings could not be reset";
+    saving.message = error instanceof Error ? error.message : t("welcome.reset_failed");
   }
 }
 
 async function testWelcome() {
   saving.value = true;
-  saving.message = "Sending test...";
+  saving.message = t("welcome.sending_test");
   try {
     await activity.testWelcome();
-    saving.message = "Test message sent";
+    saving.message = t("welcome.test_sent");
   } catch (error) {
-    saving.message = error instanceof Error ? error.message : "Welcome channel is not configured";
+    saving.message = error instanceof Error ? error.message : t("welcome.test_failed");
   } finally {
     saving.value = false;
   }
@@ -63,56 +64,56 @@ function setColor(value: string) {
   <section class="editor-grid">
     <form class="control-surface" @submit.prevent="saveWelcome">
       <div class="section-heading">
-        <span>Welcome Alerts</span>
-        <h2>Design the first server moment.</h2>
+        <span>{{ $t("module.welcome") }}</span>
+        <h2>{{ $t("welcome.heading") }}</h2>
         <div>
-          <p>Configure the welcome embed text, media and routing without changing the global module toggle.</p>
+          <p>{{ $t("welcome.description") }}</p>
         </div>
       </div>
 
       <label>
-        Title
+        {{ $t("welcome.title") }}
         <input v-model="welcomeDraft.title" maxlength="256" />
       </label>
 
       <label>
-        Description
+        {{ $t("welcome.message") }}
         <textarea v-model="welcomeDraft.description" rows="7" maxlength="2000" />
       </label>
 
       <div class="form-grid">
         <label>
-          Color
+          {{ $t("welcome.color") }}
           <input type="color" :value="colorToHex(welcomeDraft.color)" @input="setColor(($event.target as HTMLInputElement).value)" />
         </label>
         <label>
-          Rules channel
+          {{ $t("welcome.rules_channel") }}
           <select v-model="welcomeDraft.rules_channel_id">
-            <option :value="null">Not selected</option>
+            <option :value="null">{{ $t("welcome.not_selected") }}</option>
             <option v-for="channel in activity.textChannels" :key="channel.id" :value="channel.id">
               #{{ channel.name }}
             </option>
           </select>
         </label>
         <label>
-          Roles channel
+          {{ $t("welcome.roles_channel") }}
           <select v-model="welcomeDraft.roles_channel_id">
-            <option :value="null">Not selected</option>
+            <option :value="null">{{ $t("welcome.not_selected") }}</option>
             <option v-for="channel in activity.textChannels" :key="channel.id" :value="channel.id">
               #{{ channel.name }}
             </option>
           </select>
         </label>
         <label>
-          Footer
+          {{ $t("welcome.footer") }}
           <input v-model="welcomeDraft.footer_text" placeholder="OmniBot Activity" />
         </label>
         <label>
-          Thumbnail URL
+          {{ $t("welcome.thumbnail_url") }}
           <input v-model="welcomeDraft.thumbnail_url" maxlength="2048" placeholder="https://..." />
         </label>
         <label>
-          Footer icon URL
+          {{ $t("welcome.footer_icon_url") }}
           <input v-model="welcomeDraft.footer_icon_url" maxlength="2048" placeholder="https://..." />
         </label>
       </div>
@@ -128,9 +129,9 @@ function setColor(value: string) {
       </div>
 
       <div class="form-actions">
-        <button class="primary-button" type="submit" :disabled="saving.value">Save</button>
-        <button class="ghost-button" type="button" @click="resetWelcome">Reset</button>
-        <button class="ghost-button" type="button" :disabled="saving.value" @click="testWelcome">Test</button>
+        <button class="primary-button" type="submit" :disabled="saving.value">{{ $t("common.save") }}</button>
+        <button class="ghost-button" type="button" @click="resetWelcome">{{ $t("common.reset") }}</button>
+        <button class="ghost-button" type="button" :disabled="saving.value" @click="testWelcome">{{ $t("common.test") }}</button>
         <small>{{ saving.message }}</small>
       </div>
     </form>

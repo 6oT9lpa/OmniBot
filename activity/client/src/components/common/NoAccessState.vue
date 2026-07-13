@@ -16,11 +16,11 @@ defineEmits<{
 <template>
   <section class="no-access-state">
     <div class="state-icon"><LockKeyhole :size="22" /></div>
-    <h2>{{ title || "No module access" }}</h2>
-    <p>{{ text || "An administrator can grant module permissions from Access Control." }}</p>
+    <h2>{{ title || $t("access.no_module") }}</h2>
+    <p>{{ text || $t("access.admin_can_grant") }}</p>
     <button v-if="actionLabel" class="primary-button" type="button" :disabled="busy" @click="$emit('action')">
-      {{ busy ? "Syncing..." : actionLabel }}
+      {{ busy ? $t("access.syncing") : actionLabel }}
     </button>
-    <RouterLink class="secondary-link" to="/">Back to Omni</RouterLink>
+    <RouterLink class="secondary-link" to="/">{{ $t("access.back_to_omni") }}</RouterLink>
   </section>
 </template>

@@ -19,7 +19,8 @@ import WelcomeModulePanel from "../components/panel/WelcomeModulePanel.vue";
 import LoadingDots from "../components/common/LoadingDots.vue";
 import NoAccessState from "../components/common/NoAccessState.vue";
 import { useActivityStore } from "../stores/activity.store";
-import { buildModules, moduleLabels, moduleOrder } from "../stores/mock-data";
+import { t } from "../i18n";
+import { buildModules, moduleLabel, moduleOrder } from "../stores/mock-data";
 import type { ModuleKey } from "../types/activity.types";
 
 const route = useRoute();
@@ -35,23 +36,23 @@ const activeModule = computed<ModuleKey>(() => {
   return moduleOrder.includes(candidate as ModuleKey) ? (candidate as ModuleKey) : "dashboard";
 });
 
-const activeTitle = computed(() => moduleLabels[activeModule.value]);
+const activeTitle = computed(() => moduleLabel(activeModule.value));
 const subtitle = computed(() =>
   activity.session
-    ? `${activity.displayName} connected through Discord Activity.`
-    : "Discord Activity access is required.",
+    ? t("panel.connected_as", { name: activity.displayName })
+    : t("panel.discord_required"),
 );
 const sessionStateTitle = computed(() => {
-  if (activity.accessError) return "Access denied";
-  if (activity.error) return "Session failed";
-  return "Session is loading";
+  if (activity.accessError) return t("panel.access_denied");
+  if (activity.error) return t("panel.session_failed");
+  return t("panel.session_loading");
 });
 const sessionStateText = computed(() =>
-  activity.accessError?.message || activity.error || "Omni is preparing the role-based workspace.",
+  activity.accessError?.message || activity.error || t("panel.preparing_workspace"),
 );
 const sessionActionLabel = computed(() => {
-  if (activity.accessError?.can_sync_roles) return "Sync roles";
-  if (activity.error) return "Retry";
+  if (activity.accessError?.can_sync_roles) return t("panel.sync_roles");
+  if (activity.error) return t("common.retry");
   return undefined;
 });
 const activeModuleLoaded = computed(() => Boolean(activity.loadedModules[activeModule.value]));
@@ -99,10 +100,10 @@ watch(
       <PanelTopbar :title="activeTitle" :subtitle="subtitle" />
       <div v-if="visibleError && !activeModuleFailed" class="activity-error-banner" role="alert">
         <div>
-          <strong>Request failed</strong>
+          <strong>{{ $t("common.request_failed") }}</strong>
           <span>{{ visibleError }}</span>
         </div>
-        <button class="icon-button" type="button" aria-label="Dismiss error" @click="clearVisibleError">x</button>
+        <button class="icon-button" type="button" :aria-label="$t('common.dismiss_error')" @click="clearVisibleError">x</button>
       </div>
 
       <div v-if="!activity.session" class="panel-content">
@@ -116,16 +117,16 @@ watch(
       </div>
 
       <div v-else-if="activeModulePending" class="panel-content module-loading-state">
-        <LoadingDots :label="`Loading ${activeTitle}`" />
+        <LoadingDots :label="$t('common.loading_module', { module: activeTitle })" />
         <h2>{{ activeTitle }}</h2>
-        <p>Loading module data from the server.</p>
+        <p>{{ $t("common.loading_module_data") }}</p>
       </div>
 
       <div v-else-if="activeModuleFailed" class="panel-content">
         <NoAccessState
-          title="Module failed"
-          :text="activity.moduleError || 'Module data could not be loaded.'"
-          action-label="Retry"
+          :title="$t('common.module_failed')"
+          :text="activity.moduleError || $t('common.module_load_failed')"
+          :action-label="$t('common.retry')"
           :busy="activity.moduleLoading"
           @action="retryActiveModule"
         />
@@ -148,18 +149,17 @@ watch(
 
         <section v-else class="panel-section">
           <div class="section-heading">
-            <span>Module workspace</span>
-            <h2>{{ activeTitle }} is scaffolded for the next integration pass.</h2>
+            <span>{{ $t("panel.module_workspace") }}</span>
+            <h2>{{ $t("panel.scaffolded", { module: activeTitle }) }}</h2>
             <div>
               <p>
-                The navigation, permission guard and module shell are ready. The next step
-                is connecting this workspace to its repository/service/API implementation.
+                {{ $t("panel.scaffold_description") }}
               </p>
             </div>
           </div>
           <div class="empty-module">
             <strong>{{ activeTitle }}</strong>
-            <span>Ready for API endpoints, validation and Discord preview wiring.</span>
+            <span>{{ $t("panel.ready_for_api") }}</span>
           </div>
         </section>
       </div>
