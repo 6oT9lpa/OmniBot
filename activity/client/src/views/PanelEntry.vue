@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { X } from "@lucide/vue";
 import { computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AccessControlPanel from "../components/panel/AccessControlPanel.vue";
@@ -20,15 +21,25 @@ import LoadingDots from "../components/common/LoadingDots.vue";
 import NoAccessState from "../components/common/NoAccessState.vue";
 import { useActivityStore } from "../stores/activity.store";
 import { t } from "../i18n";
-import { buildModules, moduleLabel, moduleOrder } from "../stores/mock-data";
-import type { ModuleKey } from "../types/activity.types";
+import { buildModules, moduleDescription, moduleLabel, moduleOrder } from "../stores/mock-data";
+import type { ModuleKey, PanelModule } from "../types/activity.types";
 
 const route = useRoute();
 const router = useRouter();
 const activity = useActivityStore();
 
+const previewSystemModules = computed<PanelModule[]>(() => (["integrations", "health"] as const).map((key) => ({
+  key,
+  title: moduleLabel(key),
+  eyebrow: t("panel.preview"),
+  description: moduleDescription(key),
+  permission: "view",
+  status: key === "health" ? "online" : "configured",
+})));
 const modules = computed(() =>
-  activity.session ? buildModules(activity.session).filter((module) => module.permission !== "disabled") : [],
+  activity.session
+    ? buildModules(activity.session).filter((module) => module.permission !== "disabled")
+    : previewSystemModules.value,
 );
 const activeModule = computed<ModuleKey>(() => {
   const raw = route.params.module;
@@ -58,7 +69,10 @@ const sessionActionLabel = computed(() => {
 const activeModuleLoaded = computed(() => Boolean(activity.loadedModules[activeModule.value]));
 const activeModulePending = computed(() => activity.moduleLoading && !activeModuleLoaded.value);
 const activeModuleFailed = computed(() => Boolean(activity.moduleError && !activeModuleLoaded.value));
-const visibleError = computed(() => activity.moduleError || activity.healthError || activity.error);
+const isPreviewSystemModule = computed(() => !activity.session && ["integrations", "health"].includes(activeModule.value));
+const visibleError = computed(() =>
+  isPreviewSystemModule.value ? activity.moduleError || activity.healthError : activity.moduleError || activity.healthError || activity.error,
+);
 
 function clearVisibleError() {
   activity.moduleError = null;
@@ -93,25 +107,26 @@ watch(
 </script>
 
 <template>
-  <main class="panel-page">
-    <PanelSidebar :modules="modules" :active-module="activeModule" />
+  <main :class="['panel-page', { 'is-session-gated': !activity.session }]">
+    <PanelSidebar :modules="modules" :active-module="activeModule" :show-categories="Boolean(activity.session)" />
 
-    <section class="panel-workspace">
+    <section :class="['panel-workspace', { 'is-session-gated': !activity.session }]">
       <PanelTopbar :title="activeTitle" :subtitle="subtitle" />
       <div v-if="visibleError && !activeModuleFailed" class="activity-error-banner" role="alert">
         <div>
           <strong>{{ $t("common.request_failed") }}</strong>
           <span>{{ visibleError }}</span>
         </div>
-        <button class="icon-button" type="button" :aria-label="$t('common.dismiss_error')" @click="clearVisibleError">x</button>
+        <button class="icon-button" type="button" :aria-label="$t('common.dismiss_error')" @click="clearVisibleError"><X :size="18" /></button>
       </div>
 
-      <div v-if="!activity.session" class="panel-content">
+      <div v-if="!activity.session && !isPreviewSystemModule" class="panel-content panel-access-content">
         <NoAccessState
           :title="sessionStateTitle"
           :text="sessionStateText"
           :action-label="sessionActionLabel"
           :busy="activity.moduleLoading || activity.loading"
+          :guidance="Boolean(activity.accessError)"
           @action="handleSessionAction"
         />
       </div>

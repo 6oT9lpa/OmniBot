@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { RefreshCcw } from "@lucide/vue";
 import { useActivityStore } from "../../stores/activity.store";
 
 const activity = useActivityStore();
@@ -25,19 +24,17 @@ async function toggleAssignment(discordRoleId: string, accessRoleId: number, ena
 </script>
 
 <template>
-  <section class="panel-section">
-    <div class="section-heading role-panel-heading">
+  <section class="panel-section module-intro">
+    <div class="section-heading">
       <span>{{ $t("module.role-panels") }}</span>
       <h2>{{ $t("roles.heading") }}</h2>
       <div>
         <p>{{ $t("roles.description") }}</p>
       </div>
-      <button class="ghost-button" type="button" :disabled="activity.moduleLoading" @click="activity.syncRolesFromDiscord">
-        <RefreshCcw :size="16" />
-        {{ $t("settings.sync_roles") }}
-      </button>
     </div>
+  </section>
 
+  <section class="panel-section module-content-panel">
     <div class="role-map-list">
       <article v-for="role in activity.syncedRoles" :key="role.role_id" class="role-map-row">
         <div class="role-main">

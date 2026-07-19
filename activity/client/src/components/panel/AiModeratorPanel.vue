@@ -152,7 +152,7 @@ function removeValue(values: string[], value: string): string[] {
 </script>
 
 <template>
-  <RevealOnScroll tag="section" class="panel-section ai-moderation-hero">
+  <RevealOnScroll tag="section" class="panel-section module-intro">
     <div class="section-heading">
       <span>{{ $t("module.ai-moderator") }}</span>
       <h2>{{ $t("ai.heading") }}</h2>
@@ -161,6 +161,9 @@ function removeValue(values: string[], value: string): string[] {
       </div>
     </div>
 
+  </RevealOnScroll>
+
+  <RevealOnScroll tag="section" class="panel-section module-tabs-panel ai-moderator-tabs" :delay="35">
     <nav class="ai-moderation-nav" :aria-label="$t('ai.settings')">
       <button
         v-for="tab in tabs"
@@ -180,7 +183,7 @@ function removeValue(values: string[], value: string): string[] {
     </nav>
   </RevealOnScroll>
 
-  <RevealOnScroll tag="section" class="panel-section" :delay="60">
+  <RevealOnScroll tag="section" class="panel-section module-content-panel" :delay="60">
     <div v-if="activeTab === 'channels'" class="ai-moderation-workspace">
       <div class="ai-moderation-section-copy">
         <div>

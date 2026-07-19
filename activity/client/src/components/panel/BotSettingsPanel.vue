@@ -55,21 +55,21 @@ async function toggleWelcome(value: boolean) {
 </script>
 
 <template>
-  <RevealOnScroll tag="section" class="panel-section ai-moderation-hero">
-    <div class="section-heading bot-settings-heading">
+  <RevealOnScroll tag="section" class="panel-section module-intro">
+    <div class="section-heading">
       <span>{{ $t("module.bot-settings") }}</span>
       <h2>{{ $t("settings.heading") }}</h2>
       <div><p>{{ $t("settings.description") }}</p></div>
-      <button class="ghost-button" type="button" :disabled="activity.moduleLoading" @click="activity.syncRolesFromDiscord">
-        <RefreshCcw :size="16" /> {{ $t("settings.sync_roles") }}
-      </button>
     </div>
+  </RevealOnScroll>
+
+  <RevealOnScroll tag="section" class="panel-section module-tabs-panel" :delay="35">
     <nav class="ai-moderation-nav" :aria-label="$t('module.bot-settings')">
       <button v-for="tab in tabs" :key="tab.key" type="button" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">{{ tab.label }}</button>
     </nav>
   </RevealOnScroll>
 
-  <RevealOnScroll tag="section" class="panel-section" :delay="60">
+  <RevealOnScroll tag="section" class="panel-section module-content-panel" :delay="60">
     <div v-if="activeTab === 'general'" class="settings-list">
       <article>
         <strong>{{ $t("settings.subscription") }}</strong>
@@ -98,15 +98,21 @@ async function toggleWelcome(value: boolean) {
       <article v-if="activity.textChannels.length === 0"><strong>{{ $t("settings.no_channels") }}</strong><span>{{ $t("settings.no_channels_text") }}</span></article>
     </div>
 
-    <div v-else class="settings-list">
-      <article v-for="purpose in rolePurposes" :key="purpose.key">
-        <strong>{{ purpose.label }}</strong>
-        <select v-model="activity.activityRoles[purpose.key]" @change="saveRole(purpose.key, activity.activityRoles[purpose.key] || '')">
-          <option value="">{{ $t("settings.select_role") }}</option>
-          <option v-for="role in activity.roles" :key="role.id" :value="role.id">{{ role.name }}</option>
-        </select>
-      </article>
-      <article v-if="activity.roles.length === 0"><strong>{{ $t("settings.no_roles") }}</strong><span>{{ $t("settings.no_roles_text") }}</span></article>
+    <div v-else class="settings-roles-workspace">
+      <header class="module-content-header">
+        <div><h3>{{ $t("settings.roles") }}</h3><p>{{ $t("settings.roles_sync_description") }}</p></div>
+        <button class="ghost-button" type="button" :disabled="activity.moduleLoading" @click="activity.syncRolesFromDiscord"><RefreshCcw :size="16" /> {{ $t("settings.sync_roles") }}</button>
+      </header>
+      <div class="settings-list">
+        <article v-for="purpose in rolePurposes" :key="purpose.key">
+          <strong>{{ purpose.label }}</strong>
+          <select v-model="activity.activityRoles[purpose.key]" @change="saveRole(purpose.key, activity.activityRoles[purpose.key] || '')">
+            <option value="">{{ $t("settings.select_role") }}</option>
+            <option v-for="role in activity.roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+          </select>
+        </article>
+        <article v-if="activity.roles.length === 0"><strong>{{ $t("settings.no_roles") }}</strong><span>{{ $t("settings.no_roles_text") }}</span></article>
+      </div>
     </div>
     <small v-if="status" class="ai-moderation-status" role="status">{{ status }}</small>
   </RevealOnScroll>

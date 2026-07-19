@@ -60,7 +60,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="panel-section">
+  <section class="panel-section module-intro">
     <div class="section-heading">
       <span>{{ $t("module.logs") }}</span>
       <h2>{{ $t("logs.heading") }}</h2>
@@ -68,6 +68,9 @@ onMounted(() => {
         <p>{{ $t("logs.description") }}</p>
       </div>
     </div>
+  </section>
+
+  <section class="panel-section logs-filter-panel">
     <form class="module-toolbar" @submit.prevent="applyFilters">
       <input v-model="logQuery" :placeholder="$t('logs.search')" />
       <select v-model="actorQuery">
@@ -83,7 +86,9 @@ onMounted(() => {
       <input v-model="dateTo" type="datetime-local" />
       <button class="primary-button" type="submit">{{ $t("logs.apply") }}</button>
     </form>
+  </section>
 
+  <section class="panel-section module-content-panel logs-content-panel">
     <div class="record-list compact-list">
       <article v-for="row in combinedRows" :key="`log-${row.source}-${row.id}`" class="log-record">
         <strong>{{ logEventTitle(row.event_type) }}</strong>

@@ -92,12 +92,26 @@ export const mockWelcome: WelcomeConfig = {
 };
 
 export const healthSignals: HealthSignal[] = [
-  { name: "Discord Gateway", value: "Online", status: "operational" },
-  { name: "Activity API", value: "Serving", status: "operational" },
-  { name: "PostgreSQL", value: "Connected", status: "operational" },
-  { name: "Upcoming AI", value: "Planned", status: "degraded" },
-  { name: "Stream Checker", value: "Mock mode", status: "degraded" },
+  { name: "Discord Gateway", value: "Online", status: "operational", latency_ms: null },
+  { name: "Activity API", value: "Serving", status: "operational", latency_ms: null },
+  { name: "PostgreSQL", value: "Connected", status: "operational", latency_ms: null },
+  { name: "AI Classifier", value: "Connected", status: "operational", latency_ms: null },
+  { name: "Stream Checker", value: "Polling", status: "operational", latency_ms: null },
 ];
+
+export const mockIntegrations: Record<string, unknown> = {
+  discord_bot: { status: "configured", detail: "Discord Bot API is ready for the Activity workspace." },
+  creator_platforms: {
+    status: "configured",
+    poll_interval_seconds: 60,
+    sources: [
+      { platform: "Twitch", count: 3, active_count: 3 },
+      { platform: "YouTube", count: 2, active_count: 1 },
+    ],
+  },
+  ai_moderator: { status: "configured", endpoint: "Local AI classifier connected" },
+  database: { status: "configured", detail: "PostgreSQL stores bot state and Activity data." },
+};
 
 export function buildModules(session: PanelSession): PanelModule[] {
   const roleLabel = t(`permission.${session.access_level}`);

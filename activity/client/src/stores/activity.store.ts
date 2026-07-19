@@ -48,6 +48,7 @@ import { ApiError } from "../api/client";
 import {
   administratorPermissions,
   healthSignals as mockHealthSignals,
+  mockIntegrations,
   mockWelcome,
 } from "./mock-data";
 import type {
@@ -138,7 +139,7 @@ export const useActivityStore = defineStore("activity", {
     session: null,
     welcome: mockWelcome,
     healthSignals: mockHealthSignals,
-    botLatencyMs: 42,
+    botLatencyMs: null,
     healthLoading: false,
     healthError: null,
     lastHealthRefresh: 0,
@@ -164,7 +165,7 @@ export const useActivityStore = defineStore("activity", {
     accessRoles: [],
     syncedRoles: [],
     botSettings: null,
-    integrations: null,
+    integrations: mockIntegrations,
     aiModerator: null,
     discordSdk: null,
     auth: null,
@@ -324,7 +325,12 @@ export const useActivityStore = defineStore("activity", {
     },
 
     async refreshHealth(force = false) {
-      if (!this.session || !this.can("health")) return;
+      if (!this.session) {
+        this.lastHealthRefresh = Date.now();
+        this.applyPreviewHealth();
+        return;
+      }
+      if (!this.can("health")) return;
 
       const now = Date.now();
       if (!force && now - this.lastHealthRefresh < 10_000) {
@@ -333,8 +339,7 @@ export const useActivityStore = defineStore("activity", {
 
       if (!this.token || this.mode === "local") {
         this.lastHealthRefresh = now;
-        this.healthSignals = mockHealthSignals;
-        this.botLatencyMs = 42;
+        this.applyPreviewHealth();
         return;
       }
 
@@ -355,6 +360,12 @@ export const useActivityStore = defineStore("activity", {
     applyHealth(health: ActivityHealth) {
       this.healthSignals = health.signals;
       this.botLatencyMs = health.bot_latency_ms;
+    },
+
+    applyPreviewHealth() {
+      // Preview intentionally exposes no fabricated latency; real measurements require a Discord session.
+      this.healthSignals = mockHealthSignals.map((signal) => ({ ...signal, latency_ms: null }));
+      this.botLatencyMs = null;
     },
 
     async loadReferenceData() {
@@ -385,7 +396,13 @@ export const useActivityStore = defineStore("activity", {
     },
 
     async loadModuleData(module: ModuleKey) {
-      if (!this.session || !this.can(module)) return;
+      if (!this.session) {
+        if (module === "integrations") this.integrations = mockIntegrations;
+        if (module === "health") await this.refreshHealth(true);
+        if (module === "integrations" || module === "health") this.loadedModules[module] = true;
+        return;
+      }
+      if (!this.can(module)) return;
       if (!this.token || this.mode === "local") return;
 
       this.moduleLoading = true;
