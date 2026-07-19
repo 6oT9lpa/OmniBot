@@ -38,6 +38,7 @@
   "home.demo.now": "сейчас",
   "home.demo.message_removed": "Сообщение удалено политикой OmniBot.",
   "home.demo.classifier_unavailable": "Классификатор временно недоступен. Повторите попытку через мгновение.",
+  "home.demo.classifier_result": "Проверка AI · {label} · риск {risk} · {action}",
   "home.demo.restriction": "В этом демо вам назначено действие: {restriction}.",
   "home.demo.restriction.timeout": "тайм-аут",
   "home.demo.restriction.kick": "исключение",

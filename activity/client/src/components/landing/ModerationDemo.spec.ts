@@ -25,6 +25,7 @@ describe("ModerationDemo", () => {
     await wrapper.get("input").setValue("Claim a prize using this suspicious link");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
+    expect(wrapper.text()).toContain("AI check · SCAM · risk 92% · DELETE_WARN");
 
     expect(wrapper.text()).toContain("Policy violation: SCAM · risk 92% · You have been timed out and cannot write in this demo.");
     expect(wrapper.get("input").attributes("disabled")).toBeDefined();

@@ -11,7 +11,14 @@ export interface DemoMessage {
   flagged?: boolean;
   removed?: boolean;
   pending?: boolean;
+  classification?: DemoClassification;
   embed?: DemoLogEmbed;
+}
+
+export interface DemoClassification {
+  label: string;
+  risk: number;
+  action: string;
 }
 
 export interface DemoLogEmbed {

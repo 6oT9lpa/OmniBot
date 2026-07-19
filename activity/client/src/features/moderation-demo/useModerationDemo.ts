@@ -60,6 +60,12 @@ export function useModerationDemo() {
       if (message) {
         message.pending = false;
         message.flagged = hasEnforcementAction;
+        // Preserve the classifier decision on the visitor message, including safe outcomes.
+        message.classification = {
+          label: decision.primary_label,
+          risk: decision.risk_score,
+          action: effect.action,
+        };
       }
       if (hasEnforcementAction) {
       addSystemMessage(buildModerationNotice(decision, effect));

@@ -3,6 +3,7 @@ import { Bot, Hash, LockKeyhole, Radio, Send, ShieldAlert, Sparkles } from "@luc
 import { nextTick, onMounted, ref, TransitionGroup, watch } from "vue";
 import { useModerationDemo } from "../../features/moderation-demo/useModerationDemo";
 import { useI18n } from "../../i18n";
+import { formatRiskScore } from "../../features/moderation-demo/moderationOutcome";
 
 const { t } = useI18n();
 const {
@@ -85,7 +86,12 @@ onMounted(() => {
                   <p>{{ message.embed.description }}</p>
                   <dl><div v-for="field in message.embed.fields" :key="field.label"><dt>{{ field.label }}</dt><dd>{{ field.value }}</dd></div></dl>
                 </div>
-                <p v-else>{{ message.removed ? t("home.demo.message_removed") : message.content }}</p>
+                <template v-else>
+                  <p>{{ message.removed ? t("home.demo.message_removed") : message.content }}</p>
+                  <small v-if="message.classification" :class="['demo-classifier-result', { safe: message.classification.action === 'IGNORE' || message.classification.action === 'LOG' }]">
+                    {{ t("home.demo.classifier_result", { label: message.classification.label, risk: formatRiskScore(message.classification.risk), action: message.classification.action }) }}
+                  </small>
+                </template>
               </div>
             </article>
           </TransitionGroup>
