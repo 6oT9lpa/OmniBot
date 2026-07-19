@@ -80,9 +80,9 @@ class ActivityRbacService:
                     role.color,
                     role.position,
                     role.permissions,
-                    is_admin,
-                    role.managed,
-                    role.mentionable,
+                    int(is_admin),
+                    int(role.managed),
+                    int(role.mentionable),
                 ),
             )
 

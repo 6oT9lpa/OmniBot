@@ -202,7 +202,7 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
                     color,
                     position,
                     permissions,
-                    is_admin,
+                    int(is_admin),
                     managed,
                     mentionable,
                     synced_at

@@ -1,10 +1,12 @@
 from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException
 
 import activity.server.dependencies as activity_dependencies
+import activity.server.services.rbac_service as rbac_service_module
 from activity.server.schemas.dev_blog import DevBlogEmbedPayload, DevBlogPostPayload
 from activity.server.schemas.voice_rooms import VoiceRoomUpdatePayload
 from activity.server.services.access_service import ActivityAccessService
@@ -188,6 +190,56 @@ async def test_rbac_service_serializes_postgres_synced_datetime(activity_db, mon
     )
 
     assert role.synced_at == "2026-06-28 15:16:31"
+
+
+@pytest.mark.asyncio
+async def test_rbac_role_sync_persists_flags_as_bigints(monkeypatch):
+    service = ActivityRbacService()
+    captured_parameters: list[tuple[object, ...]] = []
+
+    async def execute(_query, parameters):
+        captured_parameters.append(parameters)
+
+    async def commit():
+        return None
+
+    async def ensure_discord_administrator(*_):
+        return {"id": "42", "username": "admin"}
+
+    async def list_roles(_guild_id):
+        return [
+            SimpleNamespace(
+                id="99",
+                name="Administrators",
+                color=0,
+                position=1,
+                permissions=8,
+                managed=False,
+                mentionable=True,
+            ),
+        ]
+
+    async def no_access_role(*_):
+        return None
+
+    async def no_audit(**_):
+        return None
+
+    async def no_synced_roles(*_):
+        return []
+
+    monkeypatch.setattr(rbac_service_module, "get_db", lambda: SimpleNamespace(execute=execute, commit=commit))
+    monkeypatch.setattr(service._access_service, "ensure_discord_administrator", ensure_discord_administrator)
+    monkeypatch.setattr(service._discord, "list_roles", list_roles)
+    monkeypatch.setattr(service, "_get_access_role_by_slug", no_access_role)
+    monkeypatch.setattr(service._audit_service, "log_action", no_audit)
+    monkeypatch.setattr(service, "list_synced_roles", no_synced_roles)
+
+    await service.sync_roles(100, "token")
+
+    role_parameters = captured_parameters[0]
+    assert role_parameters[6:] == (1, 0, 1)
+    assert all(type(value) is int for value in role_parameters[6:])
 
 
 @pytest.mark.asyncio
