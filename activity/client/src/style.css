@@ -1820,7 +1820,7 @@ a {
   top: 0;
   height: 100vh;
   padding: 18px 16px;
-  direction: ltr;
+  direction: rtl;
   overflow-x: hidden;
   overflow-y: auto;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
@@ -1829,6 +1829,10 @@ a {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--accent) 20%, transparent) transparent;
+}
+
+.panel-sidebar > * {
+  direction: ltr;
 }
 
 .panel-sidebar::-webkit-scrollbar {
