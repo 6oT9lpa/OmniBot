@@ -202,7 +202,7 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
                     color,
                     position,
                     permissions,
-                    int(is_admin),
+                    is_admin,
                     managed,
                     mentionable,
                     synced_at
@@ -226,7 +226,7 @@ class RoleRepository(RoleRepositoryInterface, BaseRepository):
                     role.get("color"),
                     role.get("position"),
                     permissions,
-                    is_admin,
+                    int(is_admin),
                     int(bool(role.get("managed", False))),
                     int(bool(role.get("mentionable", False))),
                 ),

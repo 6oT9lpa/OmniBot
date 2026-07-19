@@ -14,6 +14,7 @@ from activity.server.services.dev_blog_service import DevBlogService
 from activity.server.services.rbac_service import ActivityRbacService
 from activity.server.services.voice_room_service import VoiceRoomService
 from activity.server.services.welcome_service import ActivityWelcomeService
+from infrastructure.database.repositories.role_repository import RoleRepository
 
 
 @pytest_asyncio.fixture
@@ -240,6 +241,35 @@ async def test_rbac_role_sync_persists_flags_as_bigints(monkeypatch):
     role_parameters = captured_parameters[0]
     assert role_parameters[6:] == (1, 0, 1)
     assert all(type(value) is int for value in role_parameters[6:])
+
+
+@pytest.mark.asyncio
+async def test_repository_role_sync_uses_column_name_and_bigint_flag(monkeypatch):
+    repository = RoleRepository(SimpleNamespace())
+    captured: list[tuple[str, tuple[object, ...]]] = []
+
+    async def execute(query, parameters):
+        captured.append((query, parameters))
+
+    async def commit():
+        return None
+
+    async def ensure_builtin_roles(_guild_id):
+        return None
+
+    monkeypatch.setattr(repository, "execute", execute)
+    monkeypatch.setattr(repository, "commit", commit)
+    monkeypatch.setattr(repository, "_ensure_activity_builtin_roles", ensure_builtin_roles)
+
+    await repository.sync_activity_roles_from_discord(
+        100,
+        [{"id": "99", "name": "Administrators", "permissions": 8, "managed": False, "mentionable": True}],
+    )
+
+    query, parameters = captured[0]
+    assert "is_admin," in query
+    assert "int(is_admin)" not in query
+    assert parameters[6:] == (1, 0, 1)
 
 
 @pytest.mark.asyncio
