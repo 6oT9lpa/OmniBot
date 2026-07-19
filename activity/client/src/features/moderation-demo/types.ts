@@ -16,9 +16,10 @@ export interface DemoMessage {
 }
 
 export interface DemoClassification {
-  label: string;
+  labels: ReadonlyArray<string>;
   risk: number;
   action: string;
+  executionPlan: ReadonlyArray<string>;
 }
 
 export interface DemoLogEmbed {

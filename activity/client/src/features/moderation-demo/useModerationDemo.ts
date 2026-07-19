@@ -60,11 +60,12 @@ export function useModerationDemo() {
       if (message) {
         message.pending = false;
         message.flagged = hasEnforcementAction;
-        // Preserve the classifier decision on the visitor message, including safe outcomes.
+        // Preserve every classifier label and planned action, including safe outcomes.
         message.classification = {
-          label: decision.primary_label,
+          labels: decision.labels.length ? decision.labels : [decision.primary_label],
           risk: decision.risk_score,
           action: effect.action,
+          executionPlan: decision.execution_plan,
         };
       }
       if (hasEnforcementAction) {

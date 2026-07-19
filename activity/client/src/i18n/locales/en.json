@@ -38,7 +38,7 @@
   "home.demo.now": "now",
   "home.demo.message_removed": "Message removed by OmniBot policy.",
   "home.demo.classifier_unavailable": "Classifier is temporarily unavailable. Please try again in a moment.",
-  "home.demo.classifier_result": "AI check · {label} · risk {risk} · {action}",
+  "home.demo.classifier_result": "AI check · {labels} · risk {risk} · {action} · plan {plan}",
   "home.demo.restriction": "You are {restriction} in this demo.",
   "home.demo.restriction.timeout": "timed out",
   "home.demo.restriction.kick": "kicked",

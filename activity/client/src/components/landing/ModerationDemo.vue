@@ -89,7 +89,7 @@ onMounted(() => {
                 <template v-else>
                   <p>{{ message.removed ? t("home.demo.message_removed") : message.content }}</p>
                   <small v-if="message.classification" :class="['demo-classifier-result', { safe: message.classification.action === 'IGNORE' || message.classification.action === 'LOG' }]">
-                    {{ t("home.demo.classifier_result", { label: message.classification.label, risk: formatRiskScore(message.classification.risk), action: message.classification.action }) }}
+                    {{ t("home.demo.classifier_result", { labels: message.classification.labels.join(", "), risk: formatRiskScore(message.classification.risk), action: message.classification.action, plan: message.classification.executionPlan.join(" → ") || message.classification.action }) }}
                   </small>
                 </template>
               </div>

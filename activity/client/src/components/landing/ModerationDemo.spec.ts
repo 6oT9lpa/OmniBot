@@ -16,8 +16,8 @@ describe("ModerationDemo", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       risk_score: 92,
       action: "DELETE_WARN",
-      primary_label: "SCAM",
-      labels: ["SCAM"],
+      primary_label: "HATE",
+      labels: ["HATE", "TOXIC"],
       execution_plan: ["DELETE", "TIMEOUT"],
     }), { status: 200, headers: { "Content-Type": "application/json" } })));
 
@@ -25,9 +25,9 @@ describe("ModerationDemo", () => {
     await wrapper.get("input").setValue("Claim a prize using this suspicious link");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
-    expect(wrapper.text()).toContain("AI check · SCAM · risk 92% · DELETE_WARN");
+    expect(wrapper.text()).toContain("AI check · HATE, TOXIC · risk 92% · DELETE_WARN · plan DELETE → TIMEOUT");
 
-    expect(wrapper.text()).toContain("Policy violation: SCAM · risk 92% · You have been timed out and cannot write in this demo.");
+    expect(wrapper.text()).toContain("Policy violation: HATE, TOXIC · risk 92% · You have been timed out and cannot write in this demo.");
     expect(wrapper.get("input").attributes("disabled")).toBeDefined();
 
     await vi.advanceTimersByTimeAsync(900);
