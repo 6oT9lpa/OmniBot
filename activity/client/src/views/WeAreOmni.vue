@@ -1,35 +1,31 @@
 <script setup lang="ts">
 import { Bot, BrainCircuit, Database, RadioTower, ServerCog, ShieldCheck } from "@lucide/vue";
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import RevealOnScroll from "../components/common/RevealOnScroll.vue";
 import FeatureCard from "../components/landing/FeatureCard.vue";
 import HeroText from "../components/landing/HeroText.vue";
 import { t } from "../i18n";
 
+const ModerationDemo = defineAsyncComponent(() => import("../components/landing/ModerationDemo.vue"));
+
 const features = computed(() => [
   {
-    index: "01",
-    title: t("home.feature.ai.title"), text: t("home.feature.ai.text"),
+    index: "01", title: t("home.feature.ai.title"), text: t("home.feature.ai.text"), metric: t("home.feature.ai.metric"), metricLabel: t("home.feature.ai.metric_label"), live: true,
   },
   {
-    index: "02",
-    title: t("home.feature.creator.title"), text: t("home.feature.creator.text"),
+    index: "02", title: t("home.feature.creator.title"), text: t("home.feature.creator.text"), metric: t("home.feature.creator.metric"), metricLabel: t("home.feature.creator.metric_label"),
   },
   {
-    index: "03",
-    title: t("home.feature.activity.title"), text: t("home.feature.activity.text"),
+    index: "03", title: t("home.feature.activity.title"), text: t("home.feature.activity.text"), metric: t("home.feature.activity.metric"), metricLabel: t("home.feature.activity.metric_label"),
   },
   {
-    index: "04",
-    title: t("home.feature.voice.title"), text: t("home.feature.voice.text"),
+    index: "04", title: t("home.feature.voice.title"), text: t("home.feature.voice.text"), metric: t("home.feature.voice.metric"), metricLabel: t("home.feature.voice.metric_label"),
   },
   {
-    index: "05",
-    title: t("home.feature.stats.title"), text: t("home.feature.stats.text"),
+    index: "05", title: t("home.feature.stats.title"), text: t("home.feature.stats.text"), metric: t("home.feature.stats.metric"), metricLabel: t("home.feature.stats.metric_label"),
   },
   {
-    index: "06",
-    title: t("home.feature.logs.title"), text: t("home.feature.logs.text"),
+    index: "06", title: t("home.feature.logs.title"), text: t("home.feature.logs.text"), metric: t("home.feature.logs.metric"), metricLabel: t("home.feature.logs.metric_label"), live: true,
   },
 ]);
 
@@ -73,6 +69,9 @@ const aiCapabilities = computed(() => [
           :index="feature.index"
           :title="feature.title"
           :text="feature.text"
+          :metric="feature.metric"
+          :metric-label="feature.metricLabel"
+          :live="feature.live"
         />
       </RevealOnScroll>
     </section>
@@ -92,6 +91,10 @@ const aiCapabilities = computed(() => [
           </div>
         </article>
       </div>
+    </RevealOnScroll>
+
+    <RevealOnScroll>
+      <ModerationDemo />
     </RevealOnScroll>
 
     <RevealOnScroll tag="section" class="showcase-band">
