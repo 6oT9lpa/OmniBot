@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import RevealOnScroll from "./RevealOnScroll.vue";
+import { Code2 } from "@lucide/vue";
 import { useActivityStore } from "../../stores/activity.store";
 import { openExternalLink, shouldHandleExternalClick } from "../../utils/externalLinks";
 
@@ -15,6 +16,7 @@ const legalLinks = [
 ];
 
 const knowledgeBaseUrl = `${githubDocsBase}/KNOWLEDGE_BASE.md`;
+const sourceUrl = "https://github.com/6oT9lpa/discord-ai-moderation-bot";
 
 const productLinks = [
   { key: "footer.welcome", href: `${knowledgeBaseUrl}#5-welcome-alerts` },
@@ -66,9 +68,14 @@ async function handleExternalClick(event: MouseEvent, url: string) {
 
     <div class="footer-bottom">
       <p>{{ $t("footer.copyright", { year: currentYear }) }}</p>
-      <a class="donate-button" href="https://boosty.to/6o9lpa" target="_blank" rel="noreferrer" @click="handleExternalClick($event, 'https://boosty.to/6o9lpa')">
-        {{ $t("footer.donate") }}
-      </a>
+      <div class="footer-actions">
+        <a class="footer-social-link" :href="sourceUrl" target="_blank" rel="noreferrer" :aria-label="$t('footer.github')" @click="handleExternalClick($event, sourceUrl)">
+          <Code2 :size="17" /><span>{{ $t("footer.github") }}</span>
+        </a>
+        <a class="donate-button" href="https://boosty.to/6o9lpa" target="_blank" rel="noreferrer" @click="handleExternalClick($event, 'https://boosty.to/6o9lpa')">
+          {{ $t("footer.donate") }}
+        </a>
+      </div>
     </div>
   </RevealOnScroll>
 </template>

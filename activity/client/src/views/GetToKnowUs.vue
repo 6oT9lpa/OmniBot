@@ -4,6 +4,7 @@ import { computed } from "vue";
 import StaggeredHeadline from "../components/common/StaggeredHeadline.vue";
 import AboutModulePanel from "../components/landing/AboutModulePanel.vue";
 import AboutPanel from "../components/landing/AboutPanel.vue";
+import RoleAccessPreview from "../components/landing/RoleAccessPreview.vue";
 import { t } from "../i18n";
 
 const principles = computed(() => [
@@ -27,6 +28,7 @@ const facts = computed(() => [
   { value: "8+", label: t("about.fact.modules") },
   { value: "4", label: t("about.fact.roles") },
   { value: "1", label: t("about.fact.activity") },
+  { value: "24/7", label: t("about.fact.availability") },
 ]);
 
 const modules = computed(() => ["welcome", "role-panels", "creator-alerts", "dev-blog", "ai-moderator", "logs", "server-stats", "voice-rooms", "health"].map((key) => t(`module.${key}`)));
@@ -69,7 +71,12 @@ const modulePanels = computed(() => [
       </RevealOnScroll>
     </section>
 
-    <RevealOnScroll tag="section" class="about-grid">
+    <RevealOnScroll tag="section" class="about-transition">
+      <span>{{ $t("about.transition.eyebrow") }}</span>
+      <p>{{ $t("about.transition.text") }}</p>
+    </RevealOnScroll>
+
+    <RevealOnScroll tag="section" class="about-grid about-grid--support">
       <AboutPanel :eyebrow="$t('about.pillars.eyebrow')" :title="$t('about.pillars.title')">
         <ul>
           <li v-for="pillar in pillars" :key="pillar">{{ pillar }}</li>
@@ -101,15 +108,11 @@ const modulePanels = computed(() => [
       </RevealOnScroll>
     </section>
 
-    <RevealOnScroll tag="section" class="about-grid">
-      <AboutPanel :eyebrow="$t('about.roles.eyebrow')" :title="$t('about.roles.title')">
-        <ul>
-          <li>{{ $t("about.roles.standard") }}</li>
-          <li>{{ $t("about.roles.creator") }}</li>
-          <li>{{ $t("about.roles.developer") }}</li>
-          <li>{{ $t("about.roles.admin") }}</li>
-        </ul>
-      </AboutPanel>
+    <RevealOnScroll>
+      <RoleAccessPreview />
+    </RevealOnScroll>
+
+    <RevealOnScroll tag="section" class="about-grid about-grid--closing">
       <AboutPanel :eyebrow="$t('about.map.eyebrow')" :title="$t('about.map.title')">
         <p>{{ $t("about.map.text") }}</p>
       </AboutPanel>
