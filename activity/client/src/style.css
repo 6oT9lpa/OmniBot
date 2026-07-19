@@ -1820,38 +1820,17 @@ a {
   top: 0;
   height: 100vh;
   padding: 18px 16px;
-  direction: rtl;
+  direction: ltr;
   overflow-x: hidden;
   overflow-y: auto;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   border-right: 1px solid var(--border);
   backdrop-filter: blur(18px);
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--accent) 20%, transparent) transparent;
-}
-
-.panel-sidebar > * {
-  direction: ltr;
+  scrollbar-width: none;
 }
 
 .panel-sidebar::-webkit-scrollbar {
-  width: 5px;
-}
-
-.panel-sidebar::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  border: 1px solid transparent;
-  border-radius: 99px;
-  background-clip: padding-box;
-}
-
-.panel-sidebar:hover {
-  scrollbar-color: color-mix(in srgb, var(--accent) 36%, transparent) transparent;
-}
-
-.panel-sidebar:hover::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  display: none;
 }
 
 .theme-light .panel-sidebar {
