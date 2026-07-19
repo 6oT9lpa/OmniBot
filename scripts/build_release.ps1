@@ -11,6 +11,7 @@ if (Test-Path $Archive) {
 tar --exclude='./.git' `
     --exclude='./.agents' `
     --exclude='./.codex' `
+    --exclude='./.codebase-memory' `
     --exclude='./.idea' `
     --exclude='./.vscode' `
     --exclude='./venv' `
