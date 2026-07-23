@@ -4,7 +4,7 @@ import disnake
 from disnake.ext import commands
 
 from core.domain.channel_purpose import ChannelPurpose
-from application.services import WelcomeService, ChannelService
+from application.services import WelcomeService, ChannelService, MemberJoinHistoryService
 from infrastructure.logging import get_logger
 from presentation.cogs.member_events import JoinLogEmbedBuilder
 from presentation.cogs.member_events import LeaveLogEmbedBuilder
@@ -19,10 +19,12 @@ class MemberEventsCog(commands.Cog):
         bot: commands.Bot,
         channel_service: ChannelService,
         welcome_service: WelcomeService,
+        join_history_service: MemberJoinHistoryService,
     ):
         self._bot = bot
         self._channel_service = channel_service
         self._welcome_service = welcome_service
+        self._join_history_service = join_history_service
         logger.info("MemberEventsCog initialized")
 
     async def _get_log_channel(
@@ -51,6 +53,7 @@ class MemberEventsCog(commands.Cog):
         )
 
         try:
+            await self._join_history_service.record_join(member.guild.id, member.id, member.joined_at)
             await self._send_welcome_dm(member)
             await self._log_member_join(member)
         except Exception as e:

@@ -1,0 +1,11 @@
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from datetime import datetime
+
+
+class MemberJoinHistoryRepositoryInterface(ABC):
+    @abstractmethod
+    async def record_join(self, guild_id: int, user_id: int, joined_at: datetime) -> bool:
+        """Store a join and return whether it is the member's first recorded join."""
+        raise NotImplementedError

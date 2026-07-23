@@ -2,7 +2,7 @@ from typing import Optional
 
 from disnake.ext import commands
 
-from application.services import WelcomeService, ChannelService
+from application.services import WelcomeService, ChannelService, MemberJoinHistoryService
 from infrastructure.logging import get_logger
 from presentation.cogs import MemberEventsCog
 from presentation.cogs.member_events import WelcomeConfigCommands
@@ -22,6 +22,9 @@ class MemberEventsModule:
     async def get_welcome_service(self) -> WelcomeService:
         return await self._container.get_welcome_service()
 
+    async def get_member_join_history_service(self) -> MemberJoinHistoryService:
+        return await self._container.get_member_join_history_service()
+
     async def get_cog(self, bot: commands.Bot) -> Optional[MemberEventsCog]:
         if self._cog:
             return self._cog
@@ -29,11 +32,13 @@ class MemberEventsModule:
         try:
             channel_service = await self.get_channel_service()
             welcome_service = await self.get_welcome_service()
+            join_history_service = await self.get_member_join_history_service()
 
             self._cog = MemberEventsCog(
                 bot=bot,
                 channel_service=channel_service,
                 welcome_service=welcome_service,
+                join_history_service=join_history_service,
             )
             
             logger.info("MemberEventsCog created and configured")
