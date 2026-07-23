@@ -2,6 +2,7 @@ import { apiRequest } from "./client";
 import type {
   ActivityHealth,
   AiModeratorSettings,
+  AiModeratorMetrics,
   ActivityAccessRole,
   ActivityAuditPage,
   ActivityDashboardResponse,
@@ -26,6 +27,10 @@ import type {
 
 export function getAiModeratorSettings(guildId: string, token: string) {
   return apiRequest<AiModeratorSettings>(`/api/ai-moderator/settings?guild_id=${guildId}`, {}, token);
+}
+
+export function getAiModeratorMetrics(guildId: string, token: string) {
+  return apiRequest<AiModeratorMetrics>(`/api/ai-moderator/metrics?guild_id=${guildId}`, {}, token);
 }
 
 export function saveAiModeratorChannels(guildId: string, token: string, channelIds: string[]) {

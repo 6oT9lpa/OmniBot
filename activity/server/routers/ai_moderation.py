@@ -14,6 +14,11 @@ async def get_ai_moderator_settings(guild_id: int = Query(gt=0), access_token: s
     return await service.get_settings(guild_id, access_token)
 
 
+@router.get("/api/ai-moderator/metrics")
+async def get_ai_moderator_metrics(guild_id: int = Query(gt=0), access_token: str = Depends(require_bearer_token)) -> dict[str, object]:
+    return await service.get_metrics(guild_id, access_token)
+
+
 @router.put("/api/ai-moderator/channels")
 async def save_ai_moderator_channels(payload: AiModerationChannelsPayload, access_token: str = Depends(require_bearer_token)) -> dict[str, object]:
     return await service.save_channels(payload, access_token)

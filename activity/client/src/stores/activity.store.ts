@@ -10,6 +10,7 @@ import {
   deleteVoiceRoom,
   getActivityAudit,
   getAiModeratorSettings,
+  getAiModeratorMetrics,
   getActivityDashboard,
   getActivityHealth,
   getActivityRoles,
@@ -53,7 +54,8 @@ import {
 } from "./mock-data";
 import type {
   ActivityHealth,
-  AiModeratorSettings,
+    AiModeratorSettings,
+    AiModeratorMetrics,
   ActivityAccessRole,
   ActivityAuditPage,
   ActivityDashboardResponse,
@@ -122,7 +124,8 @@ type State = {
   syncedRoles: ActivitySyncedRole[];
   botSettings: BotSettingsPayload | null;
   integrations: Record<string, unknown> | null;
-  aiModerator: AiModeratorSettings | null;
+    aiModerator: AiModeratorSettings | null;
+    aiModeratorMetrics: AiModeratorMetrics | null;
   discordSdk: DiscordSDK | null;
   auth: Auth | null;
 };
@@ -166,7 +169,8 @@ export const useActivityStore = defineStore("activity", {
     syncedRoles: [],
     botSettings: null,
     integrations: mockIntegrations,
-    aiModerator: null,
+      aiModerator: null,
+      aiModeratorMetrics: null,
     discordSdk: null,
     auth: null,
   }),
@@ -486,6 +490,10 @@ export const useActivityStore = defineStore("activity", {
     async saveAiModeratorPolicyValue(policy: Record<string, unknown>) {
       if (!this.session || !this.token || this.mode === "local") return;
       this.aiModerator = await saveAiModeratorPolicy(this.session.guild_id, this.token, policy);
+    },
+    async loadAiModeratorMetrics() {
+      if (!this.session || !this.token || this.mode === "local") return;
+      this.aiModeratorMetrics = await getAiModeratorMetrics(this.session.guild_id, this.token);
     },
 
     async createDevBlog(draft: Omit<DevBlogDraft, "guild_id">) {

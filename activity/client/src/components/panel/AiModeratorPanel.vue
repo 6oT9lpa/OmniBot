@@ -6,7 +6,7 @@ import { useActivityStore } from "../../stores/activity.store";
 import type { AiModerationAction, AiModerationLabelPolicy, AiModerationPolicy } from "../../types/activity.types";
 import { t } from "../../i18n";
 
-type AiModeratorTab = "channels" | "policy" | "blacklist" | "domains" | "actions" | "risk";
+type AiModeratorTab = "channels" | "policy" | "blacklist" | "domains" | "actions" | "risk" | "metrics";
 
 type LabelDefinition = {
   key: string;
@@ -22,10 +22,11 @@ const blacklistDraft = ref("");
 const domainDraft = ref("");
 const status = ref("");
 const settings = computed(() => activity.aiModerator);
-const actionOptions = (["IGNORE", "LOG", "REVIEW", "WARN", "DELETE", "DELETE_WARN", "TIMEOUT", "KICK", "BAN"] as AiModerationAction[])
-  .map((value) => ({ value, labelKey: `ai.action.${value}` }));
+const actionOptions = computed(() => (["IGNORE", "LOG", "REVIEW", "WARN", "DELETE", "DELETE_WARN", "TIMEOUT", "KICK", "BAN"] as AiModerationAction[])
+  .filter((value) => !["TIMEOUT", "KICK", "BAN"].includes(value) || (moderationPolicy.enforcement_mode === "ELEVATED" && moderationPolicy.beta_enforcement_acknowledged && ({ TIMEOUT: moderationPolicy.allow_automated_timeout, KICK: moderationPolicy.allow_automated_kick, BAN: moderationPolicy.allow_automated_ban }[value] ?? false)))
+  .map((value) => ({ value, labelKey: `ai.action.${value}` })));
 const actionRank: Record<AiModerationAction, number> = Object.fromEntries(
-  actionOptions.map((action, index) => [action.value, index]),
+  ["IGNORE", "LOG", "REVIEW", "WARN", "DELETE", "DELETE_WARN", "TIMEOUT", "KICK", "BAN"].map((value, index) => [value, index]),
 ) as Record<AiModerationAction, number>;
 const labelDefinitions: LabelDefinition[] = [
   ...([
@@ -38,8 +39,8 @@ const labelDefinitions: LabelDefinition[] = [
     key, titleKey: `ai.label.${key}.title`, descriptionKey: `ai.label.${key}.description`, defaultPolicy: policy(risk, min, max),
   })),
 ];
-const tabs = (["channels", "policy", "blacklist", "domains", "actions", "risk"] as AiModeratorTab[])
-  .map((key) => ({ key, labelKey: `ai.tab.${key}` }));
+const tabs = computed(() => (["channels", "policy", "blacklist", "domains", "actions", "risk", ...(settings.value?.metrics_enabled ? ["metrics"] : [])] as AiModeratorTab[])
+  .map((key) => ({ key, labelKey: `ai.tab.${key}` })));
 const moderationPolicy = reactive<AiModerationPolicy>(emptyPolicy());
 
 watch(settings, (value) => {
@@ -58,6 +59,12 @@ function emptyPolicy(): AiModerationPolicy {
     labels: Object.fromEntries(labelDefinitions.map((item) => [item.key, { ...item.defaultPolicy }])),
     blacklist_action: "DELETE_WARN",
     unapproved_domain_action: "REVIEW",
+    enforcement_mode: "SHADOW",
+    limited_min_confidence: 0.95,
+    beta_enforcement_acknowledged: false,
+    allow_automated_timeout: false,
+    allow_automated_kick: false,
+    allow_automated_ban: false,
   };
 }
 
@@ -70,6 +77,12 @@ function clonePolicy(source: AiModerationPolicy | undefined): AiModerationPolicy
     labels: Object.fromEntries(labelDefinitions.map((item) => [item.key, { ...source.labels[item.key] ?? item.defaultPolicy }])),
     blacklist_action: source.blacklist_action,
     unapproved_domain_action: source.unapproved_domain_action,
+    enforcement_mode: source.enforcement_mode ?? "SHADOW",
+    limited_min_confidence: source.limited_min_confidence ?? 0.95,
+    beta_enforcement_acknowledged: source.beta_enforcement_acknowledged ?? false,
+    allow_automated_timeout: source.allow_automated_timeout ?? false,
+    allow_automated_kick: source.allow_automated_kick ?? false,
+    allow_automated_ban: source.allow_automated_ban ?? false,
   };
 }
 
@@ -118,6 +131,10 @@ async function savePolicy(message: string) {
   }
 }
 
+async function loadMetrics() {
+  try { await activity.loadAiModeratorMetrics(); } catch (error) { status.value = error instanceof Error ? error.message : "Metrics are unavailable"; }
+}
+
 function addBlacklistWords() {
   const values = splitValues(blacklistDraft.value);
   moderationPolicy.blacklist_words = unique([...moderationPolicy.blacklist_words, ...values]);
@@ -156,9 +173,7 @@ function removeValue(values: string[], value: string): string[] {
     <div class="section-heading">
       <span>{{ $t("module.ai-moderator") }}</span>
       <h2>{{ $t("ai.heading") }}</h2>
-      <div>
-        <p>{{ $t("ai.description") }}</p>
-      </div>
+      <div><p>{{ $t("ai.description") }}</p></div>
     </div>
 
   </RevealOnScroll>
@@ -251,12 +266,31 @@ function removeValue(values: string[], value: string): string[] {
       <div class="form-actions"><button class="primary-button" type="button" :disabled="activity.moduleLoading" @click="savePolicy($t('ai.actions_saved'))">{{ $t("ai.save_actions") }}</button></div>
     </div>
 
-    <div v-else class="ai-moderation-workspace">
+    <div v-else-if="activeTab === 'risk'" class="ai-moderation-workspace">
       <div class="ai-moderation-section-copy"><div><span class="ai-moderation-kicker">{{ $t("ai.sensitivity") }}</span><h3>{{ $t("ai.risk_heading") }}</h3><p>{{ $t("ai.risk_help") }}</p></div></div>
       <div class="ai-risk-list">
         <label v-for="label in labelDefinitions" :key="label.key" class="ai-risk-card"><span><strong>{{ $t(label.titleKey) }}</strong><small>{{ $t(label.descriptionKey) }}</small></span><input v-model.number="policyFor(label.key).risk_threshold" type="range" min="0" max="100" step="1" /><output>{{ policyFor(label.key).risk_threshold }}</output></label>
       </div>
       <div class="form-actions"><button class="primary-button" type="button" :disabled="activity.moduleLoading" @click="savePolicy($t('ai.risk_saved'))">{{ $t("ai.save_risk") }}</button></div>
+    </div>
+
+    <div v-else-if="activeTab === 'enforcement'" class="ai-moderation-workspace">
+      <div class="ai-moderation-section-copy"><div><span class="ai-moderation-kicker">BETA ENFORCEMENT</span><h3>Limited enforcement</h3><p>Shadow mode records recommendations only. Limited mode can delete high-confidence hard-rule invite/scam cases and warn for soft violations.</p></div></div>
+      <div class="settings-list">
+        <article><strong>Mode</strong><select v-model="moderationPolicy.enforcement_mode"><option value="SHADOW">Shadow — no automatic punishment</option><option value="LIMITED">Limited — DELETE/WARN only</option><option value="ELEVATED">Elevated — requires explicit toggles</option></select></article>
+        <article><strong>Limited confidence</strong><input v-model.number="moderationPolicy.limited_min_confidence" type="number" min="0.8" max="1" step="0.01" /></article>
+        <article><strong>I accept beta responsibility</strong><input v-model="moderationPolicy.beta_enforcement_acknowledged" type="checkbox" /></article>
+        <article><strong>Allow automatic timeout</strong><input v-model="moderationPolicy.allow_automated_timeout" :disabled="!moderationPolicy.beta_enforcement_acknowledged || moderationPolicy.enforcement_mode !== 'ELEVATED'" type="checkbox" /></article>
+        <article><strong>Allow automatic kick</strong><input v-model="moderationPolicy.allow_automated_kick" :disabled="!moderationPolicy.beta_enforcement_acknowledged || moderationPolicy.enforcement_mode !== 'ELEVATED'" type="checkbox" /></article>
+        <article><strong>Allow automatic ban</strong><input v-model="moderationPolicy.allow_automated_ban" :disabled="!moderationPolicy.beta_enforcement_acknowledged || moderationPolicy.enforcement_mode !== 'ELEVATED'" type="checkbox" /></article>
+      </div>
+      <div class="form-actions"><button class="primary-button" type="button" :disabled="activity.moduleLoading" @click="savePolicy('Enforcement settings saved.')">Save enforcement</button></div>
+    </div>
+
+    <div v-else class="ai-moderation-workspace">
+      <div class="ai-moderation-section-copy"><div><span class="ai-moderation-kicker">PRIVATE METRICS</span><h3>Shadow mode quality</h3><p>Visible only after a trusted owner or ADMIN grants access via DM.</p></div><button class="ghost-button" type="button" @click="loadMetrics">Refresh</button></div>
+      <div v-if="activity.aiModeratorMetrics" class="ai-policy-summary"><article><strong>{{ activity.aiModeratorMetrics.would_delete }}</strong><span>Would delete</span></article><article><strong>{{ activity.aiModeratorMetrics.review_count }}</strong><span>Sent to review</span></article><article><strong>{{ activity.aiModeratorMetrics.average_latency_ms }} ms</strong><span>Average latency</span></article><article><strong>{{ activity.aiModeratorMetrics.safe_false_positive_rate === null ? '—' : `${(activity.aiModeratorMetrics.safe_false_positive_rate * 100).toFixed(1)}%` }}</strong><span>SAFE false positives</span></article></div>
+      <div v-if="activity.aiModeratorMetrics" class="settings-list"><article><strong>Frequently confused classes</strong><span>{{ activity.aiModeratorMetrics.confused_classes.map((item) => `${item.name}: ${item.count}`).join(', ') || 'No moderator corrections yet' }}</span></article><article><strong>Noisy rules</strong><span>{{ activity.aiModeratorMetrics.noisy_rules.map((item) => `${item.name}: ${item.count}`).join(', ') || 'No events yet' }}</span></article><article><strong>Moderator correction speed</strong><span>{{ activity.aiModeratorMetrics.moderator_correction_seconds === null ? '—' : `${activity.aiModeratorMetrics.moderator_correction_seconds}s` }}</span></article></div>
     </div>
 
     <p v-if="status" class="ai-moderation-status" role="status">{{ status }}</p>

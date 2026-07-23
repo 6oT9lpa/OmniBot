@@ -176,6 +176,18 @@ export type AiModeratorSettings = {
   policy: AiModerationPolicy;
   is_default_policy: boolean;
   available_channels: DiscordChannel[];
+  metrics_enabled: boolean;
+};
+
+export type AiModeratorMetrics = {
+  total_messages: number;
+  would_delete: number;
+  review_count: number;
+  average_latency_ms: number;
+  safe_false_positive_rate: number | null;
+  confused_classes: Array<{ name: string; count: number }>;
+  noisy_rules: Array<{ name: string; count: number }>;
+  moderator_correction_seconds: number | null;
 };
 
 export type AiModerationAction = "IGNORE" | "LOG" | "REVIEW" | "WARN" | "DELETE" | "DELETE_WARN" | "TIMEOUT" | "KICK" | "BAN";
@@ -192,6 +204,12 @@ export type AiModerationPolicy = {
   labels: Record<string, AiModerationLabelPolicy>;
   blacklist_action: AiModerationAction;
   unapproved_domain_action: AiModerationAction;
+  enforcement_mode: "SHADOW" | "LIMITED" | "ELEVATED";
+  limited_min_confidence: number;
+  beta_enforcement_acknowledged: boolean;
+  allow_automated_timeout: boolean;
+  allow_automated_kick: boolean;
+  allow_automated_ban: boolean;
 };
 
 export type DevBlogEmbed = {

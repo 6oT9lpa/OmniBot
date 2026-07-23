@@ -3442,6 +3442,33 @@ input[type="color"] {
   font-size: 0.84rem;
 }
 
+.ai-beta-workspace { display: grid; gap: 18px; }
+.ai-beta-warning { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; padding: 20px; border: 1px solid rgba(245, 182, 66, .45); border-radius: 14px; background: linear-gradient(120deg, rgba(245, 182, 66, .12), rgba(20, 20, 24, .2)); }
+.ai-beta-warning > svg { color: #f5bd4a; margin-top: 3px; }
+.ai-beta-warning span, .ai-beta-card .ai-moderation-kicker { color: #f5bd4a; font-size: .72rem; font-weight: 800; letter-spacing: .09em; }
+.ai-beta-warning h3, .ai-beta-card h3 { margin: 4px 0 6px; }
+.ai-beta-warning p, .ai-beta-card p { margin: 0; color: var(--muted-text); line-height: 1.55; }
+.ai-beta-card { display: grid; gap: 18px; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: rgba(19, 19, 23, .72); }
+.ai-beta-card header { display: flex; justify-content: space-between; gap: 16px; }
+.ai-beta-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.ai-beta-fields label { display: grid; gap: 7px; color: var(--muted-text); font-size: .86rem; font-weight: 700; }
+.ai-beta-toggle-list { display: grid; gap: 10px; }
+.ai-beta-toggle { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 15px; border: 1px solid var(--border); border-radius: 10px; background: rgba(255, 255, 255, .02); }
+.ai-beta-toggle > span { display: grid; gap: 4px; }
+.ai-beta-toggle strong { font-size: .93rem; }
+.ai-beta-toggle small { color: var(--muted-text); line-height: 1.4; }
+.ai-beta-toggle.disabled { opacity: .58; }
+.ai-beta-switch { flex: 0 0 auto; display: inline-flex; align-items: center; width: 48px; height: 28px; padding: 3px; border: 1px solid #575760; border-radius: 999px; background: #303037; cursor: pointer; transition: background .18s ease, border-color .18s ease; }
+.ai-beta-switch i { width: 20px; height: 20px; border-radius: 50%; background: #f5f5f7; transform: translateX(0); transition: transform .18s ease; }
+.ai-beta-switch.is-on { border-color: #6e71ff; background: #595df0; }
+.ai-beta-switch.is-on i { transform: translateX(20px); }
+.ai-beta-switch:disabled { cursor: not-allowed; }
+
+@media (max-width: 680px) {
+  .ai-beta-fields { grid-template-columns: 1fr; }
+  .ai-beta-warning { padding: 16px; }
+}
+
 @media (max-width: 860px) {
   .ai-rule-card,
   .ai-risk-card {
