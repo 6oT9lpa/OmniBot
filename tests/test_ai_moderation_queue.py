@@ -19,6 +19,17 @@ class _AiClientStub:
         return None
 
 
+class _FailingAiClientStub(_AiClientStub):
+    def __init__(self) -> None:
+        self._calls = 0
+
+    async def moderate(self, request: AiModerationRequest) -> AiModerationDecision:
+        self._calls += 1
+        if self._calls == 1:
+            raise TimeoutError("AI endpoint is unavailable")
+        return await super().moderate(request)
+
+
 @pytest.mark.asyncio
 async def test_queue_delivers_decision_end_to_end() -> None:
     logger.info("AI queue test expected=one sanitized decision callback actual=queue dispatch")
@@ -47,3 +58,24 @@ async def test_queue_is_bounded() -> None:
     request = AiModerationRequest(guild_id=1, channel_id=2, user_id=3, message_id=4, raw_text="test content", created_at=datetime.now(timezone.utc))
     assert queue.submit(request) is True
     assert queue.submit(request.model_copy(update={"message_id": 5})) is False
+
+
+@pytest.mark.asyncio
+async def test_queue_survives_ai_api_failure_and_processes_the_next_request() -> None:
+    completed = asyncio.Event()
+    received: list[int] = []
+
+    async def on_decision(request: AiModerationRequest, _: AiModerationDecision) -> None:
+        received.append(request.message_id)
+        completed.set()
+
+    client = _FailingAiClientStub()
+    queue = AiModerationQueue(client, 1, 2, on_decision)
+    await queue.start()
+    try:
+        assert queue.submit(AiModerationRequest(guild_id=1, channel_id=2, user_id=3, message_id=4, raw_text="first", created_at=datetime.now(timezone.utc)))
+        assert queue.submit(AiModerationRequest(guild_id=1, channel_id=2, user_id=3, message_id=5, raw_text="second", created_at=datetime.now(timezone.utc)))
+        await asyncio.wait_for(completed.wait(), timeout=1)
+    finally:
+        await queue.stop()
+    assert received == [5]

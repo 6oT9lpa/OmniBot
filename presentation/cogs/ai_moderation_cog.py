@@ -1,9 +1,16 @@
+"""Discord edge adapter for the AI moderation pipeline.
+
+The cog collects Discord-only context, sends an immutable request to the AI
+service, applies server enforcement policy, and executes the resulting plan.
+Business policy stays in application services rather than Discord callbacks.
+"""
+
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import disnake
-from disnake.ext import commands
+from disnake.ext import commands, tasks
 
 from application.dto.ai_moderation_decision import AiModerationDecision
 from application.dto.ai_moderation_request import AiModerationRequest
@@ -11,26 +18,62 @@ from application.services.ai_moderation_queue import AiModerationQueue
 from application.services.ai_moderation_policy_enforcer import AiModerationPolicyEnforcer
 from application.services.ai_moderation_settings_service import AiModerationSettingsService
 from application.services.channel_service import ChannelService
+from application.services.discord_message_content import DiscordMessageContentNormalizer
+from application.services.user_moderation_context_builder import UserModerationContextBuilder
 from core.domain.channel_purpose import ChannelPurpose
+from core.domain.ai_moderation_guild_policy import AiModerationGuildPolicy
+from core.domain.value_objects import PunishmentType
+from core.interfaces.repositories.punishment_repository_interface import PunishmentRepositoryInterface
+from core.interfaces.repositories.ai_moderation_repository_interface import AiModerationRepositoryInterface
 from infrastructure.logging import get_logger
+from presentation.embeds.base import EmbedBuilder, DEFAULT_COLORS
 
 logger = get_logger(__name__)
 
 
 class AiModerationCog(commands.Cog):
-    def __init__(self, bot: commands.Bot, settings_service: AiModerationSettingsService, channel_service: ChannelService, queue: AiModerationQueue) -> None:
+    """Connect Discord messages, moderation decisions and audit logging."""
+    def __init__(self, bot: commands.Bot, settings_service: AiModerationSettingsService, channel_service: ChannelService, queue: AiModerationQueue, context_builder: UserModerationContextBuilder, punishment_repository: PunishmentRepositoryInterface, ai_repository: AiModerationRepositoryInterface | None = None) -> None:
         self._bot = bot
         self._settings_service = settings_service
         self._channel_service = channel_service
         self._queue = queue
+        self._context_builder = context_builder
+        self._punishment_repository = punishment_repository
+        self._ai_repository = ai_repository
+        self._content_normalizer = DiscordMessageContentNormalizer()
         self._policy_enforcer = AiModerationPolicyEnforcer()
 
     async def cog_load(self) -> None:
         await self._queue.start()
+        if self._ai_repository is not None:
+            self.restore_administrator_roles.start()
         logger.info("AI moderation cog loaded")
 
     async def shutdown(self) -> None:
+        self.restore_administrator_roles.cancel()
         await self._queue.stop()
+
+    @tasks.loop(minutes=1)
+    async def restore_administrator_roles(self) -> None:
+        """Return saved administrator roles only after the related timeout ends."""
+        if self._ai_repository is None:
+            return
+        for item in await self._ai_repository.list_due_role_restorations():
+            guild = self._bot.get_guild(int(item["guild_id"]))
+            if guild is None:
+                continue
+            member = guild.get_member(int(item["user_id"]))
+            if member is None:
+                continue
+            raw_role_ids = item.get("role_ids_json", [])
+            role_ids = tuple(int(role_id) for role_id in raw_role_ids) if isinstance(raw_role_ids, list) else ()
+            await self._restore_roles(guild, member, role_ids, "AI moderation timeout ended")
+            await self._ai_repository.mark_roles_restored(guild.id, member.id)
+
+    @restore_administrator_roles.before_loop
+    async def before_restore_administrator_roles(self) -> None:
+        await self._bot.wait_until_ready()
 
     @commands.Cog.listener()
     async def on_message(self, message: disnake.Message) -> None:
@@ -38,22 +81,57 @@ class AiModerationCog(commands.Cog):
             return
         if not await self._settings_service.is_enabled_for_channel(message.guild.id, message.channel.id):
             return
-        request = AiModerationRequest(
+        request = await self._build_request(message, "CREATE")
+        if request is None:
+            return
+        if not self._queue.submit(request):
+            logger.warning("AI moderation queue rejected message guild_id=%s message_id=%s", message.guild.id, message.id)
+
+    @commands.Cog.listener()
+    async def on_message_edit(self, before: disnake.Message, after: disnake.Message) -> None:
+        if after.author.bot or after.guild is None or not isinstance(after.channel, (disnake.TextChannel, disnake.NewsChannel)):
+            return
+        if not self._content_normalizer.changed(before, after):
+            return
+        request = await self._build_request(after, "UPDATE")
+        if request is not None and not self._queue.submit(request):
+            logger.warning("AI moderation queue rejected updated message guild_id=%s message_id=%s", after.guild.id, after.id)
+
+    async def _build_request(self, message: disnake.Message, event_type: str) -> AiModerationRequest | None:
+        """Build a bounded request with author history and reply context.
+
+        Recent messages are supplied for flood detection only; the AI service
+        still evaluates the current message content as a separate signal.
+        """
+        if message.guild is None or not isinstance(message.channel, (disnake.TextChannel, disnake.NewsChannel)):
+            return None
+        if not await self._settings_service.is_enabled_for_channel(message.guild.id, message.channel.id):
+            return None
+        policy = AiModerationGuildPolicy.model_validate(await self._settings_service.get_policy(message.guild.id))
+        user_context = await self._context_builder.build(message.author, message.guild.id, message.author.id, policy.context_window_days)
+        recent_messages, recent_timestamps = await self._recent_author_messages(message)
+        metadata = await self._reply_context(message)
+        return AiModerationRequest(
             guild_id=message.guild.id,
             channel_id=message.channel.id,
             user_id=message.author.id,
             message_id=message.id,
             raw_text=message.content,
             created_at=message.created_at,
+            author_created_at=user_context.account_created_at,
+            member_joined_at=user_context.joined_guild_at,
             reply_to_message_id=message.reference.message_id if message.reference else None,
             mention_count=len(message.mentions),
             role_mention_count=len(message.role_mentions),
             channel_mention_count=len(message.channel_mentions),
             has_attachments=bool(message.attachments),
             attachment_count=len(message.attachments),
+            recent_messages=recent_messages,
+            recent_message_timestamps=recent_timestamps,
+            metadata=metadata,
+            event_type=event_type,
+            user_context=user_context,
         )
-        if not self._queue.submit(request):
-            logger.warning("AI moderation queue rejected message guild_id=%s message_id=%s", message.guild.id, message.id)
 
     @commands.slash_command(name="set", description="AI moderation settings")
     @commands.has_permissions(administrator=True)
@@ -101,7 +179,21 @@ class AiModerationCog(commands.Cog):
         policy["allowed_domains"] = tuple(item.strip().lower() for item in domains.split(",") if item.strip())[:200]
         await self._save_policy(ctx, policy, "Domain preferences saved.")
 
+    @ai_policy.sub_command(name="context-window", description="Set the user-history window in days")
+    async def set_context_window(self, ctx: disnake.ApplicationCommandInteraction, days: int) -> None:
+        policy = await self._settings_service.get_policy(ctx.guild_id)
+        policy["context_window_days"] = days
+        await self._save_policy(ctx, policy, "Moderation context window saved.")
+
+    @ai_policy.sub_command(name="repeat-offender", description="Escalate AI moderation after repeated punishments")
+    async def set_repeat_offender_policy(self, ctx: disnake.ApplicationCommandInteraction, threshold: int, action: str = "TIMEOUT") -> None:
+        policy = await self._settings_service.get_policy(ctx.guild_id)
+        policy["repeat_offender_threshold"] = threshold
+        policy["repeat_offender_action"] = action.upper()
+        await self._save_policy(ctx, policy, "Repeat-offender policy saved.")
+
     async def handle_decision(self, request: AiModerationRequest, decision: AiModerationDecision) -> None:
+        """Enforce a queued recommendation and persist its execution outcome."""
         policy = await self._settings_service.get_policy(request.guild_id)
         try:
             decision = self._policy_enforcer.apply(request, decision, policy)
@@ -116,13 +208,37 @@ class AiModerationCog(commands.Cog):
         status = "SUCCESS"
         try:
             for action in decision.execution_plan:
-                await self._execute_action(guild, member, message, action, decision.dry_run)
-                await self._queue.report_action(decision.event_id, action, "DRY_RUN" if decision.dry_run else "SUCCESS", decision.dry_run)
+                await self._execute_action(guild, member, message, action, decision.dry_run, decision, request)
+                await self._record_ai_punishment(request, action, decision.dry_run)
+            # The AI API tracks a single decision, while Discord enforcement
+            # may need multiple technical steps (for example DELETE → TIMEOUT).
+            # Report only the final decision after every step has succeeded.
+            await self._queue.report_action(
+                decision.event_id,
+                decision.action,
+                "DRY_RUN" if decision.dry_run else "SUCCESS",
+                decision.dry_run,
+            )
         except Exception:
             status = "FAILED"
             logger.exception("AI moderation action failed guild_id=%s message_id=%s", request.guild_id, request.message_id)
-        await self._settings_service.record_event(request.guild_id, request.channel_id, request.message_id, request.user_id, decision.risk_score, decision.action, decision.primary_label, decision.labels, status)
-        await self._send_log(guild, decision, status)
+        # Audit persistence must never suppress the moderator-facing decision log.
+        # The log is the immediate feedback loop for Shadow Mode and is useful even
+        # when a transient database problem prevents dataset collection.
+        try:
+            await self._settings_service.record_event(
+                request.guild_id, request.channel_id, request.message_id, request.user_id,
+                decision.risk_score, decision.action, decision.proposed_action,
+                decision.primary_label, decision.labels, decision.confidence,
+                decision.latency_ms, status,
+            )
+        except Exception:
+            logger.exception(
+                "Could not persist AI moderation event guild_id=%s message_id=%s",
+                request.guild_id,
+                request.message_id,
+            )
+        await self._send_log(guild, request, decision, status)
 
     async def _save_policy(self, ctx: disnake.ApplicationCommandInteraction, policy: dict[str, object], success_message: str) -> None:
         try:
@@ -133,29 +249,242 @@ class AiModerationCog(commands.Cog):
         await self._settings_service.save_policy(ctx.guild_id, validated_policy)
         await ctx.response.send_message(success_message, ephemeral=True)
 
-    async def _execute_action(self, guild: disnake.Guild, member: disnake.Member | None, message: disnake.PartialMessage | None, action: str, dry_run: bool) -> None:
+    async def _execute_action(self, guild: disnake.Guild, member: disnake.Member | None, message: disnake.PartialMessage | None, action: str, dry_run: bool, decision: AiModerationDecision, request: AiModerationRequest) -> None:
         if dry_run or action in {"IGNORE", "LOG", "REVIEW"}:
             return
-        if action == "DELETE" and message is not None:
-            await message.delete(reason="AI moderation policy")
-        elif action == "WARN" and member is not None:
-            await member.send("Your message was flagged by this server's moderation policy.")
+        if action in {"DELETE", "DELETE_WARN"} and message is not None:
+            # disnake only accepts an audit-log reason for bulk deletion; the
+            # single-message endpoint rejects it. Calling without it lets the
+            # configured Manage Messages permission perform the deletion.
+            logging_cog = self._bot.get_cog("LoggingCog")
+            if logging_cog is not None:
+                logging_cog.register_bot_message_deletion(message.id)
+            await message.delete()
+        if action in {"WARN", "DELETE_WARN"} and member is not None:
+            await self._send_warning_dm(member, guild, request, decision, action)
         elif action == "TIMEOUT" and member is not None:
-            await member.timeout(duration=timedelta(minutes=10), reason="AI moderation policy")
+            duration = self._timeout_duration(decision)
+            removed_role_ids = await self._remove_administrator_roles(member, "AI moderation timeout")
+            try:
+                await member.timeout(duration=duration, reason="AI moderation policy")
+                if removed_role_ids and self._ai_repository is not None:
+                    await self._ai_repository.schedule_role_restoration(
+                        guild.id,
+                        member.id,
+                        removed_role_ids,
+                        datetime.now() + duration,
+                    )
+            except Exception:
+                # Never leave an administrator stripped if Discord rejects the
+                # timeout or the restoration record cannot be persisted.
+                await self._restore_roles(guild, member, removed_role_ids, "AI moderation timeout rollback")
+                raise
         elif action == "KICK" and member is not None:
             await member.kick(reason="AI moderation policy")
         elif action == "BAN" and member is not None:
             await guild.ban(member, reason="AI moderation policy")
 
-    async def _send_log(self, guild: disnake.Guild, decision: AiModerationDecision, status: str) -> None:
+    async def _remove_administrator_roles(self, member: disnake.Member, reason: str) -> tuple[int, ...]:
+        """Remove only manageable Administrator roles and return their IDs."""
+        bot_member = member.guild.me
+        if bot_member is None:
+            return ()
+        roles = tuple(
+            role
+            for role in member.roles
+            if not role.is_default()
+            and not role.managed
+            and role.permissions.administrator
+            and role.position < bot_member.top_role.position
+        )
+        if not roles:
+            return ()
+        await member.remove_roles(*roles, reason=reason)
+        return tuple(role.id for role in roles)
+
+    async def _restore_roles(self, guild: disnake.Guild, member: disnake.Member, role_ids: tuple[int, ...], reason: str) -> None:
+        """Restore only still-manageable roles recorded before the timeout."""
+        bot_member = guild.me
+        if bot_member is None or not role_ids:
+            return
+        roles = tuple(
+            role
+            for role_id in role_ids
+            if (role := guild.get_role(role_id)) is not None
+            and not role.is_default()
+            and not role.managed
+            and role.position < bot_member.top_role.position
+            and role not in member.roles
+        )
+        if roles:
+            await member.add_roles(*roles, reason=reason)
+
+    async def _send_warning_dm(self, member: disnake.Member, guild: disnake.Guild, request: AiModerationRequest, decision: AiModerationDecision, action: str) -> None:
+        """Send a self-contained moderation notice that remains useful after deletion."""
+        _, action_title, _ = self._action_presentation(action)
+        labels = ", ".join(label.replace("_", " ").title() for label in (decision.labels or (decision.primary_label,)))
+        occurred_at = f"<t:{int(request.created_at.timestamp())}:F>"
+        embed = (
+            EmbedBuilder(color=DEFAULT_COLORS["warn"])
+            .set_title("Предупреждение AI-модератора")
+            .set_description("Одно из ваших сообщений нарушило правила сервера.")
+            .add_field("Сервер", guild.name, inline=False)
+            .add_field("Канал", f"<#{request.channel_id}>", inline=True)
+            .add_field("Когда", occurred_at, inline=True)
+            .add_field("Причина", labels, inline=False)
+            .add_field("Действие", action_title, inline=False)
+            .build()
+        )
+        try:
+            await member.send(embed=embed)
+        except (disnake.Forbidden, disnake.HTTPException):
+            # Closed DMs must not roll back an otherwise successful deletion.
+            logger.info("Could not send AI moderation DM user_id=%s guild_id=%s", member.id, guild.id)
+
+    @staticmethod
+    def _timeout_duration(decision: AiModerationDecision) -> timedelta:
+        """Keep timeout proportional to the engine's severity and aggregate risk."""
+        severity, risk = decision.severity, decision.risk_score
+        if severity >= 5 or risk >= 90:
+            return timedelta(hours=24)
+        if severity >= 4 or risk >= 75:
+            return timedelta(hours=6)
+        if severity >= 3 or risk >= 60:
+            return timedelta(hours=1)
+        if severity >= 2 or risk >= 40:
+            return timedelta(minutes=20)
+        return timedelta(minutes=10)
+
+    async def _record_ai_punishment(self, request: AiModerationRequest, action: str, dry_run: bool) -> None:
+        if dry_run:
+            return
+        punishment_type = {"TIMEOUT": PunishmentType.TIMEOUT, "BAN": PunishmentType.BAN}.get(action)
+        if punishment_type is None:
+            return
+        await self._punishment_repository.add_punishment(
+            request.user_id,
+            0,
+            punishment_type,
+            "AI moderation policy",
+            guild_id=request.guild_id,
+            message_id=request.message_id,
+            source="AI_MODERATOR",
+        )
+
+    async def _send_log(self, guild: disnake.Guild, request: AiModerationRequest, decision: AiModerationDecision, status: str) -> None:
         channel_id = await self._channel_service.get_purpose_channel(guild.id, ChannelPurpose.AI_MODERATION_LOG)
         channel = guild.get_channel(channel_id) if channel_id else None
+        if channel is None and channel_id:
+            try:
+                channel = await guild.fetch_channel(channel_id)
+            except (disnake.NotFound, disnake.Forbidden, disnake.HTTPException):
+                logger.warning("AI moderation log channel is unavailable guild_id=%s channel_id=%s", guild.id, channel_id)
         if not isinstance(channel, (disnake.TextChannel, disnake.NewsChannel)):
+            logger.warning("AI moderation log channel is not configured guild_id=%s", guild.id)
             return
-        embed = disnake.Embed(title="AI moderation decision", color=disnake.Color.orange())
-        embed.add_field(name="User", value=f"<@{decision.user_id}>", inline=True)
-        embed.add_field(name="Risk", value=f"{decision.risk_score:.2f}", inline=True)
-        embed.add_field(name="Action", value=decision.action, inline=True)
-        embed.add_field(name="Labels", value=", ".join(decision.labels) or decision.primary_label, inline=False)
-        embed.set_footer(text=f"message={decision.message_id} event={decision.event_id} status={status}")
-        await channel.send(embed=embed)
+        content = request.raw_text.strip() or ("[attachment]" if request.has_attachments else "[empty message]")
+        content = content[:1_000]
+        jump_url = f"https://discord.com/channels/{guild.id}/{request.channel_id}/{request.message_id}"
+        action_icon, action_title, color = self._action_presentation(decision.action)
+        proposed = decision.proposed_action or decision.action
+        _, proposed_title, _ = self._action_presentation(proposed)
+        labels = ", ".join(label.replace("_", " ").title() for label in (decision.labels or (decision.primary_label,)))
+        execution_context = "Shadow mode — recommendation only" if decision.dry_run else "Decision recorded"
+        reply_text = request.metadata.get("reply_context_text")
+        reply_author_id = request.metadata.get("reply_context_author_id")
+        # Match the compact visual hierarchy used by the rest of OmniBot's
+        # activity logs: the first row answers who/what/how severe, with only
+        # the extra context that a moderator needs beneath it.
+        builder = (
+            EmbedBuilder(color=color)
+            .set_title("AI moderation decision")
+            .add_field("Member", f"<@{decision.user_id}>", inline=True)
+            .add_field("Risk", f"{decision.risk_score:.0f} / 100", inline=True)
+            .add_field("Decision", f"{action_icon} {action_title}", inline=True)
+        )
+        if proposed != decision.action:
+            builder.add_field("AI recommendation", proposed_title, inline=False)
+        is_reply = isinstance(reply_text, str) and bool(reply_text)
+        if is_reply:
+            # Field values have a 1,024-character Discord limit. Reply context
+            # is capped at 1,000 characters at collection time, so the full
+            # original message fits here with quote formatting intact. Keeping
+            # author and ID in the value makes the message/answer pair easier
+            # to scan than an overloaded field heading.
+            author = f"<@{reply_author_id}>" if reply_author_id else "unknown member"
+            author_id = str(reply_author_id) if reply_author_id else "unknown"
+            message_header = f"**Being answered:** {author} | ID: `{author_id}`"
+            max_primary_text = 1_024 - len(message_header) - len("\n> ")
+            builder.add_field("Message", f"{message_header}\n> {reply_text[:max_primary_text]}", inline=False)
+            if len(reply_text) > max_primary_text:
+                # Discord limits each embed field to 1,024 characters. A
+                # second field preserves the complete referenced message.
+                builder.add_field("Message (continued)", f"> {reply_text[max_primary_text:]}", inline=False)
+        elif request.reply_to_message_id:
+            original_url = f"https://discord.com/channels/{guild.id}/{request.channel_id}/{request.reply_to_message_id}"
+            builder.add_field("Message", f"[Open message being answered]({original_url})", inline=False)
+        embed = (
+            builder
+            .add_field("Answer" if is_reply else "Message", f"> {content}", inline=False)
+            .add_field("Classification", labels, inline=False)
+            .set_footer(f"{execution_context} • {status.title()} • {decision.latency_ms} ms")
+            .build()
+        )
+        try:
+            await channel.send(embed=embed)
+        except (disnake.Forbidden, disnake.HTTPException):
+            logger.exception("Could not send AI moderation embed guild_id=%s channel_id=%s", guild.id, channel.id)
+
+    @staticmethod
+    def _action_presentation(action: str) -> tuple[str, str, int]:
+        """Translate internal actions into compact, moderator-friendly status copy."""
+        presentation = {
+            "IGNORE": ("✅", "No action needed", DEFAULT_COLORS["success"]),
+            "LOG": ("📝", "Logged for visibility", DEFAULT_COLORS["info"]),
+            "REVIEW": ("🔎", "Review requested", DEFAULT_COLORS["warn"]),
+            "WARN": ("⚠️", "Warning issued", DEFAULT_COLORS["warn"]),
+            "DELETE": ("🗑️", "Message deleted", DEFAULT_COLORS["moderation"]),
+            "DELETE_WARN": ("🛡️", "Message deleted and warning issued", DEFAULT_COLORS["moderation"]),
+            "TIMEOUT": ("⏳", "Member timed out", DEFAULT_COLORS["moderation"]),
+            "KICK": ("👢", "Member removed", DEFAULT_COLORS["moderation"]),
+            "BAN": ("🔨", "Member banned", DEFAULT_COLORS["moderation"]),
+        }
+        return presentation.get(action.upper(), ("ℹ️", action.replace("_", " ").title(), DEFAULT_COLORS["info"]))
+
+    async def _recent_author_messages(self, message: disnake.Message) -> tuple[tuple[str, ...], tuple[datetime, ...]]:
+        """Return only the author's preceding messages: this is the flood context, not classifier text."""
+        recent: list[str] = []
+        timestamps: list[datetime] = []
+        try:
+            async for item in message.channel.history(limit=20, before=message, oldest_first=False):
+                if item.author.id != message.author.id:
+                    continue
+                recent.append(item.content[:1_000])
+                timestamps.append(item.created_at)
+        except (disnake.Forbidden, disnake.HTTPException):
+            logger.debug("Could not load message history message_id=%s", message.id)
+        return tuple(recent), tuple(timestamps)
+
+    async def _reply_context(self, message: disnake.Message) -> dict[str, object]:
+        """Return reply context as API-safe scalar metadata.
+
+        The AI API deliberately accepts only scalar metadata values. A nested
+        ``reply_context`` object caused reply messages to be rejected with 422,
+        so the Discord edge adapter flattens the same information here.
+        """
+        if message.reference is None or message.reference.message_id is None:
+            return {}
+        try:
+            referenced = message.reference.resolved
+            if not isinstance(referenced, disnake.Message):
+                referenced = await message.channel.fetch_message(message.reference.message_id)
+            return {
+                "reply_context_message_id": str(referenced.id),
+                "reply_context_author_id": str(referenced.author.id),
+                "reply_context_text": referenced.content[:1_000],
+            }
+        except (disnake.NotFound, disnake.Forbidden, disnake.HTTPException):
+            return {
+                "reply_context_message_id": str(message.reference.message_id),
+                "reply_context_unavailable": True,
+            }

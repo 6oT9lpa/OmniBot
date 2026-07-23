@@ -3,7 +3,8 @@ from disnake.ext import commands, tasks
 from datetime import datetime, timezone
 from typing import Optional
 
-from application.services import AuditLogService, LoggingService
+from application.services import AuditLogService, LoggingService, PunishmentEventRecorder
+from application.services.discord_message_content import DiscordMessageContentNormalizer
 from core.domain.value_objects import EventType
 from infrastructure.logging import get_logger
 
@@ -11,10 +12,20 @@ logger = get_logger(__name__)
 
 
 class LoggingCog(commands.Cog):
-    def __init__(self, logging_service: LoggingService, audit_log_service: AuditLogService):
+    def __init__(self, bot: commands.Bot, logging_service: LoggingService, audit_log_service: AuditLogService, punishment_recorder: PunishmentEventRecorder):
         self._logging_service = logging_service
         self._audit_log_service = audit_log_service
-        self._bot: Optional[commands.Bot] = None
+        self._punishment_recorder = punishment_recorder
+        self._bot = bot
+        self._content_normalizer = DiscordMessageContentNormalizer()
+        # Gateway deletion events do not identify the actor. AI actions register
+        # their message IDs before calling Discord so their logs stay accurate
+        # without waiting for an eventually-consistent audit-log entry.
+        self._bot_deleted_message_ids: set[int] = set()
+
+    def register_bot_message_deletion(self, message_id: int) -> None:
+        """Mark a deletion initiated by OmniBot for the next gateway event."""
+        self._bot_deleted_message_ids.add(message_id)
 
     def cog_load(self):
         self.cleanup_retention.change_interval(
@@ -42,6 +53,8 @@ class LoggingCog(commands.Cog):
     async def on_message_edit(self, before: disnake.Message, after: disnake.Message):
         if not getattr(after, "guild", None) or not getattr(before, "guild", None) or before.author.bot:
             return
+        if not self._content_normalizer.changed(before, after):
+            return
         await self._logging_service.log_message_edit(before, after)
 
     @commands.Cog.listener()
@@ -49,26 +62,33 @@ class LoggingCog(commands.Cog):
         if not message.guild or message.author.bot:
             return
 
-        deleted_by = None
+        deleted_by = self._bot.user if message.id in self._bot_deleted_message_ids else None
+        self._bot_deleted_message_ids.discard(message.id)
 
-        try:
-            async for entry in message.guild.audit_logs(
-                limit=10,
-                action=disnake.AuditLogAction.message_delete
-            ):
-                if entry.target.id != message.author.id:
-                    continue
+        if deleted_by is None:
+            try:
+                async for entry in message.guild.audit_logs(
+                    limit=10,
+                    action=disnake.AuditLogAction.message_delete
+                ):
+                    if entry.target.id != message.author.id:
+                        continue
 
-                if (
-                    datetime.now(timezone.utc) - entry.created_at
-                ).total_seconds() > 5:
-                    continue
+                    if (
+                        datetime.now(timezone.utc) - entry.created_at
+                    ).total_seconds() > 5:
+                        continue
 
-                deleted_by = entry.user
-                break
+                    deleted_by = entry.user
+                    break
 
-        except Exception as e:
-            logger.warning("Failed to get audit log for message delete: %s", e)
+            except Exception as e:
+                logger.warning("Failed to get audit log for message delete: %s", e)
+
+        # Discord creates no audit-log record when someone deletes their own
+        # message. In that case the message author is the only reliable actor.
+        if deleted_by is None:
+            deleted_by = message.author
 
         await self._logging_service.log_message_delete(
             message,
@@ -209,6 +229,7 @@ class LoggingCog(commands.Cog):
                     reason=entry.reason or "Не указана",
                     guild_id=guild_id,
                 )
+                await self._record_ban(entry, target, moderator)
 
         elif action == disnake.AuditLogAction.unban:
             target = entry.target
@@ -251,6 +272,7 @@ class LoggingCog(commands.Cog):
                             duration_seconds,
                             entry.reason or "Таймаут через аудит-лог",
                         )
+                        await self._record_timeout(entry, target, duration_seconds, after_val)
 
                     elif before_val is not None and after_val is None:
                         await self._logging_service.log_audit_unmute(
@@ -262,6 +284,32 @@ class LoggingCog(commands.Cog):
                     elif before_val is not None and after_val is not None and before_val != after_val:
                         logger.debug("Timeout duration updated for %s: %s -> %s", target.id, before_val, after_val)
                     break 
+
+    async def _record_ban(self, entry: disnake.AuditLogEntry, target: disnake.User, moderator: disnake.User | None) -> None:
+        try:
+            await self._punishment_recorder.record_ban(
+                guild_id=entry.guild.id,
+                user_id=target.id,
+                moderator_id=getattr(moderator, "id", 0),
+                audit_entry_id=entry.id,
+                reason=entry.reason or "Не указана",
+            )
+        except Exception:
+            logger.exception("Failed to record ban punishment guild_id=%s audit_entry_id=%s", entry.guild.id, entry.id)
+
+    async def _record_timeout(self, entry: disnake.AuditLogEntry, target: disnake.Member, duration_seconds: int, expires_at: datetime) -> None:
+        try:
+            await self._punishment_recorder.record_timeout(
+                guild_id=entry.guild.id,
+                user_id=target.id,
+                moderator_id=getattr(entry.user, "id", 0),
+                audit_entry_id=entry.id,
+                reason=entry.reason or "Таймаут через аудит-лог",
+                duration_seconds=duration_seconds,
+                expires_at=expires_at,
+            )
+        except Exception:
+            logger.exception("Failed to record timeout punishment guild_id=%s audit_entry_id=%s", entry.guild.id, entry.id)
 
     async def _get_audit_log_actor(
         self,
