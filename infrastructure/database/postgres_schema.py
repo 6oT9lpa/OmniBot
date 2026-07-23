@@ -140,14 +140,37 @@ class PostgresSchema:
                 user_id BIGINT NOT NULL,
                 risk_score DOUBLE PRECISION NOT NULL,
                 decision_action TEXT NOT NULL,
+                proposed_action TEXT,
                 primary_label TEXT NOT NULL,
                 labels_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                confidence DOUBLE PRECISION NOT NULL DEFAULT 0,
+                latency_ms INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (guild_id, message_id)
             )
             """,
             "CREATE INDEX IF NOT EXISTS idx_ai_moderation_events_guild_created ON ai_moderation_events(guild_id, created_at DESC)",
+            """
+            CREATE TABLE IF NOT EXISTS ai_moderation_role_restorations (
+                guild_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
+                role_ids_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                restore_at TIMESTAMP NOT NULL,
+                restored_at TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (guild_id, user_id)
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_ai_role_restorations_due ON ai_moderation_role_restorations(restore_at) WHERE restored_at IS NULL",
+            """
+            CREATE TABLE IF NOT EXISTS ai_moderation_metrics_access (
+                guild_id BIGINT PRIMARY KEY,
+                granted_by BIGINT NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
             """
             CREATE TABLE IF NOT EXISTS user_stats (
                 user_id BIGINT NOT NULL,

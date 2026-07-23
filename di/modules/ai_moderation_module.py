@@ -4,6 +4,7 @@ from disnake.ext import commands
 
 from application.services.ai_moderation_queue import AiModerationQueue
 from application.services.ai_moderation_settings_service import AiModerationSettingsService
+from application.services.user_moderation_context_builder import UserModerationContextBuilder
 from infrastructure.ai.ai_moderator_api_client import AiModeratorApiClient
 from infrastructure.logging import get_logger
 from presentation.cogs.ai_moderation_cog import AiModerationCog
@@ -25,13 +26,25 @@ class AiModerationModule:
             return None
         settings_service = await self._container.get_ai_moderation_settings_service()
         channel_service = await self._container.get_channel_service()
+        context_builder = UserModerationContextBuilder(
+            await self._container.get_punishment_repository(),
+            await self._container.get_ai_moderation_repository(),
+        )
         client = AiModeratorApiClient(
             self._container.config.ai_moderator_api_url,
             api_key.get_secret_value(),
             self._container.config.ai_moderator_request_timeout_seconds,
         )
         queue = AiModerationQueue(client, self._container.config.ai_moderator_worker_count, self._container.config.ai_moderator_queue_size, self._handle_decision)
-        self._cog = AiModerationCog(bot, settings_service, channel_service, queue)
+        self._cog = AiModerationCog(
+            bot,
+            settings_service,
+            channel_service,
+            queue,
+            context_builder,
+            await self._container.get_punishment_repository(),
+            await self._container.get_ai_moderation_repository(),
+        )
         return self._cog
 
     async def _handle_decision(self, request, decision) -> None:

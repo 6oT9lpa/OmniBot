@@ -14,6 +14,7 @@ class BotConfig(BaseSettings):
     # Discord
     discord_token: SecretStr
     discord_proxy_url: Optional[str] = None
+    discord_owner_id: int = 762514681209946122
 
     # Database
     database_url: str

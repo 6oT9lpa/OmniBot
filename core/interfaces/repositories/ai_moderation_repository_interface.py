@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Mapping
+from datetime import datetime
 
 
 class AiModerationRepositoryInterface(ABC):
@@ -19,4 +20,16 @@ class AiModerationRepositoryInterface(ABC):
     async def save_policy(self, guild_id: int, policy: Mapping[str, object]) -> None: ...
 
     @abstractmethod
-    async def save_event(self, guild_id: int, channel_id: int, message_id: int, user_id: int, risk_score: float, action: str, primary_label: str, labels: tuple[str, ...], status: str) -> None: ...
+    async def save_event(self, guild_id: int, channel_id: int, message_id: int, user_id: int, risk_score: float, action: str, proposed_action: str | None, primary_label: str, labels: tuple[str, ...], confidence: float, latency_ms: int, status: str) -> None: ...
+
+    @abstractmethod
+    async def count_ai_deleted_messages(self, guild_id: int, user_id: int, since: datetime) -> int: ...
+
+    @abstractmethod
+    async def schedule_role_restoration(self, guild_id: int, user_id: int, role_ids: tuple[int, ...], restore_at: datetime) -> None: ...
+
+    @abstractmethod
+    async def list_due_role_restorations(self) -> list[dict[str, object]]: ...
+
+    @abstractmethod
+    async def mark_roles_restored(self, guild_id: int, user_id: int) -> None: ...

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from application.dto.ai_moderation_request import AiModerationRequest
+from application.dto.user_moderation_context import UserModerationContext, UserPunishmentStatistics
 from infrastructure.ai.ai_moderator_api_client import AiModeratorApiClient
 
 
@@ -26,3 +27,25 @@ def test_ai_moderator_payload_serializes_discord_ids_as_strings() -> None:
     assert payload["message_id"] == "1525175773722579145"
     assert payload["reply_to_message_id"] == "1525175773722579144"
     assert payload["mention_count"] == 2
+
+
+def test_ai_moderator_payload_includes_validated_user_context() -> None:
+    client = AiModeratorApiClient("http://127.0.0.1:8000", "key", 1)
+    payload = client._moderation_payload(
+        AiModerationRequest(
+            guild_id=1,
+            channel_id=2,
+            user_id=3,
+            message_id=4,
+            raw_text="message",
+            created_at=datetime.now(timezone.utc),
+            event_type="UPDATE",
+            user_context=UserModerationContext(
+                account_age_days=100,
+                guild_membership_days=10,
+                punishments=UserPunishmentStatistics(window_days=30, total_in_window=2),
+            ),
+        )
+    )
+    assert payload["event_type"] == "UPDATE"
+    assert payload["user_context"]["punishments"]["total_in_window"] == 2

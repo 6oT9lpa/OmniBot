@@ -1,9 +1,10 @@
 from collections.abc import Mapping
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from core.domain.ai_moderation_action import AiModerationAction
 from core.domain.ai_moderation_label_policy import AiModerationLabelPolicy
+from core.domain.ai_moderation_enforcement_mode import AiModerationEnforcementMode
 
 
 class AiModerationGuildPolicy(BaseModel):
@@ -14,6 +15,46 @@ class AiModerationGuildPolicy(BaseModel):
     labels: dict[str, AiModerationLabelPolicy] = Field(default_factory=dict, max_length=32)
     blacklist_action: AiModerationAction = AiModerationAction.DELETE_WARN
     unapproved_domain_action: AiModerationAction = AiModerationAction.REVIEW
+    context_window_days: int = Field(default=30, ge=1, le=3650)
+    repeat_offender_threshold: int = Field(default=3, ge=1, le=1000)
+    repeat_offender_action: AiModerationAction = AiModerationAction.TIMEOUT
+    enforcement_mode: AiModerationEnforcementMode = AiModerationEnforcementMode.SHADOW
+    limited_min_confidence: float = Field(default=0.95, ge=0.0, le=1.0)
+    limited_hard_rule_labels: tuple[str, ...] = ("INVITE", "SCAM", "IMAGE_SCAM")
+    beta_enforcement_acknowledged: bool = False
+    allow_automated_timeout: bool = False
+    allow_automated_kick: bool = False
+    allow_automated_ban: bool = False
+
+    @field_validator("limited_hard_rule_labels")
+    @classmethod
+    def normalize_hard_rule_labels(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        normalized = tuple(dict.fromkeys(value.strip().upper() for value in values if value.strip()))
+        if not normalized:
+            raise ValueError("limited_hard_rule_labels must not be empty")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_elevated_actions(self) -> "AiModerationGuildPolicy":
+        """Validate execution switches without rejecting safe recommendations.
+
+        Label action bounds are recommendations used by the decision engine. In
+        Shadow and Limited modes those bounds must be retained for review and
+        analytics, even if they mention a high-impact action. The policy
+        enforcer, rather than schema loading, prevents their execution.
+        """
+        required_switches = {
+            AiModerationAction.TIMEOUT: self.allow_automated_timeout,
+            AiModerationAction.KICK: self.allow_automated_kick,
+            AiModerationAction.BAN: self.allow_automated_ban,
+        }
+        # The switches are meaningful only for Elevated mode. A high action in
+        # a label remains safe outside that mode because it is capped later by
+        # AiModerationPolicyEnforcer before Discord actions are attempted.
+        if self.enforcement_mode == AiModerationEnforcementMode.ELEVATED and not self.beta_enforcement_acknowledged:
+            if any(required_switches.values()):
+                raise ValueError("Elevated execution switches require beta acknowledgement")
+        return self
 
     @field_validator("blacklist_words", "allowed_domains")
     @classmethod

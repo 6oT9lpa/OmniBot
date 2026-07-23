@@ -1,3 +1,10 @@
+"""Translate an AI recommendation into the action permitted by guild policy.
+
+This is intentionally the only layer that can turn a recommendation from the
+AI service into an executable Discord action.  It keeps model inference,
+server-specific rules and enforcement safety boundaries separate.
+"""
+
 from __future__ import annotations
 
 import re
@@ -9,12 +16,14 @@ from application.dto.ai_moderation_request import AiModerationRequest
 from core.domain.ai_moderation_action import AiModerationAction
 from core.domain.ai_moderation_guild_policy import AiModerationGuildPolicy
 from core.domain.ai_moderation_label_policy import AiModerationLabelPolicy
+from core.domain.ai_moderation_enforcement_mode import AiModerationEnforcementMode
 from infrastructure.logging import get_logger
 
 logger = get_logger(__name__)
 
 
 class AiModerationPolicyEnforcer:
+    """Apply label rules, hard-rule evidence and enforcement-mode guardrails."""
     _ACTION_RANK = {
         AiModerationAction.IGNORE: 0,
         AiModerationAction.LOG: 1,
@@ -33,17 +42,27 @@ class AiModerationPolicyEnforcer:
         decision: AiModerationDecision,
         raw_policy: Mapping[str, object],
     ) -> AiModerationDecision:
+        """Return a decision with a preserved proposal and a safe execution plan.
+
+        The returned ``proposed_action`` is useful for Shadow Mode metrics;
+        ``action`` is the only value the Discord cog is allowed to execute.
+        """
         policy = AiModerationGuildPolicy.model_validate(raw_policy)
         configured_action = self._configured_action(policy, decision)
         blacklist_action = self._blacklist_action(policy, request.raw_text)
         domain_action = self._unapproved_domain_action(policy, request.raw_text)
+        # User history informs the upstream decision context. This layer must not
+        # manufacture a stronger punishment from a single classifier response.
+        history_action = None
         action = max(
-            (candidate for candidate in (configured_action, blacklist_action, domain_action) if candidate is not None),
+            (candidate for candidate in (configured_action, blacklist_action, domain_action, history_action) if candidate is not None),
             key=lambda candidate: self._ACTION_RANK[candidate],
             default=AiModerationAction(decision.action),
         )
         primary_label = "BLACKLIST" if blacklist_action is not None else decision.primary_label
         labels = decision.labels if blacklist_action is None else tuple(dict.fromkeys((*decision.labels, "BLACKLIST")))
+        proposed_action = action
+        action = self._limit_enforcement(proposed_action, decision, policy)
         execution_plan = self._execution_plan(action)
         if action.value == decision.action and primary_label == decision.primary_label and execution_plan == decision.execution_plan:
             return decision
@@ -56,11 +75,53 @@ class AiModerationPolicyEnforcer:
         return decision.model_copy(
             update={
                 "action": action.value,
+                "proposed_action": proposed_action.value,
                 "primary_label": primary_label,
                 "labels": labels,
                 "execution_plan": execution_plan,
             }
         )
+
+    def _limit_enforcement(
+        self,
+        proposed_action: AiModerationAction,
+        decision: AiModerationDecision,
+        policy: AiModerationGuildPolicy,
+    ) -> AiModerationAction:
+        if proposed_action in {AiModerationAction.IGNORE, AiModerationAction.LOG, AiModerationAction.REVIEW}:
+            return proposed_action
+        if policy.enforcement_mode == AiModerationEnforcementMode.SHADOW:
+            logger.info("Shadow mode suppressed proposed action message_id=%s action=%s", decision.message_id, proposed_action.value)
+            return AiModerationAction.REVIEW
+        if policy.enforcement_mode == AiModerationEnforcementMode.LIMITED:
+            return self._limited_action(proposed_action, decision, policy)
+        return self._elevated_action(proposed_action, policy)
+
+    def _limited_action(
+        self,
+        proposed_action: AiModerationAction,
+        decision: AiModerationDecision,
+        policy: AiModerationGuildPolicy,
+    ) -> AiModerationAction:
+        hard_rule_match = bool(set(label.upper() for label in decision.labels) & set(policy.limited_hard_rule_labels)) and bool(decision.rule_matches)
+        is_high_confidence = decision.confidence >= policy.limited_min_confidence
+        if proposed_action in {AiModerationAction.DELETE, AiModerationAction.DELETE_WARN} and hard_rule_match and is_high_confidence:
+            return proposed_action
+        if proposed_action in {AiModerationAction.WARN, AiModerationAction.DELETE, AiModerationAction.DELETE_WARN}:
+            return AiModerationAction.WARN
+        return AiModerationAction.REVIEW
+
+    def _elevated_action(self, proposed_action: AiModerationAction, policy: AiModerationGuildPolicy) -> AiModerationAction:
+        if not policy.beta_enforcement_acknowledged:
+            return AiModerationAction.REVIEW
+        switches = {
+            AiModerationAction.TIMEOUT: policy.allow_automated_timeout,
+            AiModerationAction.KICK: policy.allow_automated_kick,
+            AiModerationAction.BAN: policy.allow_automated_ban,
+        }
+        if proposed_action in switches and not switches[proposed_action]:
+            return AiModerationAction.REVIEW
+        return proposed_action
 
     def validate(self, raw_policy: Mapping[str, object]) -> dict[str, object]:
         return AiModerationGuildPolicy.model_validate(raw_policy).model_dump(mode="json")
@@ -102,10 +163,20 @@ class AiModerationPolicyEnforcer:
             return policy.unapproved_domain_action
         return None
 
+    def _repeat_offender_action(self, policy: AiModerationGuildPolicy, request: AiModerationRequest, decision: AiModerationDecision) -> AiModerationAction | None:
+        context = request.user_context
+        if context is None or AiModerationAction(decision.action) in {AiModerationAction.IGNORE, AiModerationAction.LOG}:
+            return None
+        return policy.repeat_offender_action if context.punishments.total_in_window >= policy.repeat_offender_threshold else None
+
     def _is_allowed_domain(self, domain: str, allowed_domains: tuple[str, ...]) -> bool:
         return any(domain == allowed or domain.endswith(f".{allowed}") for allowed in allowed_domains)
 
     def _execution_plan(self, action: AiModerationAction) -> tuple[str, ...]:
         if action == AiModerationAction.DELETE_WARN:
             return (AiModerationAction.DELETE.value, AiModerationAction.WARN.value)
+        if action in {AiModerationAction.TIMEOUT, AiModerationAction.KICK, AiModerationAction.BAN}:
+            # A high-impact moderation action must not leave the violating
+            # content visible while the member restriction takes effect.
+            return (AiModerationAction.DELETE.value, action.value)
         return (action.value,)

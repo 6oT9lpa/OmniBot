@@ -42,9 +42,11 @@ class PunishmentRepositoryInterface(ABC):
         punishment_type: PunishmentType,
         reason: str,
         *,
+        guild_id: int,
         duration: Optional[int] = None,
         expires_at: Optional[datetime] = None,
         message_id: Optional[int] = None,
+        source: str = "HUMAN",
     ) -> int:
         """Add new punishment"""
         pass

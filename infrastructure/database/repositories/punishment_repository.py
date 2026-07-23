@@ -116,28 +116,34 @@ class PunishmentRepository(PunishmentRepositoryInterface, BaseRepository):
         punishment_type: PunishmentType,
         reason: str,
         *,
+        guild_id: int,
         duration: Optional[int] = None,
         expires_at: Optional[datetime] = None,
         message_id: Optional[int] = None,
+        source: str = "HUMAN",
     ) -> int:
-        guild_id = 0
-        if message_id is not None:
-            panel = await self.fetch_one(
-                "SELECT guild_id FROM role_panel_messages WHERE message_id = ?",
-                (message_id,),
-            )
-            guild_id = panel.get("guild_id", 0) if panel else 0
-        return await self.add(
-            PunishmentDTO(
-                guild_id=guild_id,
-                user_id=user_id,
-                moderator_id=moderator_id,
-                type=punishment_type,
-                reason=reason,
-                duration_seconds=duration,
-                expires_at=expires_at,
-            )
+        if guild_id <= 0:
+            raise ValueError("guild_id must be positive")
+        normalized_source = source.upper()
+        if normalized_source not in {"AI_MODERATOR", "HUMAN", "EXTERNAL"}:
+            raise ValueError("source must be AI_MODERATOR, HUMAN or EXTERNAL")
+        await self.execute_write(
+            """
+            INSERT INTO punishments (guild_id, user_id, moderator_id, type, reason, duration_seconds, expires_at, message_id, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (guild_id, message_id, type, source) DO NOTHING
+            """,
+            (guild_id, user_id, moderator_id, punishment_type.value, reason, duration, expires_at, message_id, normalized_source),
         )
+        message_clause = "message_id = ?" if message_id is not None else "message_id IS NULL"
+        params = (guild_id, message_id, punishment_type.value, normalized_source) if message_id is not None else (guild_id, punishment_type.value, normalized_source)
+        row = await self.fetch_one(
+            f"SELECT id FROM punishments WHERE guild_id = ? AND {message_clause} AND type = ? AND source = ? ORDER BY id DESC LIMIT 1",
+            params,
+        )
+        if row is None:
+            raise RuntimeError("punishment record was not persisted")
+        return int(row["id"])
 
     async def get_active_punishments(
         self,

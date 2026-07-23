@@ -4,7 +4,10 @@ import pytest
 
 from application.dto.ai_moderation_decision import AiModerationDecision
 from application.dto.ai_moderation_request import AiModerationRequest
+from application.dto.user_moderation_context import UserModerationContext, UserPunishmentStatistics
 from application.services.ai_moderation_policy_enforcer import AiModerationPolicyEnforcer
+from core.domain.ai_moderation_action import AiModerationAction
+from core.domain.default_ai_moderation_policy import default_ai_moderation_policy
 
 
 def test_policy_enforcer_clamps_label_action_and_respects_risk_threshold() -> None:
@@ -27,7 +30,7 @@ def test_policy_enforcer_blacklist_overrides_safe_ai_decision() -> None:
     adjusted = enforcer.apply(
         _request("contains forbidden-term here"),
         _decision(action="IGNORE", risk_score=0, labels=("SAFE",)),
-        {"blacklist_words": ["forbidden-term"]},
+        {"enforcement_mode": "ELEVATED", "beta_enforcement_acknowledged": True, "blacklist_words": ["forbidden-term"]},
     )
 
     assert adjusted.action == "DELETE_WARN"
@@ -51,6 +54,74 @@ def test_policy_enforcer_rejects_inverted_action_range() -> None:
 
     with pytest.raises(ValueError, match="min_action"):
         enforcer.validate({"labels": {"TOXIC": {"min_action": "BAN", "max_action": "LOG"}}})
+
+
+def test_policy_enforcer_does_not_escalate_single_classifier_decision_from_history() -> None:
+    enforcer = AiModerationPolicyEnforcer()
+    request = _request("ordinary message").model_copy(
+        update={
+            "user_context": UserModerationContext(
+                punishments=UserPunishmentStatistics(window_days=30, total_in_window=3)
+            )
+        }
+    )
+
+    adjusted = enforcer.apply(
+        request,
+        _decision(action="WARN", risk_score=1, labels=("SAFE",)),
+        {"repeat_offender_threshold": 3, "repeat_offender_action": "TIMEOUT"},
+    )
+
+    assert adjusted.action == "REVIEW"
+
+
+def test_shadow_mode_suppresses_proposed_delete() -> None:
+    adjusted = AiModerationPolicyEnforcer().apply(
+        _request("message"),
+        _decision(action="DELETE", risk_score=90, labels=("INVITE",)),
+        {},
+    )
+    assert adjusted.action == "REVIEW"
+
+
+def test_limited_mode_deletes_only_high_confidence_hard_rule() -> None:
+    decision = _decision(action="DELETE", risk_score=90, labels=("INVITE",)).model_copy(
+        update={"confidence": 0.99, "rule_matches": ("discord_invite",)}
+    )
+    adjusted = AiModerationPolicyEnforcer().apply(
+        _request("discord.gg/example"), decision, {"enforcement_mode": "LIMITED"}
+    )
+    assert adjusted.action == "DELETE"
+
+
+def test_limited_mode_warns_when_hard_rule_evidence_or_confidence_is_missing() -> None:
+    adjusted = AiModerationPolicyEnforcer().apply(
+        _request("message"),
+        _decision(action="DELETE", risk_score=90, labels=("INVITE",)),
+        {"enforcement_mode": "LIMITED"},
+    )
+    assert adjusted.action == "WARN"
+
+
+@pytest.mark.parametrize("action", ("TIMEOUT", "KICK", "BAN"))
+def test_high_impact_actions_delete_the_source_message_first(action: str) -> None:
+    enforcer = AiModerationPolicyEnforcer()
+
+    assert enforcer._execution_plan(AiModerationAction(action)) == ("DELETE", action)
+
+
+def test_elevated_flood_rule_deletes_message_and_times_out_member() -> None:
+    policy = default_ai_moderation_policy().model_copy(
+        update={"enforcement_mode": "ELEVATED", "beta_enforcement_acknowledged": True, "allow_automated_timeout": True}
+    )
+    adjusted = AiModerationPolicyEnforcer().apply(
+        _request("same message repeated"),
+        _decision(action="LOG", risk_score=21, labels=("FLOOD",)),
+        policy.model_dump(mode="json"),
+    )
+
+    assert adjusted.action == "TIMEOUT"
+    assert adjusted.execution_plan == ("DELETE", "TIMEOUT")
 
 
 def _request(raw_text: str) -> AiModerationRequest:
