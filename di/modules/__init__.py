@@ -7,6 +7,7 @@ from di.modules.stats_module import StatsModule
 from di.modules.voice_module import VoiceModule
 from di.modules.streams_module import StreamsModule
 from di.modules.ai_moderation_module import AiModerationModule
+from di.modules.labeling_module import LabelingModule
 
 __all__ = [
     'GeneralModule',
@@ -18,4 +19,5 @@ __all__ = [
     'VoiceModule',
     'StreamsModule',
     'AiModerationModule',
+    'LabelingModule',
 ]

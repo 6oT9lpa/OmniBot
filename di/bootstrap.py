@@ -14,8 +14,9 @@ from di.modules import (
     RolesModule,
     StatsModule,
     VoiceModule,
-    StreamsModule
-    ,AiModerationModule
+    StreamsModule,
+    AiModerationModule,
+    LabelingModule,
 )
 
 logger = get_logger(__name__)
@@ -39,6 +40,7 @@ class Bootstrap:
         self._member_events_module = None
         self._streams_module = None
         self._ai_moderation_module = None
+        self._labeling_module = None
         self._shutdown_lock = asyncio.Lock()
         self._shutdown_complete = False
 
@@ -75,6 +77,7 @@ class Bootstrap:
             self._member_events_module = MemberEventsModule(self.container)
             self._streams_module = StreamsModule(self.container)
             self._ai_moderation_module = AiModerationModule(self.container)
+            self._labeling_module = LabelingModule(self.container)
 
             # Регистрация всех когов через модули
             await self._register_general_cog()
@@ -86,6 +89,7 @@ class Bootstrap:
             await self._register_moderation_cog()
             await self._register_streams_cog()
             await self._register_ai_moderation_cog()
+            await self._register_labeling_cog()
 
             self._setup_signal_handlers()
 
@@ -207,6 +211,11 @@ class Bootstrap:
         else:
             logger.warning("AI moderation cog is not configured")
 
+    async def _register_labeling_cog(self):
+        cog = await self._labeling_module.get_cog(self.bot)
+        self.bot.add_cog(cog)
+        logger.info("LabelingCog registered")
+
     # ---------- Завершение работы ----------
     async def _shutdown(self):
         async with self._shutdown_lock:
@@ -232,6 +241,8 @@ class Bootstrap:
                 await self._streams_module.shutdown()
             if self._ai_moderation_module:
                 await self._ai_moderation_module.shutdown()
+            if self._labeling_module:
+                await self._labeling_module.shutdown()
 
             if self.bot and not self.bot.is_closed():
                 try:

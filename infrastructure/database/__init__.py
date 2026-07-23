@@ -11,8 +11,10 @@ from infrastructure.database.repositories.welcome_config_repository import Welco
 from infrastructure.database.repositories.server_role_purpose_repository import ServerRolePurposeRepository
 from infrastructure.database.repositories.creator_alert_repository import CreatorAlertRepository
 from infrastructure.database.repositories.ai_moderation_repository import AiModerationRepository
+from infrastructure.database.repositories.labeling_repository import LabelingRepository
 from infrastructure.database.repositories.stats_repository import StatsRepository
 from infrastructure.database.repositories.voice_repository import VoiceRepository
+from infrastructure.database.repositories.member_join_history_repository import MemberJoinHistoryRepository
 from core.domain.channel_purpose import ChannelPurpose
 
 
@@ -33,4 +35,6 @@ __all__ = [
     'ServerRolePurposeRepository',
     'CreatorAlertRepository',
     'AiModerationRepository',
+    'LabelingRepository',
+    'MemberJoinHistoryRepository',
 ]

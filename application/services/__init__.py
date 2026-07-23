@@ -10,6 +10,10 @@ from application.services.voice_service import VoiceService
 from application.services.server_role_purpose_service import ServerRolePurposeService
 from application.services.creator_alert_service import CreatorAlertService
 from application.services.ai_moderation_settings_service import AiModerationSettingsService
+from application.services.labeling_permission_service import LabelingPermissionService
+from application.services.moderation_labeling_service import ModerationLabelingService
+from application.services.punishment_event_recorder import PunishmentEventRecorder
+from application.services.member_join_history_service import MemberJoinHistoryService
 
 
 __all__ = [
@@ -25,4 +29,8 @@ __all__ = [
     'ServerRolePurposeService',
     'CreatorAlertService',
     'AiModerationSettingsService',
+    'LabelingPermissionService',
+    'ModerationLabelingService',
+    'PunishmentEventRecorder',
+    'MemberJoinHistoryService',
 ]

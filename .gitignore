@@ -29,6 +29,7 @@ pythonenv*
 .settings/
 *.sublime-*
 *.iml
+.codebase-memory/
 
 # Discord Bot specific
 .env

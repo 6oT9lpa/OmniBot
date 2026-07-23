@@ -270,11 +270,18 @@ Current features:
 - per-label thresholds and action limits;
 - AI Moderator health signal in Activity Health;
 - selected channel filtering to avoid invalid Discord channel IDs;
+- context-aware requests with account age, current-guild membership time, and guild-scoped moderation history;
+- persisted first/latest observed member joins and rejoin counts, plus idempotent audit-log ban and timeout history;
 - Discord snowflakes are preserved as strings in Activity requests;
 - local/self-hosted API support, including GPU-backed model loading when the server has NVIDIA drivers and CUDA-ready PyTorch;
 - human-admin configuration remains the source of truth for destructive actions.
 
 The AI Moderator does not receive every server message by default. Only channels selected in Activity are covered.
+
+Discord exposes `Member.joined_at` for the current membership, but not a reliable
+first-ever join timestamp before the bot began collecting it. Migration
+`0014_member_join_history` records the first and latest joins observed after it
+is applied; older membership history cannot be reconstructed retrospectively.
 
 ## Data and Storage
 

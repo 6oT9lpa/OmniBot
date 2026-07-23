@@ -16,7 +16,7 @@ from infrastructure.database import (
     VoiceRepository,
     ServerRolePurposeRepository,
     CreatorAlertRepository
-    ,AiModerationRepository
+    ,AiModerationRepository, LabelingRepository, MemberJoinHistoryRepository
 )
 from application.services import (
     RoleService,
@@ -30,7 +30,7 @@ from application.services import (
     StatsService,
     ServerRolePurposeService,
     CreatorAlertService
-    ,AiModerationSettingsService
+    ,AiModerationSettingsService, LabelingPermissionService, ModerationLabelingService, MemberJoinHistoryService
 )
 from core.domain.creator_alert import CreatorPlatform
 from infrastructure.api.kick_client import KickClient
@@ -64,6 +64,7 @@ class Container:
         self._message_log_repo: Optional[MessageLogRepository] = None
         self._guild_event_log_repo: Optional[GuildEventLogRepository] = None
         self._punishment_repo: Optional[PunishmentRepository] = None
+        self._member_join_history_repo: Optional[MemberJoinHistoryRepository] = None
         self._audit_log_service: Optional[AuditLogService] = None
         self._logging_service: Optional[LoggingService] = None
         self._moderation_history_service: Optional[ModerationHistoryService] = None
@@ -71,7 +72,9 @@ class Container:
         self._server_role_purpose_service: Optional[ServerRolePurposeService] = None
         self._creator_alert_service: Optional[CreatorAlertService] = None
         self._ai_moderation_repository: Optional[AiModerationRepository] = None
+        self._labeling_repository: Optional[LabelingRepository] = None
         self._ai_moderation_settings_service: Optional[AiModerationSettingsService] = None
+        self._moderation_labeling_service: Optional[ModerationLabelingService] = None
         self._member_events_module: Optional[MemberEventsModule] = None
         self._logging_module: Optional[LoggingModule] = None
         self._moderation_module: Optional[ModerationModule] = None
@@ -133,6 +136,16 @@ class Container:
             db = await self.get_database()
             self._punishment_repo = PunishmentRepository(db)
         return self._punishment_repo
+
+    async def get_punishment_event_recorder(self):
+        from application.services.punishment_event_recorder import PunishmentEventRecorder
+
+        return PunishmentEventRecorder(await self.get_punishment_repository())
+
+    async def get_member_join_history_service(self) -> MemberJoinHistoryService:
+        if not self._member_join_history_repo:
+            self._member_join_history_repo = MemberJoinHistoryRepository(await self.get_database())
+        return MemberJoinHistoryService(self._member_join_history_repo)
     
     async def get_stats_repository(self) -> StatsRepository:
         if not self._stats_repo:
@@ -162,6 +175,11 @@ class Container:
         if not self._ai_moderation_repository:
             self._ai_moderation_repository = AiModerationRepository(await self.get_database())
         return self._ai_moderation_repository
+
+    async def get_labeling_repository(self) -> LabelingRepository:
+        if not self._labeling_repository:
+            self._labeling_repository = LabelingRepository(await self.get_database())
+        return self._labeling_repository
 
     #=============== Service =====================
 
@@ -221,6 +239,13 @@ class Container:
         if not self._ai_moderation_settings_service:
             self._ai_moderation_settings_service = AiModerationSettingsService(await self.get_ai_moderation_repository())
         return self._ai_moderation_settings_service
+
+    async def get_moderation_labeling_service(self) -> ModerationLabelingService:
+        if not self._moderation_labeling_service:
+            repository = await self.get_labeling_repository()
+            permissions = LabelingPermissionService(repository, self.config.discord_owner_id)
+            self._moderation_labeling_service = ModerationLabelingService(repository, permissions)
+        return self._moderation_labeling_service
 
     async def get_role_service(self) -> RoleService:
         if not self._role_service:

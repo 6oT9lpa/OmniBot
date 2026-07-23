@@ -1,7 +1,7 @@
 # Terms of Service for OmniBot
 
 **Effective Date:** June 18, 2026  
-**Last Updated:** July 10, 2026
+**Last Updated:** July 23, 2026
 
 These Terms of Service govern use of OmniBot, including the Discord bot, slash commands, Discord Activity control panel, Creator Alerts, Dev Blog, logging, statistics, voice rooms, role tools, welcome tools, moderation commands, and AI moderation features.
 
@@ -140,17 +140,30 @@ External services have their own terms and policies.
 
 ## 12. AI Moderation
 
-AI moderation may classify selected-channel messages, return labels and risk scores, and assist moderators or configured policy flows.
+AI moderation may classify selected-channel messages, reply context, and limited recent-message context; return labels, risk scores, confidence, and recommended actions; and assist moderators or configured policy flows.
+
+### 12.1 Enforcement Modes and Beta Features
+
+AI moderation has three server-controlled modes:
+
+- **Shadow** records recommendations only and does not apply automated Discord punishment;
+- **Limited** may apply low-impact actions under configured confidence and hard-rule safeguards;
+- **Elevated** can apply timeout, kick, or ban only after a server administrator accepts the beta acknowledgement and explicitly enables each action.
+
+Automated enforcement is probabilistic. It can produce false positives, false negatives, delayed actions, duplicate logs, or failed actions caused by Discord permissions, role hierarchy, unavailable channels, closed DMs, or external-service errors. Server administrators must test configuration on a test server before enabling Elevated actions on a production server.
+
+When permitted by server policy, an enforcement plan may remove the violating message before a warning, timeout, kick, or ban. A timeout may temporarily remove only manageable administrator-permission roles required for Discord to apply the timeout; recorded eligible roles are returned after the timeout ends when they still exist and remain below the bot's highest role.
 
 Server administrators are responsible for:
 
 - selecting only channels that should be moderated by the AI module;
 - reviewing thresholds and maximum action limits before enabling strict behavior;
+- keeping OmniBot's role above only the roles it is intended to manage;
 - informing members when AI moderation is active;
 - handling appeals, false positives, and false negatives;
 - keeping human staff responsible for final server policy.
 
-AI moderation should not be treated as a final authority. It is an assistive system and may make mistakes.
+AI moderation should not be treated as a final authority. It is an assistive system and may make mistakes. Administrators, not OmniBot, are responsible for their server rules, appeal process, permission setup, and decisions to enable automated enforcement.
 
 ## 13. Availability and Changes
 

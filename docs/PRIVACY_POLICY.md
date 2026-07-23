@@ -1,7 +1,7 @@
 # Privacy Policy for OmniBot
 
 **Effective Date:** June 18, 2026  
-**Last Updated:** July 10, 2026
+**Last Updated:** July 23, 2026
 
 This Privacy Policy explains what data OmniBot processes, why it is processed, how it is stored, and how deletion or access requests can be made.
 
@@ -120,8 +120,14 @@ When AI moderation is enabled and channels are selected in Activity, OmniBot may
 - guild AI moderation policy settings;
 - blacklist words and allowed domains configured by administrators;
 - Discord message ID, guild ID, channel ID, author ID, timestamp, and message text for covered channels;
-- AI Moderator request and response metadata such as labels, confidence, risk score, reason code, decision action, and latency;
-- moderation queue errors and health check results.
+- reply context when a covered message uses Discord's reply feature: referenced message ID, referenced author ID, and referenced message text;
+- a bounded set of recent messages and timestamps from the same author for flood/spam detection;
+- AI Moderator request and response metadata such as labels, confidence, risk score, reason code, proposed and final decision action, execution status, and latency;
+- configured policy values, including enforcement mode, action limits, confidence thresholds, blacklist words, allowed domains, and beta acknowledgement;
+- moderation queue errors, health check results, and audit events needed to diagnose or appeal an action;
+- limited metadata for enforcement notices, such as server ID, channel ID, action type, and message time when a Discord DM warning is sent.
+
+For an automated timeout that requires temporary removal of administrator-permission roles, OmniBot stores only the IDs of roles it removed, the user ID, server ID, and restoration time. This record is used solely to restore eligible roles after the timeout; it is not used for profiling.
 
 The current production design uses a local/self-hosted AI Moderator API. Messages are not sent to a commercial third-party AI API by default. The AI Moderator may use local rules, local ruBERT model inference, policy resolution, and optional fallback components configured by the operator.
 
@@ -155,7 +161,9 @@ Data is used to:
 - publish Creator Alerts and Dev Blog posts;
 - prevent duplicate stream announcements;
 - send selected-channel messages to the local AI Moderator API;
+- evaluate reply and flood/spam context only for selected AI-moderated channels;
 - apply configured AI moderation policy and staff review workflows;
+- send moderation notices to the affected member by Discord DM when an action includes a warning, where Discord permits delivery;
 - maintain audit trails;
 - diagnose errors and improve service stability.
 
@@ -185,6 +193,8 @@ Default retention:
 - cleanup interval: approximately every 6 hours unless changed by configuration;
 - server settings, Activity RBAC, role panels, welcome settings, Creator Alerts, and Dev Blog drafts: kept while the server uses the bot or until changed/deleted;
 - AI moderation settings: kept while the server uses the module or until changed/deleted;
+- AI moderation decision and execution records: retained for moderation review, dataset collection, metric calculation, and configured cleanup periods;
+- temporary administrator-role restoration records: retained until roles are restored or the record is no longer actionable;
 - technical logs: kept until log rotation or manual cleanup.
 
 Some data may be retained longer where needed for security, abuse investigation, backups, legal compliance, or recovery.
@@ -221,6 +231,8 @@ Security measures include:
 - optional proxy configuration via server environment.
 - local AI Moderator API keys stored in server `.env`;
 - AI Moderator access restricted to backend services.
+- policy checks before automated timeout, kick, or ban;
+- role-hierarchy checks before temporary administrator-role removal or restoration.
 
 No system is perfectly secure. Report suspected leaks or vulnerabilities through the contact channel.
 
